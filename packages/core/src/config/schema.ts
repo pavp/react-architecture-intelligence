@@ -3,6 +3,10 @@ import { z } from "zod";
 export const ConfigSchema = z.object({
   configVersion: z.string().default("1"),
   shared: z.object({
+    // Defaults calibrated to the MVP deterministic feature-hash embedding (256-dim), whose
+    // cosine spread is ~0.81 for genuinely-similar components and ~0.01 for unrelated ones —
+    // 0.75 cleanly bisects that gap. Re-derive minCosine + minPropOverlap together when a
+    // learned embedding model replaces the feature-hash one (§2.6 re-embed migration).
     minCosine: z.number().min(0).max(1).default(0.75),
     minPropOverlap: z.number().min(0).max(1).default(0.40),
     minHookOverlap: z.number().min(0).max(1).default(0.70),

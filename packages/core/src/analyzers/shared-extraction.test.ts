@@ -88,3 +88,29 @@ test("is pure: same context -> deeply equal findings (ignoring ulid id)", () => 
   const f2 = sharedExtraction.analyze(ctx(cs)).map((f) => ({ ...f, id: "" }));
   expect(f1).toEqual(f2);
 });
+
+test("divergence guard: rejects an over-divergent cluster (god-component, §4.4)", () => {
+  // all share label+onClick+useTheme (so they cluster) but each adds many unique props,
+  // pushing variancePoints past maxVariance (default 6) → no extraction finding.
+  const cs = [
+    comp("A", ["label", "onClick", "a1", "a2", "a3"], ["useTheme"]),
+    comp("B", ["label", "onClick", "b1", "b2", "b3"], ["useTheme"]),
+    comp("C", ["label", "onClick", "c1", "c2", "c3"], ["useTheme"]),
+  ];
+  // sanity: they DO cluster (shared surface present) but variance (a1..c3 = 9) > maxVariance
+  expect(sharedExtraction.analyze(ctx(cs)).length).toBe(0);
+});
+
+test("opportunity fingerprint survives member churn (§4.5)", () => {
+  // shared shape = {label,onClick} + useTheme; adding a 4th member that keeps that shared
+  // shape must NOT change the structural fingerprint (so a rejection stays applied).
+  const three = [
+    comp("A", ["label", "onClick", "variant"], ["useTheme"]),
+    comp("B", ["label", "onClick", "size"], ["useTheme"]),
+    comp("C", ["label", "onClick", "variant"], ["useTheme"]),
+  ];
+  const four = [...three, comp("D", ["label", "onClick", "color"], ["useTheme"])];
+  const fp3 = sharedExtraction.analyze(ctx(three))[0]!.fingerprint.structural;
+  const fp4 = sharedExtraction.analyze(ctx(four))[0]!.fingerprint.structural;
+  expect(fp4).toBe(fp3); // same shared shape → same identity → reject survives churn
+});

@@ -28,11 +28,16 @@ export function clusterByCosine<T extends VecItem>(items: T[], minCosine: number
   return [...groups.values()];
 }
 
-/** Min pairwise cosine within a cluster — the conservative similarity used by the predicate. */
+/**
+ * Min pairwise cosine within a cluster — the conservative similarity used by the predicate.
+ * A cluster of < 2 has no pair, so return 0 (conservative — a singleton must never trivially
+ * satisfy a `>=` similarity gate by looking maximally similar to itself).
+ */
 export function minClusterCosine(items: VecItem[]): number {
+  if (items.length < 2) return 0;
   let min = 1;
   for (let i = 0; i < items.length; i++)
     for (let j = i + 1; j < items.length; j++)
       min = Math.min(min, cosine(items[i]!.vec, items[j]!.vec));
-  return items.length < 2 ? 1 : min;
+  return min;
 }

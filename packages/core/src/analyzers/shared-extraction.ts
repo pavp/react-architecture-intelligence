@@ -48,7 +48,7 @@ export const sharedExtraction: Analyzer = {
         id: ulid(),
         ruleId: RULE_ID,
         type,
-        fingerprint: opportunityFingerprint(comps, c.shared.minFpCardinality),
+        fingerprint: opportunityFingerprint(comps, c.shared.minFpCardinality, c.shared.outlierFreq),
         analysisVersion: ctx.analysisVersion,
         fpAlgoVersion: FP_ALGO_VERSION,
         producingRunId: ctx.runId,
@@ -123,7 +123,7 @@ function symmetricDiff(lists: string[][]): string[] {
 }
 
 /** Opportunity fingerprint (§4.5): keyed on the SHARED SHAPE, with union-fallback for thin sets. */
-function opportunityFingerprint(comps: ComponentNode[], minCardinality: number) {
+function opportunityFingerprint(comps: ComponentNode[], minCardinality: number, outlierFreq: number) {
   const inter = [
     ...intersectAll(comps.map((c) => c.propNames)).map((p) => "prop:" + p),
     ...intersectAll(comps.map((c) => c.hookCalls)).map((h) => "hook:" + h),
@@ -135,7 +135,7 @@ function opportunityFingerprint(comps: ComponentNode[], minCardinality: number) 
     structural = sha(inter.join("|"));
   } else {
     // union-minus-outliers fallback, tagged so regimes never collide (§4.5, §4-Fix-2)
-    const union = unionMinusOutliers(comps);
+    const union = unionMinusOutliers(comps, outlierFreq);
     structural = sha(union.join("|") + ":union-fallback");
   }
   const nominal = sha(dominantNamePattern(comps));
@@ -143,15 +143,16 @@ function opportunityFingerprint(comps: ComponentNode[], minCardinality: number) 
   return { structural, nominal, positional };
 }
 
-function unionMinusOutliers(comps: ComponentNode[]): string[] {
+/** Keep tokens present in at least `outlierFreq` fraction of the cluster (drops one-off props). */
+function unionMinusOutliers(comps: ComponentNode[], outlierFreq: number): string[] {
   const freq = new Map<string, number>();
   const bump = (t: string) => freq.set(t, (freq.get(t) ?? 0) + 1);
   for (const c of comps) {
     for (const p of c.propNames) bump("prop:" + p);
     for (const h of c.hookCalls) bump("hook:" + h);
   }
-  const half = comps.length / 2;
-  return [...freq.entries()].filter(([, n]) => n >= half).map(([t]) => t).sort();
+  const cutoff = comps.length * outlierFreq;
+  return [...freq.entries()].filter(([, n]) => n >= cutoff).map(([t]) => t).sort();
 }
 
 function dominantNamePattern(comps: ComponentNode[]): string {
