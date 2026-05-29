@@ -24,7 +24,10 @@ export function pass1(file: string, source: string): Pass1Result {
     file, start: node.start, end: node.end, kind, astPath,
   });
 
-  const walkComponent = (name: string, kind: ComponentNode["kind"], node: any, idx: number) => {
+  const walkComponent = (
+    name: string, kind: ComponentNode["kind"], node: any, idx: number,
+    exportKind: ComponentNode["exportKind"],
+  ) => {
     const facts = collectRenderFacts(node);
     components.push({
       id: `${file}#${cid++}`,
@@ -32,7 +35,7 @@ export function pass1(file: string, source: string): Pass1Result {
       span: span(node, "component", `module>decl[${idx}]`),
       kind,
       file,
-      exportKind: "none",
+      exportKind,
       propNames: collectPropNames(node),
       hookCalls: facts.hooks,
       childComponents: facts.children,
@@ -44,20 +47,62 @@ export function pass1(file: string, source: string): Pass1Result {
   const body: any[] = program.body ?? [];
   body.forEach((stmt: any, idx: number) => {
     if (stmt.type === "ImportDeclaration") { imports.push({ from: stmt.source.value }); return; }
-    if (stmt.type === "FunctionDeclaration" && stmt.id && COMPONENT_NAME.test(stmt.id.name)) {
-      walkComponent(stmt.id.name, "fn", stmt, idx);
+
+    // Unwrap inline export wrappers (oxc: ExportNamed/DefaultDeclaration hold the real
+    // node under `.declaration`). Without this, `export function/const/default` are missed.
+    let s: any = stmt;
+    let exportKind: ComponentNode["exportKind"] = "none";
+    if (s.type === "ExportNamedDeclaration" && s.declaration) { exportKind = "named"; s = s.declaration; }
+    else if (s.type === "ExportDefaultDeclaration" && s.declaration) { exportKind = "default"; s = s.declaration; }
+
+    if (s.type === "FunctionDeclaration" && s.id && COMPONENT_NAME.test(s.id.name)) {
+      walkComponent(s.id.name, "fn", s, idx, exportKind);
     }
-    if (stmt.type === "VariableDeclaration") {
-      for (const d of stmt.declarations) {
+    if (s.type === "VariableDeclaration") {
+      for (const d of s.declarations) {
         if (d.id?.type === "Identifier" && COMPONENT_NAME.test(d.id.name) && d.init) {
           const kind = arrowKind(d.init);
-          if (kind) walkComponent(d.id.name, kind, d.init, idx);
+          if (kind) walkComponent(d.id.name, kind, d.init, idx, exportKind);
         }
       }
     }
   });
 
+  // Second pass: correlate SEPARATE export statements to already-declared components by name.
+  //   export default Button;  |  export default memo(Button);  |  export { Button };
+  for (const stmt of body) {
+    if (stmt.type === "ExportDefaultDeclaration" && stmt.declaration) {
+      const name = exportedComponentName(stmt.declaration);
+      if (name) setExportKind(components, name, "default");
+    }
+    if (stmt.type === "ExportNamedDeclaration" && Array.isArray(stmt.specifiers)) {
+      for (const spec of stmt.specifiers) {
+        const name = spec?.local?.name ?? spec?.exported?.name;
+        if (name) setExportKind(components, name, "named");
+      }
+    }
+  }
+
   return { file, components, imports };
+}
+
+/** Name referenced by a default export: `Button`, or `memo(Button)`/`forwardRef(Button)`. */
+function exportedComponentName(decl: any): string | null {
+  if (decl?.type === "Identifier") return decl.name;
+  if (decl?.type === "CallExpression") {
+    const callee = decl.callee?.name;
+    if (callee === "memo" || callee === "forwardRef") {
+      const arg = decl.arguments?.[0];
+      if (arg?.type === "Identifier") return arg.name;
+    }
+  }
+  return null;
+}
+
+function setExportKind(components: ComponentNode[], name: string, kind: ComponentNode["exportKind"]): void {
+  const c = components.find((x) => x.name === name);
+  // don't downgrade an already-detected inline export
+  if (c && c.exportKind === "none") c.exportKind = kind;
 }
 
 function arrowKind(init: any): ComponentNode["kind"] | null {
@@ -72,7 +117,9 @@ function arrowKind(init: any): ComponentNode["kind"] | null {
 function collectPropNames(fnNode: any): string[] {
   const fn = unwrapFn(fnNode);
   // oxc-parser wraps params in a `FormalParameters` node: { items: [{ pattern }] }.
-  const first = firstParamPattern(fn);
+  let first = firstParamPattern(fn);
+  // unwrap default-valued params: `function F({a,b} = {})` → AssignmentPattern.left
+  if (first?.type === "AssignmentPattern") first = first.left;
   if (!first) return [];
   if (first.type === "ObjectPattern") {
     return (first.properties ?? [])
@@ -116,16 +163,16 @@ function collectRenderFacts(fnNode: any): RenderFacts {
   const markers = new Set<string>();
   let conditionals = 0;
 
-  if (fnNode.type === "CallExpression" && fnNode.callee?.name) {
-    if (["memo", "forwardRef", "lazy"].includes(fnNode.callee.name)) markers.add(fnNode.callee.name);
-  }
-
   const visit = (n: any) => {
     if (!n || typeof n !== "object") return;
     if (Array.isArray(n)) { n.forEach(visit); return; }
     switch (n.type) {
       case "CallExpression":
-        if (n.callee?.type === "Identifier" && HOOK_NAME.test(n.callee.name)) hooks.add(n.callee.name);
+        if (n.callee?.type === "Identifier") {
+          if (HOOK_NAME.test(n.callee.name)) hooks.add(n.callee.name);
+          // collect ALL composition wrappers in the chain (memo(forwardRef(...)))
+          if (["memo", "forwardRef", "lazy"].includes(n.callee.name)) markers.add(n.callee.name);
+        }
         break;
       case "JSXOpeningElement": {
         const nm = jsxName(n.name);
