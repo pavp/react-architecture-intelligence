@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+*.log
+.DS_Store
+
+# RAI cache (regenerable, content-hash keyed) — never source-of-truth
+.react-intel/cache.db
+.react-intel/cache.db-*
+.react-intel/*.cache
+
+# committed: .react-intel/memory.db (T4 feedback + T5 weights) — the moat
