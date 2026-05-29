@@ -18,6 +18,7 @@
 6. [Framework-adapter architecture](#6-framework-adapter-architecture)
 7. [MVP roadmap / phasing](#7-mvp-roadmap--phasing)
 8. [Risks / tradeoffs / scalability / performance](#8-risks--tradeoffs--scalability--performance)
+9. [Repository / release engineering](#9-repository--release-engineering)
 
 ---
 
@@ -1153,6 +1154,129 @@ THE ONE-LINE TRUTH:
   then lets Claude reason over it — trading "AI cleverness" for "reproducible correctness +
   memory." The bet: a system that REMEMBERS your decisions and never re-litigates them beats a
   smarter system that forgets.
+```
+
+---
+
+## 9. Repository / release engineering
+
+**Strategy: adopt the [`storywright`](../../../storywright) repo conventions wholesale** — Conventional Commits + commitlint + husky + semantic-release + the same CI/PR-title/release workflow split + PR template + CONTRIBUTING/RELEASING docs. One delta: storywright is a **single npm package**; RAI is a **monorepo publishing multiple packages** (`@rai/core`, `@rai/adapter-*`, `@rai/cli`, `@rai/config`), so the release job is monorepo-aware (see §9.5).
+
+### 9.1 Commit conventions (identical to storywright)
+
+```
+Conventional Commits, enforced two ways:
+  • LOCAL:  husky `commit-msg` hook → `npx --no-install commitlint --edit "$1"`
+  • CI:     pr-title workflow validates the PR title (squash subject = release driver)
+
+commitlint.config.mjs:
+  extends: ["@commitlint/config-conventional"]
+  rules: { subject-case: [0], body-max-line-length: [0], footer-max-line-length: [0] }
+  (relaxed: long bodies + any subject case allowed; type/format still enforced)
+
+Type → release (semantic-release releaseRules):
+  feat → minor · fix|perf|refactor|docs|build → patch
+  ci|chore|test|style → NO release · breaking (feat! / BREAKING CHANGE:) → major
+```
+
+### 9.2 Release automation (semantic-release, push-to-main)
+
+```
+Push to main → release.yml → semantic-release:
+  1. commit-analyzer (conventionalcommits preset, releaseRules above)
+  2. release-notes-generator (emoji sections: ✨ Features · 🐛 Bug Fixes · ⚡ Performance ·
+     ♻️ Refactors · 📝 Docs · 📦 Build; ci/chore/test/style hidden)
+  3. @semantic-release/changelog → CHANGELOG.md
+  4. @semantic-release/npm (publish via the publish job, OIDC — see 9.5)
+  5. @semantic-release/git → commits "chore(release): ${version} [skip ci]" (assets:
+     package.json + CHANGELOG.md; the [skip ci] prevents a release loop)
+  6. @semantic-release/github → GitHub Release with notes
+
+No manual `npm version` / `npm publish`. Maintainers never bump versions by hand.
+```
+
+### 9.3 CI / workflows (3, same split as storywright)
+
+```
+ci.yml         on: pull_request + push (branches-ignore: main)
+               jobs: validate (lint) + test. permissions: contents:read.
+               → adapted for RAI: lint + typecheck + unit/integration tests +
+                 the GOLDEN FIXTURE SUITE (§7.1) + rebuild-equivalence + determinism-replay
+                 checks. These are the §7 phase-exit gates run on every PR.
+
+pr-title.yml   on: pull_request [opened|edited|synchronize|reopened]
+               enforces Conventional Commit PR title (squash subject drives the version).
+               regex: ^(feat|fix|docs|refactor|perf|build|ci|chore|test|style)(\(scope\))?!?: .+
+
+release.yml    on: push [main]; concurrency group:release (serialize — no tag/publish race)
+               job 1 release: PAT (RELEASE_TOKEN, bypasses branch ruleset) → validate + test
+                              → semantic-release → outputs {version, released}
+               job 2 publish: needs release; if released==true; id-token:write (OIDC)
+                              → checkout main (NOT tag — main == released code post-bump)
+                              → version-mismatch guard (refuse to publish wrong tree)
+                              → npm publish (Trusted Publishing, provenance)
+                              → verify-live-on-npm with exponential backoff (no phantom release)
+```
+
+### 9.4 PR template + governance docs
+
+```
+.github/PULL_REQUEST_TEMPLATE.md  — Conventional-title reminder + sections:
+   Summary · Packages/modules touched · Output/contract impact (checkbox: did a Finding
+   shape / MCP tool schema / fingerprint algorithm change?) · Validation (manual check)
+CONTRIBUTING.md  — Conventional Commits, local setup, authoring an analyzer/adapter,
+   reviewing a PR, release flow pointer.
+RELEASING.md  — rollback procedure: re-point npm dist-tag → revert offending commit →
+   `npm deprecate` as last resort. NEVER `npm unpublish` (breaks dependency trees).
+```
+
+**RAI-specific PR-template addition** — a checkbox tied to the design's invariants:
+
+```
+## Contract / invariant impact
+- [ ] No change to Finding shape, MCP tool schema, or fingerprint algorithm
+- [ ] Fingerprint algorithm changed — fp_algo_version bumped + re-baseline documented (§7)
+- [ ] MCP tool schema changed — determinism contract (§5) re-verified
+- [ ] New analyzer — pure (no I/O/clock/randomness), registered, framework-tagged (§2.4)
+- [ ] Touched packages/core — confirmed grep-framework-in-core still == 0 (§6 CI lint)
+```
+
+### 9.5 Monorepo delta (the one place RAI diverges from storywright)
+
+storywright = one package → one version, one `npm publish`. RAI = many packages with **independent versions + interdependencies** (`@rai/adapter-next` depends on `@rai/core`). Options + recommendation:
+
+```
+RECOMMENDED: semantic-release-monorepo (or changesets) — per-package independent versioning.
+  • each package gets its own version bump from commits scoped to its path
+  • release.yml fans out: detect changed packages → release each in dependency order
+    (core before adapters before cli)
+  • publish job iterates changed packages; OIDC provenance per package
+  • the version-mismatch guard + verify-live-on-npm checks run PER package
+WHY: adapters version + ship on their own cadence; bumping core shouldn't force-bump
+     an untouched adapter. Independent versioning matches the §6 "core/adapter are
+     separately-evolving" architecture.
+
+ALTERNATIVE (simpler, v0): fixed/locked versioning — all packages share one version,
+  released together. Less precise but trivial. Acceptable until adapters ship (P6); the
+  MVP (P0–P3) is effectively single-package (@rai/core + @rai/cli), so locked versioning
+  is fine through P5 and the monorepo-release machinery lands with the first adapter (P6).
+```
+
+**Phasing note:** locked single-version release (storywright pattern, near-verbatim) is sufficient through P5 — the MVP ships `@rai/core` + `@rai/cli` together. Per-package independent release (semantic-release-monorepo / changesets) is introduced in **P6** alongside the first adapter, when multiple independently-versioned packages first exist. This keeps the release setup as simple as storywright's until the architecture actually requires more.
+
+### 9.6 Repo scaffold checklist (carried from storywright)
+
+```
+.releaserc.json              semantic-release config (monorepo-aware from P6)
+commitlint.config.mjs        Conventional Commits (relaxed subject/line rules)
+.husky/commit-msg            local commitlint hook
+.github/workflows/ci.yml     validate + test + golden fixtures + determinism replay
+.github/workflows/pr-title.yml   Conventional PR-title gate
+.github/workflows/release.yml    semantic-release → OIDC publish (fan-out from P6)
+.github/PULL_REQUEST_TEMPLATE.md  + the contract/invariant-impact checkbox (§9.4)
+CONTRIBUTING.md · RELEASING.md · CHANGELOG.md · LICENSE · README.md
+package.json publishConfig: { access: public, provenance: true }
+secrets: RELEASE_TOKEN (PAT, branch-ruleset bypass) · npm OIDC Trusted Publishing (no token)
 ```
 
 ---
