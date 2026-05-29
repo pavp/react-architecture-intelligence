@@ -3,8 +3,8 @@ import { z } from "zod";
 export const ConfigSchema = z.object({
   configVersion: z.string().default("1"),
   shared: z.object({
-    minCosine: z.number().min(0).max(1).default(0.90),
-    minPropOverlap: z.number().min(0).max(1).default(0.80),
+    minCosine: z.number().min(0).max(1).default(0.75),
+    minPropOverlap: z.number().min(0).max(1).default(0.40),
     minHookOverlap: z.number().min(0).max(1).default(0.70),
     minInstances: z.number().int().min(2).default(3),
     maxVariance: z.number().int().min(0).default(6),
