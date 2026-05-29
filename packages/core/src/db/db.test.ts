@@ -1,4 +1,7 @@
 import { expect, test } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { openDb } from "./db.js";
 
 test("opens an in-memory db with all tables", () => {
@@ -28,4 +31,19 @@ test("finding table is append-friendly (insert + read back)", () => {
   const got = db.prepare("SELECT id FROM finding").get() as { id: string };
   expect(got.id).toBe("1");
   db.close();
+});
+
+test("file-backed db enables WAL and reads schema.sql from disk", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rai-db-"));
+  const dbPath = join(dir, "test.db");
+  try {
+    const db = openDb(dbPath); // exercises the on-disk path + real schema.sql read
+    const mode = db.pragma("journal_mode", { simple: true });
+    expect(mode).toBe("wal"); // WAL only takes effect on a file-backed db, not :memory:
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[];
+    expect(tables.map((t) => t.name)).toContain("finding");
+    db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
