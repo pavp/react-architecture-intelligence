@@ -1,0 +1,86 @@
+schema: spec-driven
+
+project: react-architecture-intelligence
+persistence:
+  mode: hybrid
+  artifact_store: both
+
+context: |
+  TypeScript ESM/NodeNext pnpm workspace with packages/core and packages/cli.
+  Runtime target is Node >=22; package manager is pnpm.
+  Core provides deterministic React architecture analysis, SQLite memory, and MCP tools.
+  CLI exposes `rai analyze` and `rai mcp` over @rai/core.
+  Tests use Vitest in node environment across packages/*/src/**/*.test.ts.
+  TypeScript strict mode is enabled with noUncheckedIndexedAccess and exactOptionalPropertyTypes.
+  No CI workflow, real linter, formatter, or coverage command is configured yet.
+
+strict_tdd: true
+
+testing:
+  detected: 2026-05-30
+  strict_tdd: true
+  test_runner:
+    framework: Vitest
+    command: pnpm test
+    config: vitest.config.ts
+  layers:
+    unit:
+      available: true
+      tool: Vitest
+      evidence: packages/*/src/**/*.test.ts
+    integration:
+      available: true
+      tool: Vitest with in-memory/temporary SQLite, engine pipeline, MCP session tests, CLI tests
+      evidence: packages/core/src/engine/*.test.ts, packages/core/src/mcp/*.test.ts, packages/cli/src/cli.test.ts
+    e2e:
+      available: true
+      tool: scripts/smoke.sh compiled CLI smoke test
+      evidence: scripts/smoke.sh
+  coverage:
+    available: false
+    command: ""
+  quality:
+    linter:
+      available: false
+      command: "pnpm lint (placeholder only: echo 'lint: TODO P4')"
+    type_checker:
+      available: true
+      command: pnpm typecheck
+    formatter:
+      available: false
+      command: ""
+  verified:
+    test: pnpm test -> 23 files, 101 tests passing
+    typecheck: pnpm typecheck -> packages/core and packages/cli clean
+
+rules:
+  proposal:
+    - Include motivation, impact, rollback notes, and explicit non-goals for risky changes.
+    - Keep changes scoped to reviewable units; ask before chained PRs because chained_pr_strategy is ask-always.
+  specs:
+    - Use RFC 2119 keywords for requirements.
+    - Use Given/When/Then for scenarios.
+    - Preserve RAI integrity model: CODE -> FINDINGS -> CONFIG/MEMORY overlay -> LLM.
+  design:
+    - Document deterministic boundaries and persistence/write-direction invariants.
+    - Keep @rai/core framework-independent; adapters depend on core, never the reverse.
+  tasks:
+    - Group tasks by phase and keep each task completable in one focused session.
+    - Include tests and docs/status updates with the code task when they belong to the same behavior.
+  apply:
+    tdd: true
+    test_command: pnpm test
+    typecheck_command: pnpm typecheck
+    review_budget_lines: 400
+    rules:
+      - Follow existing TypeScript ESM NodeNext imports with explicit .js extensions.
+      - Preserve append-only findings/feedback semantics and deterministic pure logic.
+  verify:
+    test_command: pnpm test
+    build_command: pnpm build
+    typecheck_command: pnpm typecheck
+    smoke_command: ./scripts/smoke.sh --build
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas.
+    - Keep archived changes as audit trail under openspec/changes/archive/YYYY-MM-DD-{change-name}/.

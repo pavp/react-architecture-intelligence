@@ -44,18 +44,17 @@ const severity: Severity = f.severityRaw; // config severity-clamp is a P4 knob;
 
 ---
 
-### 1.4 KI-1 — Non-component capitalized functions → false positives
+### 1.4 KI-1 — Non-component capitalized functions → false positives ✅ FIXED in fix-ki1-component-detector
 
 **Location:** [packages/core/src/parse/pass1.ts](../packages/core/src/parse/pass1.ts) line ~10 (`COMPONENT_NAME = /^[A-Z]/`)
 
-**Impact:** Next.js route handlers (`GET`, `POST`, `PUT`, `DELETE`) are capitalized functions that are not React components. Pass-1 treats them as components, they all get the same empty structural fingerprint, and `shared-extraction` fires a false positive at cosine 1.0.
+**Impact (resolved):** Next.js route handlers (`GET`, `POST`, `PUT`, `DELETE`) were capitalized functions that are not React components. Pass-1 was treating them as components, they all got the same empty structural fingerprint, and `shared-extraction` fired a false positive at cosine 1.0.
 
 **Reproduced in field:** `scaffold-nextjs-app/src` (477 files) → 1 true positive + 1 false positive (route handlers).
 
-**Fix options:**
-- **Preferred (B):** Add `returnsJsx: boolean` flag during AST walk in `pass1.ts`. Skip components where `returnsJsx === false`. Route handlers never enter the graph.
-- **Alternative (A):** Cardinality floor in the analyzer — treats the symptom, not the cause.
-- **Alternative (C):** `excludeGlob` config — hides Next handlers but leaves the gap for other frameworks.
+**Fix applied (Option B):** Added `returnsJsx: boolean` flag to `RenderFacts` during AST walk in `pass1.ts`. Added guard `if (!facts.returnsJsx) return;` inside `walkComponent` — capitalized functions that produce no JSX are not admitted as components. Route handlers never enter the graph.
+
+**Change:** `fix-ki1-component-detector` — branch `feat/rai-mvp-p0-p3`.
 
 **Documented in:** [docs/superpowers/STATUS.md](superpowers/STATUS.md) under "Known issues → KI-1".
 
