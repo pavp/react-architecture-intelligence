@@ -1,4 +1,4 @@
-import type { PresentedFinding } from "../types.js";
+import type { AnalysisDiagnostic, Finding, PresentedFinding } from "../types.js";
 import type { RaiConfig } from "../config/schema.js";
 import { buildGraph, type SourceFile } from "../parse/graph-build.js";
 import { freezeGraph } from "../graph/repograph.js";
@@ -8,7 +8,7 @@ import { FeedbackStore } from "../memory/feedback-store.js";
 import { MemoryReader } from "../memory/memory-reader.js";
 import { overlay } from "../memory/overlay.js";
 import { EMBED_MODEL_VERSION } from "../similarity/embed.js";
-import type { AnalysisContext, BoundaryRule } from "../analyzers/analyzer.js";
+import type { Analyzer, AnalysisContext, BoundaryRule } from "../analyzers/analyzer.js";
 
 export interface AnalyzeRepoInput {
   files: SourceFile[];
@@ -24,6 +24,7 @@ export interface AnalyzeRepoInput {
 
 export interface AnalyzeRepoResult {
   presented: PresentedFinding[];
+  diagnostics: AnalysisDiagnostic[];
   analysisVersion: number;
   runId: string;
 }
@@ -49,7 +50,13 @@ export function analyzeRepo(input: AnalyzeRepoInput): AnalyzeRepoResult {
   };
 
   // 6. run analyzers (pure)
-  const raw = input.registry.list().flatMap((a) => a.analyze(ctx));
+  const raw: Finding[] = [];
+  const diagnostics: AnalysisDiagnostic[] = [];
+  for (const analyzer of input.registry.list()) {
+    const result = runAnalyzerSafely(analyzer, ctx);
+    raw.push(...result.findings);
+    if (result.diagnostic) diagnostics.push(result.diagnostic);
+  }
 
   // 7. persist findings (append-only) + 8. overlay with memory
   const presented: PresentedFinding[] = [];
@@ -61,5 +68,30 @@ export function analyzeRepo(input: AnalyzeRepoInput): AnalyzeRepoResult {
   }
 
   presented.sort((a, b) => a.fingerprint.structural.localeCompare(b.fingerprint.structural));
-  return { presented, analysisVersion, runId: input.runId };
+  return { presented, diagnostics, analysisVersion, runId: input.runId };
+}
+
+function runAnalyzerSafely(analyzer: Analyzer, ctx: AnalysisContext): { findings: Finding[]; diagnostic: AnalysisDiagnostic | null } {
+  try {
+    return { findings: analyzer.analyze(ctx), diagnostic: null };
+  } catch (error) {
+    return {
+      findings: [],
+      diagnostic: {
+        ruleId: analyzer.ruleId,
+        kind: "analyzer-error",
+        ...normalizeAnalyzerError(error),
+      },
+    };
+  }
+}
+
+function normalizeAnalyzerError(error: unknown): { errorName: string; message: string } {
+  if (error instanceof Error) {
+    const errorName = error.name || error.constructor.name || "Error";
+    const message = error.message || "Analyzer failed";
+    return { errorName, message };
+  }
+  const message = String(error) || "Analyzer failed";
+  return { errorName: "NonErrorThrown", message };
 }

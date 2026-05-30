@@ -1,6 +1,8 @@
 import { expect, test } from "vitest";
 import { createSession } from "./tools.js";
 import { DEFAULT_CONFIG } from "../config/resolve.js";
+import type { Analyzer } from "../analyzers/analyzer.js";
+import type { Finding } from "../types.js";
 
 const A = `function LoginButton({ label, onClick, variant }) { const t = useTheme(); return <button onClick={onClick}>{label}</button>; }
 export default LoginButton;`;
@@ -10,12 +12,89 @@ const C = `function CtaButton({ label, onClick, variant }) { const t = useTheme(
 export default CtaButton;`;
 const files = [{ file: "LoginButton.tsx", source: A }, { file: "SignupBtn.tsx", source: B }, { file: "CtaButton.tsx", source: C }];
 
+function makeFinding(ruleId: string): Finding {
+  return {
+    id: `finding-${ruleId}`,
+    ruleId,
+    type: "opportunity",
+    fingerprint: { structural: `${ruleId}-structural`, nominal: `${ruleId}-nominal`, positional: `${ruleId}-positional` },
+    analysisVersion: 1,
+    fpAlgoVersion: 1,
+    producingRunId: "run1",
+    commitSha: "c1",
+    severityRaw: "warn",
+    evidence: {
+      kind: "shared-extraction",
+      instances: [],
+      cosine: 1,
+      propOverlap: 1,
+      hookOverlap: 1,
+      variancePoints: [],
+      sharedSurface: [],
+    },
+    createdAt: 0,
+  };
+}
+
+function analyzer(ruleId: string, run: () => Finding[]): Analyzer {
+  return { ruleId, framework: "react", analyze: run };
+}
+
+function registerAnalyzer(session: unknown, testAnalyzer: Analyzer): void {
+  (session as { registry: { register(analyzer: Analyzer): void } }).registry.register(testAnalyzer);
+}
+
 test("analyze_repo returns counts + handles, not a finding dump", () => {
   const s = createSession({ config: DEFAULT_CONFIG });
   const r = s.analyzeRepo({ files, asOf: 0 });
   expect(r.counts.byType.opportunity).toBe(1);
   expect(r.topFingerprints.length).toBe(1);
   expect((r as any).findings).toBeUndefined(); // handles, not bodies
+});
+
+test("analyze_repo returns diagnostic count and details for partial analyzer failure", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  registerAnalyzer(s, analyzer("test/failing", () => { throw new TypeError("boom"); }));
+
+  const r = s.analyzeRepo({ files, asOf: 0 });
+
+  expect(r.counts.diagnostics).toBe(1);
+  expect(r.diagnostics).toEqual([
+    { ruleId: "test/failing", kind: "analyzer-error", errorName: "TypeError", message: "boom" },
+  ]);
+});
+
+test("analyze_repo diagnostics do not leak finding bodies, evidence, fingerprints, or feedback handles", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  registerAnalyzer(s, analyzer("test/failing", () => { throw new Error("boom"); }));
+
+  const r = s.analyzeRepo({ files, asOf: 0 });
+  const diagnostic = r.diagnostics[0]!;
+
+  expect(Object.keys(diagnostic).sort()).toEqual(["errorName", "kind", "message", "ruleId"]);
+  expect((diagnostic as any).finding).toBeUndefined();
+  expect((diagnostic as any).findings).toBeUndefined();
+  expect((diagnostic as any).evidence).toBeUndefined();
+  expect((diagnostic as any).fingerprint).toBeUndefined();
+  expect((diagnostic as any).feedbackHandle).toBeUndefined();
+});
+
+test("diagnostics are not close_session feedback targets or prompt items", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  registerAnalyzer(s, analyzer("test/failing", () => { throw new Error("boom"); }));
+  registerAnalyzer(s, analyzer("test/success", () => [makeFinding("test/success")]));
+
+  const analyze = s.analyzeRepo({ files, asOf: 0 });
+  const close = s.closeSession({
+    decisions: [{ fingerprint: "test/failing", ruleId: "test/failing", verdict: "reject" }],
+    asOf: 1,
+  });
+
+  expect(analyze.diagnostics).toEqual([
+    { ruleId: "test/failing", kind: "analyzer-error", errorName: "Error", message: "boom" },
+  ]);
+  expect(close.items.some((item) => item.ruleId === "test/failing")).toBe(false);
+  expect(close.results).toEqual([{ fingerprint: "test/failing", ruleId: "test/failing", accepted: false, refusedReason: "unknown current finding" }]);
 });
 
 test("find_shared_opportunities separates opportunities from conflicts", () => {

@@ -84,8 +84,10 @@ export class Session {
           info: active.filter((p) => p.severity === "info").length,
         },
         suppressed: res.presented.filter((p) => p.status === "suppressed").length,
+        diagnostics: res.diagnostics.length,
       },
       topFingerprints: active.map((p) => p.fingerprint.structural),
+      diagnostics: res.diagnostics,
     };
   }
 

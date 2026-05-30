@@ -71,6 +71,15 @@ export interface PresentedFinding extends Finding {
   weight: Weight | null;
 }
 
+// ── Analysis Diagnostics ────────────────────────────────────────────────
+export type AnalysisDiagnosticKind = "analyzer-error";
+export interface AnalysisDiagnostic {
+  ruleId: string;
+  kind: AnalysisDiagnosticKind;
+  errorName: string;
+  message: string;
+}
+
 // ── Memory (§3) ─────────────────────────────────────────────────────────
 export type Verdict = "accept" | "reject" | "wontfix" | "confirm" | "dismiss";
 export type FeedbackSource = "human" | "agent";

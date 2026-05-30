@@ -6,6 +6,8 @@ import { AnalyzerRegistry } from "../analyzers/registry.js";
 import { FindingsStore } from "../memory/findings-store.js";
 import { FeedbackStore } from "../memory/feedback-store.js";
 import { DEFAULT_CONFIG } from "../config/resolve.js";
+import type { Analyzer } from "../analyzers/analyzer.js";
+import type { Finding } from "../types.js";
 
 const A = `function LoginButton({ label, onClick, variant }) { const t = useTheme(); return <button onClick={onClick}>{label}</button>; }
 export default LoginButton;`;
@@ -23,6 +25,34 @@ function setup() {
   return { db, registry, findings, feedback };
 }
 const files = [{ file: "LoginButton.tsx", source: A }, { file: "SignupBtn.tsx", source: B }, { file: "CtaButton.tsx", source: C }];
+
+function makeFinding(ruleId: string): Finding {
+  return {
+    id: `finding-${ruleId}`,
+    ruleId,
+    type: "opportunity",
+    fingerprint: { structural: `${ruleId}-structural`, nominal: `${ruleId}-nominal`, positional: `${ruleId}-positional` },
+    analysisVersion: 1,
+    fpAlgoVersion: 1,
+    producingRunId: "run1",
+    commitSha: "c1",
+    severityRaw: "warn",
+    evidence: {
+      kind: "shared-extraction",
+      instances: [],
+      cosine: 1,
+      propOverlap: 1,
+      hookOverlap: 1,
+      variancePoints: [],
+      sharedSurface: [],
+    },
+    createdAt: 0,
+  };
+}
+
+function analyzer(ruleId: string, run: () => Finding[]): Analyzer {
+  return { ruleId, framework: "react", analyze: run };
+}
 
 test("end-to-end: finds the shared-extraction opportunity", () => {
   const { registry, findings, feedback } = setup();
@@ -62,4 +92,52 @@ test("deterministic: two identical runs produce equal presented findings (ignori
   const s2 = setup(); const r2 = analyzeRepo({ files, registry: s2.registry, findings: s2.findings, feedback: s2.feedback, config: DEFAULT_CONFIG, runId: "r", commitSha: "c", asOf: 0 });
   const strip = (p: any) => ({ type: p.type, status: p.status, fp: p.fingerprint.structural, ev: p.evidence });
   expect(r1.presented.map(strip)).toEqual(r2.presented.map(strip));
+});
+
+test("contains a throwing analyzer and continues later analyzers in registry order", () => {
+  const { findings, feedback } = setup();
+  const registry = new AnalyzerRegistry();
+  const calls: string[] = [];
+  registry.register(analyzer("rule/a", () => { calls.push("A"); return []; }));
+  registry.register(analyzer("rule/b", () => { calls.push("B"); throw new Error("boom"); }));
+  registry.register(analyzer("rule/c", () => { calls.push("C"); return []; }));
+
+  const res = analyzeRepo({ files, registry, findings, feedback, config: DEFAULT_CONFIG, runId: "run1", commitSha: "c1", asOf: 0 });
+
+  expect(calls).toEqual(["A", "B", "C"]);
+  expect(res.presented).toEqual([]);
+  expect(res.diagnostics).toEqual([
+    { ruleId: "rule/b", kind: "analyzer-error", errorName: "Error", message: "boom" },
+  ]);
+});
+
+test("persists successful findings while failed analyzer writes zero T3 findings", () => {
+  const { db, findings, feedback } = setup();
+  const registry = new AnalyzerRegistry();
+  registry.register(analyzer("rule/failing", () => { throw new TypeError("boom"); }));
+  registry.register(analyzer("rule/success", () => [makeFinding("rule/success")]));
+
+  const res = analyzeRepo({ files, registry, findings, feedback, config: DEFAULT_CONFIG, runId: "run1", commitSha: "c1", asOf: 7 });
+
+  expect(res.presented.map((finding) => finding.ruleId)).toEqual(["rule/success"]);
+  const rows = db.prepare("SELECT rule_id, evidence_json FROM finding ORDER BY rule_id").all() as { rule_id: string; evidence_json: string }[];
+  expect(rows.map((row) => row.rule_id)).toEqual(["rule/success"]);
+  expect(rows.some((row) => row.evidence_json.includes("rule/failing"))).toBe(false);
+});
+
+test("returns deterministic analyzer diagnostics without finding or volatile fields", () => {
+  const { findings, feedback } = setup();
+  const registry = new AnalyzerRegistry();
+  registry.register(analyzer("shared-extraction", () => { throw new TypeError("boom"); }));
+
+  const res = analyzeRepo({ files, registry, findings, feedback, config: DEFAULT_CONFIG, runId: "run1", commitSha: "c1", asOf: 0 });
+
+  expect(res.diagnostics).toEqual([
+    { ruleId: "shared-extraction", kind: "analyzer-error", errorName: "TypeError", message: "boom" },
+  ]);
+  expect(Object.keys(res.diagnostics[0]!).sort()).toEqual(["errorName", "kind", "message", "ruleId"]);
+  expect((res.diagnostics[0] as any).stack).toBeUndefined();
+  expect((res.diagnostics[0] as any).evidence).toBeUndefined();
+  expect((res.diagnostics[0] as any).body).toBeUndefined();
+  expect((res.diagnostics[0] as any).fingerprint).toBeUndefined();
 });
