@@ -20,6 +20,7 @@ function ctx(components: ComponentNode[], over: Partial<AnalysisContext> = {}): 
     config: DEFAULT_CONFIG,
     types: { typeOf: () => null },
     runId: "run", commitSha: "c", analysisVersion: 1, embeddingModelVersion: EMBED_MODEL_VERSION,
+    boundaryRules: [],
     ...over,
   };
 }
@@ -113,4 +114,40 @@ test("opportunity fingerprint survives member churn (§4.5)", () => {
   const fp3 = sharedExtraction.analyze(ctx(three))[0]!.fingerprint.structural;
   const fp4 = sharedExtraction.analyze(ctx(four))[0]!.fingerprint.structural;
   expect(fp4).toBe(fp3); // same shared shape → same identity → reject survives churn
+});
+
+test("§1.1 boundary crossing: cluster crossing src/features->src/ui emits architectural-conflict", () => {
+  // components in different boundary zones — one in features/, one in ui/
+  // Note: excludeGlobs filters "ui/**" by default, so we override config to disable it
+  const cs = [
+    { ...comp("FeatureBtn", ["label", "onClick", "variant"], ["useTheme"]), file: "src/features/cart/FeatureBtn.tsx" },
+    { ...comp("UiBtn", ["label", "onClick", "size"], ["useTheme"]), file: "src/ui/UiBtn.tsx" },
+    { ...comp("UiCtaBtn", ["label", "onClick", "variant"], ["useTheme"]), file: "src/ui/UiCtaBtn.tsx" },
+  ];
+  const c = ctx(cs, {
+    config: { ...DEFAULT_CONFIG, excludeGlobs: [] }, // disable default excludes
+    boundaryRules: [{ from: "src/features/**", to: "src/ui/**", reason: "features must not be shared into ui" }],
+  });
+  const findings = sharedExtraction.analyze(c);
+  expect(findings.length).toBe(1);
+  expect(findings[0]!.type).toBe("architectural-conflict");
+  expect(findings[0]!.evidence.conflict).toBeDefined();
+  expect(findings[0]!.evidence.conflict!.rule).toBeTruthy();
+  expect(findings[0]!.evidence.conflict!.why).toBeTruthy();
+});
+
+test("§1.1 boundary negative: cluster with all files in src/ui/ only stays opportunity", () => {
+  const cs = [
+    { ...comp("A", ["label", "onClick", "variant"], ["useTheme"]), file: "src/ui/A.tsx" },
+    { ...comp("B", ["label", "onClick", "size"], ["useTheme"]), file: "src/ui/B.tsx" },
+    { ...comp("C", ["label", "onClick", "variant"], ["useTheme"]), file: "src/ui/C.tsx" },
+  ];
+  const c = ctx(cs, {
+    config: { ...DEFAULT_CONFIG, excludeGlobs: [] },
+    boundaryRules: [{ from: "src/features/**", to: "src/ui/**", reason: "features must not be shared into ui" }],
+  });
+  const findings = sharedExtraction.analyze(c);
+  expect(findings.length).toBe(1);
+  expect(findings[0]!.type).toBe("opportunity");
+  expect(findings[0]!.evidence.conflict).toBeUndefined();
 });

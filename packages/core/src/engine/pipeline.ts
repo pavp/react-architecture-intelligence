@@ -8,7 +8,7 @@ import { FeedbackStore } from "../memory/feedback-store.js";
 import { MemoryReader } from "../memory/memory-reader.js";
 import { overlay } from "../memory/overlay.js";
 import { EMBED_MODEL_VERSION } from "../similarity/embed.js";
-import type { AnalysisContext } from "../analyzers/analyzer.js";
+import type { AnalysisContext, BoundaryRule } from "../analyzers/analyzer.js";
 
 export interface AnalyzeRepoInput {
   files: SourceFile[];
@@ -45,6 +45,7 @@ export function analyzeRepo(input: AnalyzeRepoInput): AnalyzeRepoResult {
     types: { typeOf: () => null }, // lazy Pass-2 wired in P4
     runId: input.runId, commitSha: input.commitSha,
     analysisVersion, embeddingModelVersion: EMBED_MODEL_VERSION,
+    boundaryRules: input.config.boundaries as readonly BoundaryRule[],
   };
 
   // 6. run analyzers (pure)

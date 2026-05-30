@@ -1,6 +1,6 @@
 import { ulid } from "ulid";
 import type { Analyzer, AnalysisContext } from "./analyzer.js";
-import type { ComponentNode, Finding, Severity } from "../types.js";
+import type { ComponentNode, Finding, FindingType, Severity } from "../types.js";
 import { embedComponent } from "../similarity/embed.js";
 import { clusterByCosine, minClusterCosine } from "../similarity/similarity-index.js";
 import { structuralFingerprint, FP_ALGO_VERSION } from "../fingerprint/structural.js";
@@ -41,8 +41,24 @@ export const sharedExtraction: Analyzer = {
       // divergence guard (§4.4): too many variance points => god-component, reject
       if (variancePoints.length > c.shared.maxVariance) continue;
 
-      // boundary check is a P4 feature (boundary_rule table empty in MVP) → always opportunity
-      const type = "opportunity" as const;
+      // boundary check (§1.1): a cluster crossing a configured boundary is a conflict, not an opportunity
+      const files = comps.map((x) => x.file);
+      let conflict: { rule: string; why: string } | undefined;
+      outer: for (let i = 0; i < files.length; i++) {
+        for (let j = 0; j < files.length; j++) {
+          if (i === j) continue;
+          for (const rule of ctx.boundaryRules) {
+            if (globMatch(rule.from, files[i]!) && globMatch(rule.to, files[j]!)) {
+              conflict = {
+                rule: rule.reason || `${rule.from} → ${rule.to}`,
+                why: `boundary ${rule.from} → ${rule.to} crossed by ${files[i]}, ${files[j]}`,
+              };
+              break outer;
+            }
+          }
+        }
+      }
+      const type: FindingType = conflict ? "architectural-conflict" : "opportunity";
 
       out.push({
         id: ulid(),
@@ -62,6 +78,7 @@ export const sharedExtraction: Analyzer = {
           hookOverlap,
           variancePoints,
           sharedSurface,
+          ...(conflict ? { conflict } : {}),
         },
         createdAt: 0, // set by the engine runner at persist time (kept 0 for purity)
       });
