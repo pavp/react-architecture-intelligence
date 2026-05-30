@@ -76,12 +76,46 @@ node packages/cli/dist/index.js mcp    fixtures/duplication/buttons    # → MCP
 
 ---
 
+## Known issues found in the field
+
+### KI-1 — Non-component functions collapse to one empty fingerprint → false positive (HIGH)
+**Found:** 2026-05-30, first real-repo run via MCP against `scaffold-nextjs-app/src` (477 files).
+
+The MVP run produced **2 findings**. One is a true positive, one is a false positive:
+
+| Finding | Verdict | Detail |
+|---------|---------|--------|
+| `common-grid` containers (cosine 0.82) | ✅ TRUE positive | `Bottom/Main/RightContainer` are byte-identical: `({children}: PropsWithChildren) => <Box className={container}>{children}</Box>`. Extract one base — correct call. |
+| API route handlers (cosine 1.0, 9 fns / 4 files) | ❌ FALSE positive | `GET`/`POST`/`PUT`/`DELETE` Next route handlers flagged as duplicate components. Their bodies are completely different (a 1-line settings GET vs a 30-line todos GET with query parsing). |
+
+**Root cause (reproduced, not guessed):** `pass1` treats any `^[A-Z]`-named function as a React component (`pass1.ts:10` `COMPONENT_NAME = /^[A-Z]/`, used at `:58`/`:63`). It does **not** require the function to return JSX. Next route handlers (`GET`, `POST`, …) are `(req) => Response` functions — capitalized, but with **0 props, 0 hooks, 0 JSX children, 0 markers, 0 conditionals**. The structural fingerprint (§2.3) hashes exactly those 5 empty sets, so every such function collapses to the **same** fingerprint:
+
+```
+front-end-settings GET → props=[] hooks=[] children=[] markers=[] cond=0 → fp=4b77a12c…
+todos GET              → props=[] hooks=[] children=[] markers=[] cond=0 → fp=4b77a12c…  (identical)
+todos POST             → props=[] hooks=[] children=[] markers=[] cond=0 → fp=4b77a12c…  (identical)
+```
+
+`shared-extraction` then groups N identical empty fingerprints into one bogus opportunity at cosine 1.0. `minFpCardinality` does **not** guard against this — it's consumed for the opportunity's own fingerprint (`shared-extraction.ts:51`), not as an "is this shape substantial enough to be signal" filter.
+
+**Fix options (preferred = B):**
+- **A. Cardinality floor in the analyzer** — drop clusters whose structural shape is empty (the 5 sets sum to 0 elements). Smallest change; lives in `shared-extraction`. Treats the symptom.
+- **B. JSX-return guard in `pass1` (the real cure)** — a function that returns no JSX is not a React component, so `pass1` should not emit it as one. `collectRenderFacts` already visits `JSXOpeningElement` (for children); add a `returnsJsx` flag set on any `JSXElement`/`JSXFragment` visit and skip components where it's false. Removes the false node at the source; route handlers never enter the graph.
+- **C. excludeGlob `**/route.{ts,tsx}` / `**/api/**`** — a config patch, not a fix. Hides Next handlers but leaves the underlying "capitalized non-component" gap for any other framework.
+
+**Repro:** `node` against `dist/parse/pass1.js` + `dist/fingerprint/structural.js` over the two `todos`/`front-end-settings` route files → both yield `fp=4b77a12c…`. (Ad-hoc script; fold into a test fixture when fixing — TDD with these two handlers as the failing case.)
+
+**Caveat on the design:** this is a structural-fingerprint blind spot, not a bug in the memory/MCP layers — those worked end-to-end on the real repo. The thesis holds; the *component detector* is too loose.
+
+---
+
 ## Next steps (not started — separate plans)
 
 These are explicitly **post-MVP** per the design's §7 phasing. Each should get its own
 `docs/superpowers/plans/` doc via the writing-plans skill, then subagent-driven execution.
 
 ### P4 — Breadth + temporal (highest value next)
+- **Fix KI-1 (component detector too loose)** — add a JSX-return guard to `pass1` so non-component capitalized functions (Next route handlers, plain factories) don't collapse to one empty fingerprint and emit false positives. See *Known issues → KI-1* above. Smallest credible first task of P4; has a real reproducing fixture (`scaffold-nextjs-app` route handlers).
 - More analyzers: `coupling`, `hook-topology`, `over-abstraction`, `boundary-violation` (all pure, into the registry)
 - `snapshot` table population + `get_drift` MCP tool (pure SQL set-algebra over snapshots — §3.5/§5)
 - `query_architecture` MCP tool (enumerated graph questions, bounded-depth recursive CTEs)
