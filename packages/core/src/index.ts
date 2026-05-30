@@ -13,3 +13,5 @@ export { boundaryViolation, RULE_ID as BOUNDARY_VIOLATION_RULE_ID } from "./anal
 export { AnalyzerRegistry, createDefaultAnalyzerRegistry } from "./analyzers/registry.js";
 export { buildSharedExtractionProposal } from "./codemod/proposal.js";
 export type { SharedExtractionProposal, ProposalRefusalReason, ProposalRisk, ProposalRiskLevel, ProposalRiskReason } from "./codemod/proposal.js";
+export { mayExecuteCodemod } from "./codemod/capability-gate.js";
+export type { CodemodGateContext, CodemodGateRefusalReason, CodemodGateResult } from "./codemod/capability-gate.js";

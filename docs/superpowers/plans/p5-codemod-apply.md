@@ -1,6 +1,6 @@
 # P5 — Codemod Apply — Implementation Plan
 
-**Status:** In progress — Slices 1 and 2 complete
+**Status:** In progress — Slices 1, 2, and 3 complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §1, §4.6, §5.2, §7
@@ -122,17 +122,17 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 3 — Capability-token gate for apply
+### Slice 3 — Capability-token gate for apply ✅ DONE
 
 **Goal:** implement the mutation gate without applying code yet.
 
 **Tasks:**
 
-- [ ] Add `mayExecuteCodemod(fp, ctx)` around `FindingsStore.currentVersion(...)` and overlay status.
-- [ ] Refuse absent, stale, suppressed, superseded, conflict, and non-opportunity findings.
-- [ ] Require current `analysis_version` and matching `ruleId`.
-- [ ] Add structured refusal codes.
-- [ ] Add tests for every refusal branch.
+- [x] Add `mayExecuteCodemod(fp, ctx)` around `FindingsStore.currentVersion(...)` and overlay status.
+- [x] Refuse absent, stale, suppressed, superseded, conflict, and non-opportunity findings.
+- [x] Require current `analysis_version` and matching `ruleId`.
+- [x] Add structured refusal codes.
+- [x] Add tests for every refusal branch.
 
 **Strict TDD anchors:**
 
@@ -144,8 +144,8 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 **Exit criteria:**
 
-- [ ] No write path can run without a bound current finding.
-- [ ] Refusal behavior matches design §4.6.
+- [x] No write path can run without a bound current finding.
+- [x] Refusal behavior matches design §4.6.
 
 ---
 
