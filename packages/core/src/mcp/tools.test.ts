@@ -68,3 +68,82 @@ test("explainFinding lastReason is null when no feedback with non-null reason ex
   const e = s.explainFinding({ fingerprint: fp });
   expect(e.memory.lastReason).toBeNull();
 });
+
+test("closeSession without decisions returns current prompt items and writes no feedback", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0 });
+  const fp = a.topFingerprints[0]!;
+
+  const r = s.closeSession({});
+
+  expect(r.items).toEqual([
+    expect.objectContaining({
+      fingerprint: fp,
+      ruleId: "react/shared-extraction",
+      type: "opportunity",
+      severity: "warn",
+      status: "active",
+    }),
+  ]);
+  expect(r.results).toEqual([]);
+  expect(s.explainFinding({ fingerprint: fp }).memory.eventCount).toBe(0);
+});
+
+test("closeSession with summary but no decisions returns prompt context and writes no feedback", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0 });
+  const fp = a.topFingerprints[0]!;
+
+  const r = s.closeSession({ summary: "Looks like we should reject this later." });
+
+  expect(r.items.map((item) => item.fingerprint)).toEqual([fp]);
+  expect(r.summary).toBe("Looks like we should reject this later.");
+  expect(r.results).toEqual([]);
+  expect(s.explainFinding({ fingerprint: fp }).memory.eventCount).toBe(0);
+});
+
+test("closeSession with explicit known decision records feedback", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0 });
+  const fp = a.topFingerprints[0]!;
+
+  const r = s.closeSession({ decisions: [{ fingerprint: fp, ruleId: "react/shared-extraction", verdict: "reject", reason: "not reusable" }], asOf: 7 });
+
+  expect(r.results).toEqual([{ fingerprint: fp, ruleId: "react/shared-extraction", accepted: true }]);
+  const e = s.explainFinding({ fingerprint: fp });
+  expect(e.memory.eventCount).toBe(1);
+  expect(e.memory.lastReason).toBe("not reusable");
+});
+
+test("closeSession refuses unknown decision fingerprint and writes no feedback", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0 });
+  const fp = a.topFingerprints[0]!;
+
+  const r = s.closeSession({ decisions: [{ fingerprint: "phantom", ruleId: "react/shared-extraction", verdict: "reject" }], asOf: 7 });
+
+  expect(r.results).toEqual([{ fingerprint: "phantom", ruleId: "react/shared-extraction", accepted: false, refusedReason: "unknown current finding" }]);
+  expect(s.explainFinding({ fingerprint: fp }).memory.eventCount).toBe(0);
+});
+
+test("closeSession refuses mismatched ruleId and writes no feedback", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0 });
+  const fp = a.topFingerprints[0]!;
+
+  const r = s.closeSession({ decisions: [{ fingerprint: fp, ruleId: "wrong/rule", verdict: "reject" }], asOf: 7 });
+
+  expect(r.results).toEqual([{ fingerprint: fp, ruleId: "wrong/rule", accepted: false, refusedReason: "unknown current finding" }]);
+  expect(s.explainFinding({ fingerprint: fp }).memory.eventCount).toBe(0);
+});
+
+test("closeSession ignores ambiguous summary text without decisions", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0 });
+  const fp = a.topFingerprints[0]!;
+
+  const r = s.closeSession({ summary: "We probably do not want this finding." });
+
+  expect(r.results).toEqual([]);
+  expect(s.explainFinding({ fingerprint: fp }).memory.eventCount).toBe(0);
+});

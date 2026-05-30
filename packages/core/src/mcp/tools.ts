@@ -1,6 +1,6 @@
 import { openDb, type Db } from "../db/db.js";
 import type { RaiConfig } from "../config/schema.js";
-import type { PresentedFinding, Verdict, FeedbackSource } from "../types.js";
+import type { PresentedFinding, Verdict, FeedbackSource, FindingType, PresentedStatus, Severity } from "../types.js";
 import { AnalyzerRegistry } from "../analyzers/registry.js";
 import { sharedExtraction } from "../analyzers/shared-extraction.js";
 import { FindingsStore } from "../memory/findings-store.js";
@@ -9,6 +9,42 @@ import { analyzeRepo } from "../engine/pipeline.js";
 import type { SourceFile } from "../parse/graph-build.js";
 
 export interface SessionOpts { config: RaiConfig; dbPath?: string; }
+
+export interface CloseSessionDecision {
+  fingerprint: string;
+  ruleId: string;
+  verdict: Verdict;
+  reason?: string | undefined;
+}
+
+export interface CloseSessionInput {
+  discussed?: string[] | undefined;
+  summary?: string | undefined;
+  decisions?: CloseSessionDecision[] | undefined;
+  asOf?: number | undefined;
+}
+
+export interface CloseSessionPromptItem {
+  fingerprint: string;
+  ruleId: string;
+  type: FindingType;
+  severity: Severity;
+  status: PresentedStatus;
+}
+
+export interface CloseSessionDecisionResult {
+  fingerprint: string;
+  ruleId: string;
+  accepted: boolean;
+  refusedReason?: string | undefined;
+}
+
+export interface CloseSessionResult {
+  items: CloseSessionPromptItem[];
+  question: string;
+  results: CloseSessionDecisionResult[];
+  summary?: string | undefined;
+}
 
 /** Engine session backing the MCP tools. One per repo. */
 export class Session {
@@ -85,6 +121,58 @@ export class Session {
   // ── record_feedback (§5.3) — the SOLE memory write door ──────────────
   recordFeedback(input: { fingerprint: string; ruleId: string; verdict: Verdict; source: FeedbackSource; originRunId?: string | undefined; reason?: string | undefined; asOf?: number | undefined }) {
     return this.feedback.record(input);
+  }
+
+  // ── close_session — stateless closure helper over current lastPresented ──
+  closeSession(input: CloseSessionInput): CloseSessionResult {
+    const promptItems = this.currentCloseSessionFindings(input.discussed).map((finding) => ({
+      fingerprint: finding.fingerprint.structural,
+      ruleId: finding.ruleId,
+      type: finding.type,
+      severity: finding.severity,
+      status: finding.status,
+    }));
+    const results = input.decisions?.map((decision) => this.recordCloseSessionDecision(decision, input.asOf)) ?? [];
+    return {
+      items: promptItems,
+      question: "Which findings should be accepted, rejected, confirmed, dismissed, or marked wontfix?",
+      results,
+      ...(input.summary !== undefined ? { summary: input.summary } : {}),
+    };
+  }
+
+  private currentCloseSessionFindings(discussed: string[] | undefined): PresentedFinding[] {
+    if (!discussed) return this.lastPresented;
+    const discussedSet = new Set(discussed);
+    return this.lastPresented.filter((finding) => discussedSet.has(finding.fingerprint.structural));
+  }
+
+  private recordCloseSessionDecision(decision: CloseSessionDecision, asOf: number | undefined): CloseSessionDecisionResult {
+    const finding = this.lastPresented.find((presented) =>
+      presented.fingerprint.structural === decision.fingerprint && presented.ruleId === decision.ruleId,
+    );
+    if (!finding) {
+      return {
+        fingerprint: decision.fingerprint,
+        ruleId: decision.ruleId,
+        accepted: false,
+        refusedReason: "unknown current finding",
+      };
+    }
+    const recorded = this.feedback.record({
+      fingerprint: decision.fingerprint,
+      ruleId: decision.ruleId,
+      verdict: decision.verdict,
+      source: "human",
+      reason: decision.reason,
+      asOf,
+    });
+    return {
+      fingerprint: decision.fingerprint,
+      ruleId: decision.ruleId,
+      accepted: recorded.accepted,
+      ...(recorded.refusedReason !== undefined ? { refusedReason: recorded.refusedReason } : {}),
+    };
   }
 }
 

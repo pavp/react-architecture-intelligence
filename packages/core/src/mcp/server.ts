@@ -72,6 +72,23 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("record_feedback");
 
+  server.tool("close_session", "Close current analysis session by prompting for explicit finding decisions or recording explicit decisions only.",
+    {
+      discussed: z.array(z.string()).optional(),
+      summary: z.string().optional(),
+      decisions: z.array(z.object({
+        fingerprint: z.string(),
+        ruleId: z.string(),
+        verdict: z.enum(["accept", "reject", "wontfix", "confirm", "dismiss"]),
+        reason: z.string().optional(),
+      })).optional(),
+    },
+    async (args) => {
+      const r = session.closeSession({ ...args, asOf: now() });
+      return { content: [{ type: "text", text: JSON.stringify(r, null, 2) }] };
+    });
+  toolNames.push("close_session");
+
   return { server, session, toolNames };
 }
 
