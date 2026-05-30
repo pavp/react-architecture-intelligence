@@ -384,30 +384,35 @@ edge kinds (`imports`, `calls`, `passes`) are rejected until those edges are con
 
 ---
 
-### Slice 5 — (Deferred) `rai backfill` CLI
+### Slice 5 — `rai backfill` CLI ✅ DONE
 
 **Goal:** retroactively populate `snapshot` for historical commits, solving cold-start
-fully. **Not a P4 blocker** — sequenced after the Slice 1 contract is stable.
+fully.
 
 **Risk (why deferred):** detached-HEAD handling, dirty-tree guard, checkout restore on
 failure, partial per-commit failures, per-commit analyze cost. This is git-state
 orchestration, categorically riskier than the read-only slices above.
 
-**Tasks (when scheduled):**
-- [ ] **5.1 Dirty-tree guard** — refuse to run with uncommitted changes.
-- [ ] **5.2 Commit-range resolution** — `--from <tag/sha> --to HEAD`.
-- [ ] **5.3 Per-commit checkout → analyze → snapshot → restore.** Restore the original
+**Implemented scope:** `rai backfill [dir] --from <sha> --to <sha> --db <path>` runs over an
+inclusive commit range, writes snapshots through the normal analyzer pipeline, stores the DB under
+`.git/rai.sqlite` by default, skips commits that already have snapshot rows, and always restores the
+starting branch/HEAD.
+
+**Tasks:**
+- [x] **5.1 Dirty-tree guard** — refuse to run with uncommitted changes.
+- [x] **5.2 Commit-range resolution** — `--from <tag/sha> --to HEAD`.
+- [x] **5.3 Per-commit checkout → analyze → snapshot → restore.** Restore the original
       HEAD on any failure (try/finally around the checkout loop).
-- [ ] **5.4 Partial-failure reporting** — one commit failing must not abort the rest;
+- [x] **5.4 Partial-failure reporting** — one commit failing must not abort the rest;
       report per-commit status.
-- [ ] **5.5 Idempotency** — re-running backfill over already-snapshotted commits is a
-      no-op (Slice 1's `PRIMARY KEY` idempotency carries this).
+- [x] **5.5 Idempotency** — re-running backfill over already-snapshotted commits is a
+      no-op for those commits.
 
 **Exit criteria:**
-- [ ] Backfill populates snapshot for a multi-commit fixture range
-- [ ] Original HEAD always restored, even on mid-range failure
-- [ ] Dirty tree refused
-- [ ] build/test/typecheck clean
+- [x] Backfill populates snapshot for a multi-commit fixture range
+- [x] Original HEAD always restored, even on mid-range failure
+- [x] Dirty tree refused
+- [x] build/test/typecheck clean
 
 **Size estimate:** ~250–350 lines. Single PR. Own approved issue.
 
@@ -423,17 +428,17 @@ Slice 1 (snapshot + get_drift)   ← FIRST, groundwork exists, highest value
         ├── Slice 3 (ts-morph Pass-2)      independent, unlocks type-aware work
         └── Slice 4 (edge audit + hook-topology)
                     └── Slice 4b (boundary-violation / conventions)
-Slice 5 (backfill CLI)   deferred, after Slice 1 contract is stable
+Slice 5 (backfill CLI)   completes cold-start snapshot population
 ```
 
 ## P4 overall exit criteria (design §7.2)
 
 - [x] ≥4 analyzers green
 - [ ] `get_drift` shows a fan-in delta (e.g. 3→9) across commits
-- [ ] `snapshot` populated deterministically per analysis run
+- [x] `snapshot` populated deterministically per analysis run
 - [x] `query_architecture` answers bounded graph questions
 - [x] Band C `get_node` / `raw_graph_query` are bounded and read-only
-- [ ] cold-start returns explicit `insufficient_history`, never silent-clean
+- [x] cold-start returns explicit `insufficient_history`, never silent-clean
 - [ ] All slices: build/test/typecheck clean, specs synced, each PR ≤400 lines or chained
 
 ## Per-slice GitHub workflow

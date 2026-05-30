@@ -302,6 +302,11 @@ export class Session {
     return { status: "ok", rows: rows.slice(0, limit), truncated: rows.length > limit };
   }
 
+  hasSnapshot(commitSha: string): boolean {
+    const row = this.db.prepare("SELECT 1 AS found FROM snapshot WHERE commit_sha=? LIMIT 1").get(commitSha) as { found: number } | undefined;
+    return row !== undefined;
+  }
+
   // ── explain_finding (§5.2) — evidence + groundingFields, NO prose (§5-Fix-1) ──
   explainFinding(input: { fingerprint: string }) {
     const f = this.lastPresented.find((p) => p.fingerprint.structural === input.fingerprint);

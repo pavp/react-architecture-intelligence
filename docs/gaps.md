@@ -110,16 +110,13 @@ Tasks that need to be formalized:
 
 These are issues identified in the spec or through architectural review that have no documentation, no plan, and no code stub. They need to be resolved before or during the relevant phase.
 
-### 3.1 `get_drift` requires pre-existing snapshot history
+### 3.1 `get_drift` requires pre-existing snapshot history ✅ FIXED by `rai backfill`
 
-**Problem:** `get_drift` computes comparisons exclusively from the `snapshot` table (spec §5.2 strict source rule). If a repo was never analyzed in prior commits, there is no historical data — the tool cannot backfill history retroactively.
+**Problem (resolved):** `get_drift` computes comparisons exclusively from the `snapshot` table (spec §5.2 strict source rule). If a repo was never analyzed in prior commits, there is no historical data unless snapshots are backfilled explicitly.
 
-**Impact:** A team adopting RAI mid-project gets no temporal data until they run `analyze_repo` on multiple commits over time. The first months of use produce no drift signal.
+**Fix applied:** Added `rai backfill [dir] --from <sha> --to <sha> --db <path>`. It refuses dirty worktrees, checks out each commit in an inclusive range, analyzes through the normal pipeline, writes snapshots, reports per-commit failures without aborting the whole range, skips commits already snapshotted, and restores the starting branch/HEAD.
 
-**Options to evaluate:**
-- Accept the limitation and document it clearly (simplest)
-- Add a `rai backfill --from <tag> --to HEAD` command that re-analyzes past commits and populates `snapshot` (expensive but solves cold-start)
-- Show "no historical data yet" gracefully in `get_drift` response rather than an error
+**Remaining limitation:** Snapshot rows are idempotent, but findings remain append-only by design; backfill skips already-snapshotted commits to avoid rerun growth for the normal case.
 
 ### 3.2 No threshold calibration mechanism per repo
 
