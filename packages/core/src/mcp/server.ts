@@ -5,6 +5,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { createSession, type Session } from "./tools.js";
 import type { RaiConfig } from "../config/schema.js";
+import { resolveCommitSha } from "../engine/git-sha.js";
 
 export interface McpServerOpts { config: RaiConfig; rootDir: string; }
 
@@ -36,7 +37,8 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     { scope: z.enum(["full", "dirty"]).optional() },
     async () => {
       const files = readSources(opts.rootDir);
-      const r = session.analyzeRepo({ files, asOf: now() });
+      const sha = resolveCommitSha(opts.rootDir);
+      const r = session.analyzeRepo({ files, asOf: now(), commitSha: sha ?? "" });
       return { content: [{ type: "text", text: JSON.stringify(r, null, 2) }] };
     });
   toolNames.push("analyze_repo");
