@@ -2,13 +2,13 @@
 
 **Last updated:** 2026-05-30
 **Branch:** `feat/rai-mvp-p0-p3` (not yet merged to `main`)
-**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Pass-2, hook topology, and conventions slices complete; P5 Slices 1–3 complete; CI/PR workflow active.**
+**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Pass-2, hook topology, and conventions slices complete; P5 Slices 1–4 complete; CI/PR workflow active.**
 
 ---
 
 ## TL;DR
 
-The MVP vertical slice is done, temporal drift is active, `query_architecture` is available, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, the codemod capability gate exists, and GitHub PRs run CI.
+The MVP vertical slice is done, temporal drift is active, `query_architecture` is available, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, the codemod capability gate exists, dry-run patch preview exists, and GitHub PRs run CI.
 
 ```
 typecheck:  0 errors (strict: noUncheckedIndexedAccess + exactOptionalPropertyTypes)
@@ -125,9 +125,10 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - ✅ Slice 1 complete: shared-extraction evidence now carries `exportKind`, and a pure no-write proposal builder classifies export/span/variance/source-file risk.
 - ✅ Slice 2 complete: `propose_refactor` MCP tool returns deterministic proposal-only output for current active findings and refuses unknown/suppressed/conflict/unsupported findings.
 - ✅ Slice 3 complete: `mayExecuteCodemod` binds only current active opportunity findings and refuses absent, stale, suppressed, and conflict/non-opportunity findings.
+- ✅ Slice 4 complete: `previewSharedExtractionPatch` re-runs Pass 1, refuses stale spans/unsafe variance, and returns deterministic in-memory patch + rollback preview without workspace writes.
 - `propose_refactor` (proposal-only) → `apply_refactor` with the §4.6 capability-token gate (current+active+opportunity finding) → DRY-RUN → TYPECHECK → TESTS → GIT-clean → commit + reversal patch. NO `--force`.
 - Append-only codemod proof artifacts (patch + verification output + rollback patch + originating fingerprint)
-- **Next implementation slice:** dry-run transform and patch preview. Workspace must remain unchanged.
+- **Next implementation slice:** `apply_refactor` verification pipeline.
 
 ### P6 — First framework adapter (prove the seam)
 - `@rai/adapter-next`: detect + enrich (RSC/client/route tags, frozen-input append-only) + 2–3 Next analyzers + variant-guard diagnostics + nominal/positional-only fp extension

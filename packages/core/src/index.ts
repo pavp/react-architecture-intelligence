@@ -15,3 +15,5 @@ export { buildSharedExtractionProposal } from "./codemod/proposal.js";
 export type { SharedExtractionProposal, ProposalRefusalReason, ProposalRisk, ProposalRiskLevel, ProposalRiskReason } from "./codemod/proposal.js";
 export { mayExecuteCodemod } from "./codemod/capability-gate.js";
 export type { CodemodGateContext, CodemodGateRefusalReason, CodemodGateResult } from "./codemod/capability-gate.js";
+export { previewSharedExtractionPatch } from "./codemod/dry-run.js";
+export type { DryRunPatchInput, DryRunPatchPreview, DryRunRefusalReason } from "./codemod/dry-run.js";

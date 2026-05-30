@@ -1,6 +1,6 @@
 # P5 — Codemod Apply — Implementation Plan
 
-**Status:** In progress — Slices 1, 2, and 3 complete
+**Status:** In progress — Slices 1, 2, 3, and 4 complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §1, §4.6, §5.2, §7
@@ -149,17 +149,17 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 4 — Dry-run transform and patch preview
+### Slice 4 — Dry-run transform and patch preview ✅ DONE
 
 **Goal:** generate a patch preview for the first shared-extraction codemod without mutating the workspace.
 
 **Tasks:**
 
-- [ ] Add source loading for proposal/apply inputs without storing raw file bytes in findings.
-- [ ] Re-run Pass 1 on touched files and reject stale/mismatched spans.
-- [ ] Generate extraction patch in memory.
-- [ ] Return patch preview plus touched files and rollback preview.
-- [ ] Add fixture tests for clean apply preview and span-staleness refusal.
+- [x] Add source loading for proposal/apply inputs without storing raw file bytes in findings.
+- [x] Re-run Pass 1 on touched files and reject stale/mismatched spans.
+- [x] Generate extraction patch in memory.
+- [x] Return patch preview plus touched files and rollback preview.
+- [x] Add fixture tests for clean apply preview and span-staleness refusal.
 
 **Strict TDD anchors:**
 
@@ -170,8 +170,8 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 **Exit criteria:**
 
-- [ ] Dry-run proves the codemod can construct deterministic patches.
-- [ ] Workspace remains unchanged after dry-run.
+- [x] Dry-run proves the codemod can construct deterministic patches.
+- [x] Workspace remains unchanged after dry-run.
 
 ---
 
