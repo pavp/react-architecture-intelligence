@@ -2,7 +2,8 @@ import { expect, test } from "vitest";
 import { openDb } from "../db/db.js";
 import { analyzeRepo } from "./pipeline.js";
 import { sharedExtraction } from "../analyzers/shared-extraction.js";
-import { AnalyzerRegistry } from "../analyzers/registry.js";
+import { overAbstraction } from "../analyzers/over-abstraction.js";
+import { AnalyzerRegistry, createDefaultAnalyzerRegistry } from "../analyzers/registry.js";
 import { FindingsStore } from "../memory/findings-store.js";
 import { FeedbackStore } from "../memory/feedback-store.js";
 import { DEFAULT_CONFIG } from "../config/resolve.js";
@@ -123,6 +124,36 @@ test("persists successful findings while failed analyzer writes zero T3 findings
   const rows = db.prepare("SELECT rule_id, evidence_json FROM finding ORDER BY rule_id").all() as { rule_id: string; evidence_json: string }[];
   expect(rows.map((row) => row.rule_id)).toEqual(["rule/success"]);
   expect(rows.some((row) => row.evidence_json.includes("rule/failing"))).toBe(false);
+});
+
+test("executes shared extraction, render coupling, and over abstraction in registry order", () => {
+  const registry = createDefaultAnalyzerRegistry();
+
+  expect(registry.list().map((registered) => registered.ruleId)).toEqual([
+    "react/shared-extraction",
+    "react/render-coupling",
+    "react/over-abstraction",
+  ]);
+});
+
+test("C3 isolation lets later new analyzer findings survive failed earlier analyzer", () => {
+  const { findings, feedback } = setup();
+  const registry = new AnalyzerRegistry();
+  registry.register(analyzer("rule/failing", () => { throw new TypeError("boom"); }));
+  registry.register(overAbstraction);
+  const files = [{
+    file: "DenseCard.tsx",
+    source: "export function DenseCard({ a, b, c }) { return <section>{a}{b}{c}</section>; }",
+  }];
+  const config = { ...DEFAULT_CONFIG, overAbstraction: { ...DEFAULT_CONFIG.overAbstraction, maxProps: 2 } };
+
+  const res = analyzeRepo({ files, registry, findings, feedback, config, runId: "run1", commitSha: "c1", asOf: 0 });
+
+  expect(res.diagnostics).toEqual([
+    { ruleId: "rule/failing", kind: "analyzer-error", errorName: "TypeError", message: "boom" },
+  ]);
+  expect(res.presented.map((finding) => finding.ruleId)).toEqual(["react/over-abstraction"]);
+  expect(res.presented[0]!.evidence).toMatchObject({ kind: "over-abstraction", propCount: 3 });
 });
 
 test("returns deterministic analyzer diagnostics without finding or volatile fields", () => {
