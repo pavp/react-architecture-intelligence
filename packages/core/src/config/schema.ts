@@ -1,6 +1,13 @@
 import { z } from "zod";
 import type { Severity } from "../types.js";
 
+const ConventionNodeSelectorSchema = z.object({
+  kind: z.enum(["component", "hook"]).optional(),
+  name: z.string().optional(),
+  file: z.string().optional(),
+  exportKind: z.enum(["default", "named", "none"]).optional(),
+}).strict();
+
 export const ConfigSchema = z.object({
   configVersion: z.string().default("1"),
   shared: z.object({
@@ -70,6 +77,15 @@ export const ConfigSchema = z.object({
     kind: z.string().optional(),
     reason: z.string(),
   })).default([]),
+  conventions: z.array(z.object({
+    id: z.string().min(1),
+    edgeKind: z.enum(["renders", "uses-hook"]),
+    from: ConventionNodeSelectorSchema.default({}),
+    to: ConventionNodeSelectorSchema.default({}),
+    policy: z.literal("forbid").default("forbid"),
+    severity: z.enum(["info", "warn", "error"]).default("warn"),
+    reason: z.string().min(1),
+  }).strict()).default([]),
 });
 
 export type RaiConfig = z.infer<typeof ConfigSchema>;

@@ -84,7 +84,17 @@ export interface HookTopologyEvidence {
   reachableDepth: number;
 }
 
-export type Evidence = SharedExtractionEvidence | RenderCouplingEvidence | OverAbstractionEvidence | HookTopologyEvidence;
+export interface BoundaryViolationEvidence {
+  kind: "boundary-violation";
+  convention: { id: string; edgeKind: "renders" | "uses-hook"; policy: "forbid"; reason: string };
+  edge: {
+    kind: "renders" | "uses-hook";
+    from: { id: string; kind: "component" | "hook"; name: string; file: string; span: Span };
+    to: { id: string; kind: "component" | "hook"; name: string; file: string; span: Span };
+  };
+}
+
+export type Evidence = SharedExtractionEvidence | RenderCouplingEvidence | OverAbstractionEvidence | HookTopologyEvidence | BoundaryViolationEvidence;
 
 export interface Finding {
   id: string;

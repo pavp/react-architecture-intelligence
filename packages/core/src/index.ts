@@ -9,4 +9,5 @@ export { sharedExtraction, RULE_ID as SHARED_EXTRACTION_RULE_ID } from "./analyz
 export { renderCoupling, RULE_ID as RENDER_COUPLING_RULE_ID } from "./analyzers/render-coupling.js";
 export { overAbstraction, RULE_ID as OVER_ABSTRACTION_RULE_ID } from "./analyzers/over-abstraction.js";
 export { hookTopology, RULE_ID as HOOK_TOPOLOGY_RULE_ID } from "./analyzers/hook-topology.js";
+export { boundaryViolation, RULE_ID as BOUNDARY_VIOLATION_RULE_ID } from "./analyzers/boundary-violation.js";
 export { AnalyzerRegistry, createDefaultAnalyzerRegistry } from "./analyzers/registry.js";

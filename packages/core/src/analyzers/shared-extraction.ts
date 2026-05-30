@@ -5,6 +5,7 @@ import { embedComponent } from "../similarity/embed.js";
 import { clusterByCosine, minClusterCosine } from "../similarity/similarity-index.js";
 import { structuralFingerprint, FP_ALGO_VERSION } from "../fingerprint/structural.js";
 import { createHash } from "node:crypto";
+import { globMatch } from "./matching.js";
 
 export const RULE_ID = "react/shared-extraction";
 
@@ -91,27 +92,6 @@ export const sharedExtraction: Analyzer = {
 
 function isCandidate(comp: ComponentNode, excludeGlobs: string[]): boolean {
   return !excludeGlobs.some((g) => globMatch(g, comp.file));
-}
-
-/** Minimal glob: supports **, *, and literal segments. Enough for the MVP exclude list. */
-function globMatch(glob: string, path: string): boolean {
-  // Split on ** then escape literal parts and replace single * with [^/]*
-  const escSeg = (s: string) =>
-    s.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*");
-
-  // Normalize: treat leading **/ as optional dir prefix, trailing /** as optional trailing
-  const norm = glob
-    .replace(/^\*\*\//, "__LEAD__")
-    .replace(/\/\*\*$/, "__TRAIL__")
-    .replace(/\*\*/g, "__STAR2__");
-
-  let pattern = norm
-    .split("__STAR2__").map(escSeg).join(".*")
-    .replace("__LEAD__", "(?:.*\\/)?")
-    .replace("__TRAIL__", "(?:\\/.*)?");
-
-  const re = new RegExp("^" + pattern + "$");
-  return re.test(path);
 }
 
 function jaccardSets(sets: Set<string>[]): number {

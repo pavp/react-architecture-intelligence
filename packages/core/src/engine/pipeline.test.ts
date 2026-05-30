@@ -137,6 +137,7 @@ test("executes default analyzers in registry order", () => {
     "react/render-coupling",
     "react/over-abstraction",
     "react/hook-topology",
+    "react/boundary-violation",
   ]);
 });
 

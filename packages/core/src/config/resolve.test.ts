@@ -59,3 +59,31 @@ test("resolveConfig accepts partial threshold overrides without adding non-metri
   // @ts-expect-error convention config is intentionally out of scope for Slice 4.
   expect(() => resolveConfig({ hookTopology: { forbiddenHooks: [] } })).toThrow();
 });
+
+test("resolveConfig accepts forbidden edge conventions with defaults", () => {
+  const c = resolveConfig({
+    conventions: [{
+      id: "no-feature-to-ui-render",
+      edgeKind: "renders",
+      from: { kind: "component", file: "features/**" },
+      to: { kind: "component", file: "ui/**" },
+      reason: "feature components must not render ui internals",
+    }],
+  });
+
+  expect(c.conventions).toEqual([{
+    id: "no-feature-to-ui-render",
+    edgeKind: "renders",
+    from: { kind: "component", file: "features/**" },
+    to: { kind: "component", file: "ui/**" },
+    policy: "forbid",
+    severity: "warn",
+    reason: "feature components must not render ui internals",
+  }]);
+});
+
+test("resolveConfig rejects convention edge kinds that are not built yet", () => {
+  expect(() => resolveConfig({
+    conventions: [{ id: "no-imports", edgeKind: "imports", from: {}, to: {}, reason: "imports not built yet" }],
+  } as any)).toThrow();
+});

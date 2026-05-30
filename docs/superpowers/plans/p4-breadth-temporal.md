@@ -1,6 +1,6 @@
 # P4 — Breadth + Temporal — Implementation Plan
 
-**Status:** In progress — Slices 1/1b/2/3/4 complete; Slice 4b conventions remains
+**Status:** In progress — Slices 1/1b/2/3/4/4b complete; Slice 5 backfill deferred
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §3.5, §5.2, §7.2
@@ -89,10 +89,10 @@ adoption onward.
 `Component -> Hook` plus `Hook -> Hook` `uses-hook` edges. `passes`, `imports`, and `calls`
 remain deferred because Slice 4 does not ship prop-flow or import/call analyzers.
 
-### D3 — Hook-convention config mechanism (gaps §3.6) — DEFERRED TO SLICE 4B
+### D3 — Hook-convention config mechanism (gaps §3.6) — RESOLVED IN SLICE 4B
 
-Slice 4 ships metric-only `react/hook-topology` first (fan-in/fan-out/direct dependencies/depth),
-like `render-coupling`. Team-defined convention config stays out of scope and moves to Slice 4b.
+Slice 4 shipped metric-only `react/hook-topology`; Slice 4b adds team-defined `conventions[]`
+for forbidden `renders` / `uses-hook` edges and the `react/boundary-violation` analyzer.
 
 ---
 
@@ -336,6 +336,31 @@ more and resolves the edge-construction gap.
 
 ---
 
+### Slice 4b — `boundary-violation` / convention analyzer ✅ DONE
+
+**Goal:** make existing graph edges useful for team-specific architectural rules without adding
+new edge types.
+
+**Implemented scope:** config-driven `conventions[]` for forbidden `renders` and `uses-hook`
+edges, plus `react/boundary-violation` findings with `architectural-conflict` type. Unsupported
+edge kinds (`imports`, `calls`, `passes`) are rejected until those edges are constructed.
+
+**Tasks:**
+- [x] **4b.1 Convention config schema** — `id`, `edgeKind`, `from`, `to`, `policy`, `severity`, `reason`.
+- [x] **4b.2 Selector matching** — node `kind`, `name`, `file`, and `exportKind`; `name`/`file` use minimal glob semantics.
+- [x] **4b.3 `react/boundary-violation` analyzer** — emits `architectural-conflict` findings over current graph edges only.
+- [x] **4b.4 Register/export analyzer** in default registry and public package exports.
+- [x] **4b.5 Spec/status/gaps update**.
+
+**Exit criteria:**
+- [x] Forbidden `renders` edge emits conflict.
+- [x] Forbidden `uses-hook` edge emits conflict.
+- [x] Component-to-hook `uses-hook` conventions can match.
+- [x] Unsupported edge kinds are rejected, not silently ignored.
+- [x] build/test/typecheck clean; spec updated.
+
+---
+
 ### Slice 5 — (Deferred) `rai backfill` CLI
 
 **Goal:** retroactively populate `snapshot` for historical commits, solving cold-start
@@ -373,7 +398,7 @@ Slice 1 (snapshot + get_drift)   ← FIRST, groundwork exists, highest value
         ├── Slice 2 (query_architecture)   independent of 1, can run parallel
         ├── Slice 3 (ts-morph Pass-2)      independent, unlocks type-aware work
         └── Slice 4 (edge audit + hook-topology)
-                    └── Slice 4b (boundary-violation / conventions)   if split
+                    └── Slice 4b (boundary-violation / conventions)
 Slice 5 (backfill CLI)   deferred, after Slice 1 contract is stable
 ```
 

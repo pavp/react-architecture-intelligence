@@ -74,7 +74,7 @@ Tasks that need to be formalized:
 - Populate `snapshot` table on each analysis run — ✅ done
 - Implement `get_drift` MCP tool (pure SQL set-algebra over snapshots — spec §3.5/§5.2) — ✅ done
 - Implement `query_architecture` MCP tool (enumerated graph questions, bounded traversal — spec §5.2) — ✅ done for current `renders` graph facts
-- Add more analyzers: `coupling`, `hook-topology`, `over-abstraction`, `boundary-violation` — ✅ `react/render-coupling`, `react/over-abstraction`, and metric-only `react/hook-topology` done; `boundary-violation` / conventions deferred
+- Add more analyzers: `coupling`, `hook-topology`, `over-abstraction`, `boundary-violation` — ✅ `react/render-coupling`, `react/over-abstraction`, `react/hook-topology`, and `react/boundary-violation` done
 - Analyzer fault containment: crash isolation ✅ done; hard sync-CPU timeout still deferred until worker isolation exists
 - Band C MCP tools: `get_node`, `raw_graph_query` (spec §5.4)
 
@@ -157,15 +157,15 @@ These are issues identified in the spec or through architectural review that hav
 
 **Change:** `wire-deferred-mvp-gaps` — branch `feat/rai-mvp-p0-p3`.
 
-### 3.6 Hook coupling conventions — metric analyzer done; convention config deferred
+### 3.6 Hook coupling conventions ✅ FIXED in `wire-boundary-violation-conventions`
 
-**Problem:** `wire-hook-topology` now builds `uses-hook` edges and emits metric-only `react/hook-topology` findings. But there is still no config mechanism to declare forbidden or required hook dependency patterns — no way to say "useCheckout must not depend on useCart directly".
+**Fix applied:** Added `conventions[]` config plus `react/boundary-violation`. Teams can now forbid `renders` and `uses-hook` edges with selectors over node kind, name, file, and export kind.
 
-The edges now exist in the graph and are visible to the metric analyzer. Without a `conventions[]` config knob for edge patterns, team-specific rule violations remain invisible.
+The edges now exist in the graph, metric topology is visible, and team-specific forbidden edges can produce `architectural-conflict` findings.
 
-**Impact:** Hook coupling depth/fan-in/fan-out now produces findings, but team-specific conventions still cannot be enforced. This is the same mechanism as §1.1 (boundary_rule for components).
+**Remaining limitation:** Only `renders` and `uses-hook` conventions are supported. `imports`, `calls`, and `passes` convention rules are rejected until those edges are constructed.
 
-**Fix:** Implement the team-defined convention analyzer in Slice 4b. The `uses-hook` edge case should be a first-class example in the convention config schema.
+**Change:** `wire-boundary-violation-conventions` — branch `feat/rai-mvp-p0-p3`.
 
 ---
 
@@ -241,7 +241,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 3. ~~**Implement snapshot population + `get_drift`**~~ — ✅ complete.
 4. ~~**Implement `query_architecture`**~~ — ✅ complete for current render graph facts.
 5. ~~**Wire lazy ts-morph Pass-2** (§1.2)~~ — ✅ complete.
-6. **Implement `boundary-violation` / conventions** if P4 continues beyond metric analyzers.
+6. ~~**Implement `boundary-violation` / conventions**~~ — ✅ complete for `renders` / `uses-hook`.
 7. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
 
 ---

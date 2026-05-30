@@ -1,12 +1,12 @@
 # Capability Spec: Architecture Analysis
 
 **Status**: Active (RFC 2119)  
-**Origin**: changes `wire-deferred-mvp-gaps`, `more-analyzers-render-overabstraction`, `wire-hook-topology` (2026-05-30)
-**Scope**: config-driven boundary conflict classification, render/structure analyzers, and metric-only hook topology.
+**Origin**: changes `wire-deferred-mvp-gaps`, `more-analyzers-render-overabstraction`, `wire-hook-topology`, `wire-boundary-violation-conventions` (2026-05-30)
+**Scope**: config-driven boundary conflict classification, render/structure analyzers, hook topology, and convention-based boundary violations.
 
 ## Purpose
 
-Define durable contracts for deterministic architecture analyzers. Boundary classification and topology findings are CODE-derived from CONFIG data and MUST preserve append-only finding semantics.
+Define durable contracts for deterministic architecture analyzers. Boundary classification, topology findings, and convention violations are CODE-derived from CONFIG data and MUST preserve append-only finding semantics.
 
 ## Boundary Rules Contract
 
@@ -115,9 +115,36 @@ The system MUST emit `react/hook-topology` findings only from current hook graph
 - WHEN architecture analysis runs
 - THEN `react/hook-topology` MUST emit no finding
 
+## Requirement: Convention-Based Boundary Violation Findings
+
+The config MUST support `conventions[]` entries that forbid currently constructed graph edges. This capability version supports only `edgeKind: "renders"` and `edgeKind: "uses-hook"`. Unsupported edge kinds such as `imports`, `calls`, and `passes` MUST be rejected by config validation until those edges are constructed.
+
+Each convention MUST include stable `id`, `edgeKind`, `from` selector, `to` selector, `reason`, optional `severity`, and `policy: "forbid"`. Selectors MAY match node `kind`, `name`, `file`, and `exportKind`; `name` and `file` selectors use the existing minimal glob semantics.
+
+`react/boundary-violation` MUST emit `architectural-conflict` findings for forbidden matching edges. Evidence MUST identify the convention and the exact graph edge. Findings MUST NOT claim prop-flow, import, runtime call, or unstored ownership facts.
+
+### Scenario: Forbidden render edge emits conflict
+
+- GIVEN a convention forbids `renders` edges from `features/**` components to `ui/**` components
+- WHEN the current graph contains such an edge
+- THEN `react/boundary-violation` MUST emit an `architectural-conflict`
+- AND evidence MUST include convention id, reason, edge kind, source node, and destination node
+
+### Scenario: Forbidden hook edge emits conflict
+
+- GIVEN a convention forbids `uses-hook` edges from `useCheckout` to `useCart`
+- WHEN the current graph contains that hook edge
+- THEN `react/boundary-violation` MUST emit an `architectural-conflict`
+
+### Scenario: Unsupported edge kinds are rejected
+
+- GIVEN config declares a convention for an edge kind that is not constructed
+- WHEN config resolution runs
+- THEN validation MUST fail rather than silently creating a no-op convention
+
 ## Requirement: Analyzer Scope Invariants
 
-The render and over-abstraction analyzers MUST NOT introduce hook-topology naming, parser enrichment, ts-morph or type-aware logic, or import coupling claims. `react/hook-topology` MUST remain metric-only and MUST NOT implement team-defined convention or boundary-violation rules in this capability version.
+The render and over-abstraction analyzers MUST NOT introduce hook-topology naming, parser enrichment, ts-morph or type-aware logic, or import coupling claims. `react/hook-topology` MUST remain metric-only. `react/boundary-violation` MUST only evaluate configured conventions over existing graph edges.
 
 ### Scenario: Out-of-scope data remains unused
 
@@ -126,6 +153,7 @@ The render and over-abstraction analyzers MUST NOT introduce hook-topology namin
 - THEN render findings MUST depend only on render edges and `ComponentNode` identities
 - AND over-abstraction findings MUST depend only on `ComponentNode` structural facts
 - AND hook-topology findings MUST depend only on hook graph facts
+- AND boundary-violation findings MUST depend only on configured conventions and existing graph edges
 - AND rule names and evidence MUST NOT imply out-of-scope capabilities
 
 ## Integrity Invariants
@@ -146,9 +174,10 @@ The render and over-abstraction analyzers MUST NOT introduce hook-topology namin
 | No boundaries configured | finding type remains `opportunity` |
 | Hook composes another known hook | `uses-hook` edge exists |
 | Hook topology exceeds threshold | metric-only `react/hook-topology` finding exists |
+| Configured convention forbids existing edge | `react/boundary-violation` architectural conflict exists |
 
 ## References
 
-- Implementation: `packages/core/src/analyzers/analyzer.ts`, `packages/core/src/engine/pipeline.ts`, `packages/core/src/analyzers/shared-extraction.ts`, `packages/core/src/analyzers/hook-topology.ts`, `packages/core/src/parse/pass1.ts`, `packages/core/src/parse/graph-build.ts`
-- Tests: `packages/core/src/analyzers/shared-extraction.test.ts`, `packages/core/src/analyzers/hook-topology.test.ts`, `packages/core/src/parse/pass1.test.ts`, `packages/core/src/parse/graph-build.test.ts`, `packages/core/src/engine/pipeline.test.ts`
-- Source changes: `wire-deferred-mvp-gaps`, `more-analyzers-render-overabstraction`, `wire-hook-topology`
+- Implementation: `packages/core/src/analyzers/analyzer.ts`, `packages/core/src/engine/pipeline.ts`, `packages/core/src/analyzers/shared-extraction.ts`, `packages/core/src/analyzers/hook-topology.ts`, `packages/core/src/analyzers/boundary-violation.ts`, `packages/core/src/parse/pass1.ts`, `packages/core/src/parse/graph-build.ts`
+- Tests: `packages/core/src/analyzers/shared-extraction.test.ts`, `packages/core/src/analyzers/hook-topology.test.ts`, `packages/core/src/analyzers/boundary-violation.test.ts`, `packages/core/src/parse/pass1.test.ts`, `packages/core/src/parse/graph-build.test.ts`, `packages/core/src/engine/pipeline.test.ts`
+- Source changes: `wire-deferred-mvp-gaps`, `more-analyzers-render-overabstraction`, `wire-hook-topology`, `wire-boundary-violation-conventions`

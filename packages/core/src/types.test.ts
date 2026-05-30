@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import type {
   Fingerprint,
+  BoundaryViolationEvidence,
   Finding,
   FindingType,
   HookTopologyEvidence,
@@ -34,7 +35,7 @@ test("isFinding rejects a non-finding", () => {
   expect(isFinding(null)).toBe(false);
 });
 
-test("finding evidence accepts metric-only render-coupling, over-abstraction, and hook-topology variants", () => {
+test("finding evidence accepts metric-only analyzer and boundary-violation variants", () => {
   const span: Span = { file: "Card.tsx", start: 0, end: 10, kind: "component", astPath: "module>fn[0]" };
   const renderEvidence: RenderCouplingEvidence = {
     kind: "render-coupling",
@@ -61,6 +62,15 @@ test("finding evidence accepts metric-only render-coupling, over-abstraction, an
     directDependencies: 3,
     reachableDepth: 2,
   };
+  const violationEvidence: BoundaryViolationEvidence = {
+    kind: "boundary-violation",
+    convention: { id: "no-feature-to-ui", edgeKind: "renders", policy: "forbid", reason: "no cross layer render" },
+    edge: {
+      kind: "renders",
+      from: { id: "Page", kind: "component", name: "Page", file: "features/Page.tsx", span },
+      to: { id: "Button", kind: "component", name: "Button", file: "ui/Button.tsx", span },
+    },
+  };
 
   const fp: Fingerprint = { structural: "s", nominal: "n", positional: "p" };
   const renderFinding: Finding = {
@@ -78,8 +88,10 @@ test("finding evidence accepts metric-only render-coupling, over-abstraction, an
   };
   const abstractionFinding: Finding = { ...renderFinding, id: "01O", ruleId: "react/over-abstraction", evidence: abstractionEvidence };
   const hookFinding: Finding = { ...renderFinding, id: "01H", ruleId: "react/hook-topology", evidence: hookEvidence };
+  const violationFinding: Finding = { ...renderFinding, id: "01B", ruleId: "react/boundary-violation", type: "architectural-conflict", evidence: violationEvidence };
 
   expect(isFinding(renderFinding)).toBe(true);
   expect(isFinding(abstractionFinding)).toBe(true);
   expect(isFinding(hookFinding)).toBe(true);
+  expect(isFinding(violationFinding)).toBe(true);
 });

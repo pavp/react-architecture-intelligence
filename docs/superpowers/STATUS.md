@@ -2,17 +2,17 @@
 
 **Last updated:** 2026-05-30
 **Branch:** `feat/rai-mvp-p0-p3` (not yet merged to `main`)
-**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Pass-2, and hook-topology slices complete; CI/PR workflow active.**
+**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Pass-2, hook topology, and conventions slices complete; CI/PR workflow active.**
 
 ---
 
 ## TL;DR
 
-The MVP vertical slice is done, temporal drift is active, `query_architecture` is available, lazy Pass-2 is wired, hook topology is analyzed, and GitHub PRs run CI.
+The MVP vertical slice is done, temporal drift is active, `query_architecture` is available, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, and GitHub PRs run CI.
 
 ```
 typecheck:  0 errors (strict: noUncheckedIndexedAccess + exactOptionalPropertyTypes)
-tests:      192 passing / 29 files (Vitest)
+tests:      200 passing / 30 files (Vitest)
 build:      both packages compile; schema.sql copied to dist
 CLI smoke:  rai analyze fixtures/duplication/buttons → { opportunity: 1, warn: 1 }
             rai mcp fixtures/duplication/buttons    → stdio handshake + 4 tools listed
@@ -39,7 +39,7 @@ append-only, and **a human rejection survives re-analysis and suppresses the fin
 | DB | `core/src/db/` | SQLite (T1–T5 + snapshot) + **better-sqlite3 + sqlite-vec** |
 | Memory | `core/src/memory/` | T3 append-only findings · T4 feedback (anti-self-loop+phantom guard) · pure reducer · overlay · MemoryReader |
 | Similarity | `core/src/similarity/` | deterministic feature-hash embedding + cosine clustering |
-| Analyzers | `core/src/analyzers/` | contract + registry + `shared-extraction`, `render-coupling`, `over-abstraction`, `hook-topology` |
+| Analyzers | `core/src/analyzers/` | contract + registry + `shared-extraction`, `render-coupling`, `over-abstraction`, `hook-topology`, `boundary-violation` |
 | Engine | `core/src/engine/pipeline.ts` | `analyzeRepo`: graph→analyze→persist→overlay, with per-analyzer crash diagnostics |
 | Golden | `fixtures/`, `engine/golden.test.ts` | corpus + rebuild/determinism-replay |
 | MCP | `core/src/mcp/` | Band-A/B tools session + stdio server, including `get_drift` and `query_architecture` |
@@ -117,7 +117,8 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - ~~`query_architecture` MCP tool~~ — ✅ Done; bounded questions over latest analyzed `RepoGraph`.
 - ~~Lazy ts-morph Pass-2~~ — ✅ Done; `ctx.types.typeOf(span)` returns stable `TypeInfo` lazily.
 - ~~`react/hook-topology` analyzer + `uses-hook` edges~~ — ✅ Done; metric-only hook fan-in/fan-out/depth.
-- **Still next:** `boundary-violation` / conventions as scoped, plus deferred edge work (`passes`, import/call analyzers) only when needed.
+- ~~`react/boundary-violation` / conventions~~ — ✅ Done; config forbids `renders` / `uses-hook` edges.
+- **Still next:** deferred edge work (`passes`, import/call analyzers) only when needed, or P5 planning.
 
 ### P5 — Codemod apply (dangerous — sequenced last, gated)
 - `propose_refactor` (proposal-only) → `apply_refactor` with the §4.6 capability-token gate (current+active+opportunity finding) → DRY-RUN → TYPECHECK → TESTS → GIT-clean → commit + reversal patch. NO `--force`.

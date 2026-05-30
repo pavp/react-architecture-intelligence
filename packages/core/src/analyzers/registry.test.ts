@@ -25,5 +25,6 @@ test("default registry includes hook topology after structural analyzers", () =>
     "react/render-coupling",
     "react/over-abstraction",
     "react/hook-topology",
+    "react/boundary-violation",
   ]);
 });

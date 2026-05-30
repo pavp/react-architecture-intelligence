@@ -3,6 +3,7 @@ import { sharedExtraction } from "./shared-extraction.js";
 import { renderCoupling } from "./render-coupling.js";
 import { overAbstraction } from "./over-abstraction.js";
 import { hookTopology } from "./hook-topology.js";
+import { boundaryViolation } from "./boundary-violation.js";
 
 export class AnalyzerRegistry {
   private analyzers = new Map<string, Analyzer>();
@@ -23,5 +24,6 @@ export function createDefaultAnalyzerRegistry(): AnalyzerRegistry {
   registry.register(renderCoupling);
   registry.register(overAbstraction);
   registry.register(hookTopology);
+  registry.register(boundaryViolation);
   return registry;
 }
