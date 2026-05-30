@@ -1,7 +1,7 @@
 import type { AnalysisDiagnostic, Finding, PresentedFinding } from "../types.js";
 import type { RaiConfig } from "../config/schema.js";
 import { buildGraph, type SourceFile } from "../parse/graph-build.js";
-import { freezeGraph } from "../graph/repograph.js";
+import { freezeGraph, type RepoGraph } from "../graph/repograph.js";
 import { AnalyzerRegistry } from "../analyzers/registry.js";
 import { FindingsStore } from "../memory/findings-store.js";
 import { FeedbackStore } from "../memory/feedback-store.js";
@@ -10,6 +10,7 @@ import { overlay } from "../memory/overlay.js";
 import { EMBED_MODEL_VERSION } from "../similarity/embed.js";
 import type { Analyzer, AnalysisContext, BoundaryRule } from "../analyzers/analyzer.js";
 import { SnapshotStore } from "../memory/snapshot-store.js";
+import { createTypeResolver, type TypeResolverHooks } from "../parse/type-resolver.js";
 
 export interface AnalyzeRepoInput {
   files: SourceFile[];
@@ -21,6 +22,7 @@ export interface AnalyzeRepoInput {
   commitSha: string;
   asOf: number; // explicit time anchor (§3.3 determinism)
   analysisVersion?: number | undefined;
+  typeResolverHooks?: TypeResolverHooks | undefined;
 }
 
 export interface AnalyzeRepoResult {
@@ -28,6 +30,7 @@ export interface AnalyzeRepoResult {
   diagnostics: AnalysisDiagnostic[];
   analysisVersion: number;
   runId: string;
+  graph: Readonly<RepoGraph>;
 }
 
 /** analyzeRepo orchestration (§2.5). Pure analyzers, impure persistence around them. */
@@ -44,7 +47,7 @@ export function analyzeRepo(input: AnalyzeRepoInput): AnalyzeRepoResult {
   );
   const ctx: AnalysisContext = {
     graph, memory, config: input.config,
-    types: { typeOf: () => null }, // lazy Pass-2 wired in P4
+    types: createTypeResolver({ files: input.files, graph, hooks: input.typeResolverHooks }),
     runId: input.runId, commitSha: input.commitSha,
     analysisVersion, embeddingModelVersion: EMBED_MODEL_VERSION,
     boundaryRules: input.config.boundaries as readonly BoundaryRule[],
@@ -94,7 +97,7 @@ export function analyzeRepo(input: AnalyzeRepoInput): AnalyzeRepoResult {
   }
 
   presented.sort((a, b) => a.fingerprint.structural.localeCompare(b.fingerprint.structural));
-  return { presented, diagnostics, analysisVersion, runId: input.runId };
+  return { presented, diagnostics, analysisVersion, runId: input.runId, graph };
 }
 
 function runAnalyzerSafely(analyzer: Analyzer, ctx: AnalysisContext): { findings: Finding[]; diagnostic: AnalysisDiagnostic | null } {

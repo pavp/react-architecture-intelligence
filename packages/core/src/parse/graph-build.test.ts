@@ -19,6 +19,23 @@ test("creates a renders edge Page -> Card", () => {
   expect(edge).toBeDefined();
 });
 
+test("creates uses-hook edges for component consumers and hook composition", () => {
+  const g = buildGraph([
+    { file: "hooks.ts", source: `export function useCheckout() { useCart(); usePrice(); }
+function useCart() { useState([]); }
+function usePrice() { return 1; }` },
+    { file: "Page.tsx", source: `export function Page() { useCheckout(); return <div />; }` },
+  ]);
+  const page = g.components.find((c) => c.name === "Page")!;
+  const checkout = g.hooks.find((h) => h.name === "useCheckout")!;
+  const cart = g.hooks.find((h) => h.name === "useCart")!;
+  const price = g.hooks.find((h) => h.name === "usePrice")!;
+
+  expect(g.edges).toContainEqual({ srcId: page.id, dstId: checkout.id, kind: "uses-hook" });
+  expect(g.edges).toContainEqual({ srcId: checkout.id, dstId: cart.id, kind: "uses-hook" });
+  expect(g.edges).toContainEqual({ srcId: checkout.id, dstId: price.id, kind: "uses-hook" });
+});
+
 test("modules carry a content hash", () => {
   const g = buildGraph([{ file: "Card.tsx", source: A }]);
   expect(g.modules[0]!.contentHash).toMatch(/^[0-9a-f]{64}$/);

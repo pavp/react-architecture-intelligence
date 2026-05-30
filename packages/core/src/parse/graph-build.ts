@@ -1,18 +1,20 @@
 import { pass1 } from "./pass1.js";
 import { contentHash } from "../graph/content-hash.js";
 import type { RepoGraph } from "../graph/repograph.js";
-import type { GraphEdge, ModuleNode, ComponentNode } from "../types.js";
+import type { GraphEdge, ModuleNode, ComponentNode, HookNode } from "../types.js";
 
 export interface SourceFile { file: string; source: string; }
 
 export function buildGraph(files: SourceFile[]): RepoGraph {
   const components: ComponentNode[] = [];
+  const hooks: HookNode[] = [];
   const modules: ModuleNode[] = [];
   const edges: GraphEdge[] = [];
 
   for (const { file, source } of files) {
     const r = pass1(file, source);
     components.push(...r.components);
+    hooks.push(...r.hooks);
     modules.push({ id: file, file, contentHash: contentHash(source) });
   }
 
@@ -27,5 +29,32 @@ export function buildGraph(files: SourceFile[]): RepoGraph {
     }
   }
 
-  return { components, modules, edges };
+  const hookByName = new Map<string, string>();
+  for (const hook of hooks) if (!hookByName.has(hook.name)) hookByName.set(hook.name, hook.id);
+
+  for (const component of components) {
+    for (const hookName of component.hookCalls) {
+      const dst = hookByName.get(hookName);
+      if (dst) edges.push({ srcId: component.id, dstId: dst, kind: "uses-hook" });
+    }
+  }
+
+  for (const hook of hooks) {
+    for (const hookName of hook.hookCalls) {
+      const dst = hookByName.get(hookName);
+      if (dst && dst !== hook.id) edges.push({ srcId: hook.id, dstId: dst, kind: "uses-hook" });
+    }
+  }
+
+  return { components, hooks, modules, edges: dedupeEdges(edges).sort(compareEdges) };
+}
+
+function dedupeEdges(edges: GraphEdge[]): GraphEdge[] {
+  const byKey = new Map<string, GraphEdge>();
+  for (const edge of edges) byKey.set(`${edge.kind}:${edge.srcId}:${edge.dstId}`, edge);
+  return [...byKey.values()];
+}
+
+function compareEdges(a: GraphEdge, b: GraphEdge): number {
+  return a.kind.localeCompare(b.kind) || a.srcId.localeCompare(b.srcId) || a.dstId.localeCompare(b.dstId);
 }

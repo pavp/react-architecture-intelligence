@@ -2,6 +2,7 @@ import type { Analyzer } from "./analyzer.js";
 import { sharedExtraction } from "./shared-extraction.js";
 import { renderCoupling } from "./render-coupling.js";
 import { overAbstraction } from "./over-abstraction.js";
+import { hookTopology } from "./hook-topology.js";
 
 export class AnalyzerRegistry {
   private analyzers = new Map<string, Analyzer>();
@@ -21,5 +22,6 @@ export function createDefaultAnalyzerRegistry(): AnalyzerRegistry {
   registry.register(sharedExtraction);
   registry.register(renderCoupling);
   registry.register(overAbstraction);
+  registry.register(hookTopology);
   return registry;
 }

@@ -30,6 +30,17 @@ test("extracts hook calls", () => {
   expect(btn.hookCalls).toContain("useTheme");
 });
 
+test("extracts custom hook declarations with composed hook calls", () => {
+  const r = pass1("hooks.ts", `export function useCheckout() { const cart = useCart(); const price = usePrice(); return { cart, price }; }
+function useCart() { return useState([]); }`);
+  const hook = r.hooks.find((h) => h.name === "useCheckout");
+
+  expect(hook).toBeDefined();
+  expect(hook!.hookCalls).toEqual(["useCart", "usePrice"]);
+  expect(hook!.exportKind).toBe("named");
+  expect(hook!.span.kind).toBe("hook");
+});
+
 test("is pure: same source yields deeply equal output", () => {
   expect(pass1("Button.tsx", SRC)).toEqual(pass1("Button.tsx", SRC));
 });

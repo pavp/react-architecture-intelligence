@@ -12,6 +12,13 @@ const C = `function CtaButton({ label, onClick, variant }) { const t = useTheme(
 export default CtaButton;`;
 const files = [{ file: "LoginButton.tsx", source: A }, { file: "SignupBtn.tsx", source: B }, { file: "CtaButton.tsx", source: C }];
 
+const graphFiles = [
+  { file: "Leaf.tsx", source: "export function Leaf() { return <span />; }" },
+  { file: "Card.tsx", source: "export function Card() { return <Leaf />; }" },
+  { file: "Sidebar.tsx", source: "export function Sidebar() { return <Leaf />; }" },
+  { file: "Page.tsx", source: "export function Page() { return <main><Card /><Sidebar /></main>; }" },
+];
+
 function makeFinding(ruleId: string): Finding {
   return {
     id: `finding-${ruleId}`,
@@ -50,6 +57,75 @@ test("analyze_repo returns counts + handles, not a finding dump", () => {
   expect(r.counts.byType.opportunity).toBe(1);
   expect(r.topFingerprints.length).toBe(1);
   expect((r as any).findings).toBeUndefined(); // handles, not bodies
+  expect((r as any).graph).toBeUndefined(); // graph stays internal to query_architecture
+});
+
+// ─── queryArchitecture tests ────────────────────────────────────────────────
+
+test("queryArchitecture refuses unknown questions with the valid enum", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+
+  const r = s.queryArchitecture({ question: "hook-consumers", target: "Leaf" });
+
+  expect(r).toEqual({
+    status: "unknown_question",
+    question: "hook-consumers",
+    validQuestions: ["renders", "rendered-by", "fan-in", "fan-out", "reachability"],
+  });
+});
+
+test("queryArchitecture requires a prior analysis", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+
+  const r = s.queryArchitecture({ question: "renders", target: "Page" });
+
+  expect(r.status).toBe("no_analysis");
+});
+
+test("queryArchitecture answers renders and rendered-by from the last graph", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  s.analyzeRepo({ files: graphFiles, asOf: 0 });
+
+  const renders = s.queryArchitecture({ question: "renders", target: "Page" });
+  const renderedBy = s.queryArchitecture({ question: "rendered-by", target: "Leaf" });
+
+  expect(renders.status).toBe("ok");
+  expect((renders as any).answer.children.map((n: { name: string }) => n.name)).toEqual(["Card", "Sidebar"]);
+  expect((renders as any).edges).toHaveLength(2);
+  expect(renderedBy.status).toBe("ok");
+  expect((renderedBy as any).answer.parents.map((n: { name: string }) => n.name)).toEqual(["Card", "Sidebar"]);
+});
+
+test("queryArchitecture answers fan-in for a shared rendered component", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  s.analyzeRepo({ files: graphFiles, asOf: 0 });
+
+  const r = s.queryArchitecture({ question: "fan-in", target: "Leaf" });
+
+  expect(r.status).toBe("ok");
+  expect((r as any).answer.count).toBe(2);
+});
+
+test("queryArchitecture reachability respects the requested depth bound", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  s.analyzeRepo({ files: graphFiles, asOf: 0 });
+
+  const depthOne = s.queryArchitecture({ question: "reachability", target: "Page", depth: 1 });
+  const depthTwo = s.queryArchitecture({ question: "reachability", target: "Page", depth: 2 });
+
+  expect(depthOne.status).toBe("ok");
+  expect((depthOne as any).answer.reachable.map((n: { name: string }) => n.name)).toEqual(["Card", "Sidebar"]);
+  expect(depthTwo.status).toBe("ok");
+  expect((depthTwo as any).answer.reachable.map((n: { name: string }) => n.name)).toEqual(["Card", "Leaf", "Sidebar"]);
+});
+
+test("queryArchitecture refuses unknown targets", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  s.analyzeRepo({ files: graphFiles, asOf: 0 });
+
+  const r = s.queryArchitecture({ question: "renders", target: "Missing" });
+
+  expect(r).toEqual({ status: "unknown_target", target: "Missing" });
 });
 
 test("analyze_repo returns diagnostic count and details for partial analyzer failure", () => {

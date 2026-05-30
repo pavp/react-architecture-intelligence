@@ -1,12 +1,12 @@
 # Capability Spec: Analysis Pipeline
 
 **Status**: Active (RFC 2119)  
-**Origin**: change `analyzer-fault-containment` (2026-05-30)  
-**Scope**: analyzer execution ordering, partial-failure diagnostics, and persistence boundaries for repository analysis.
+**Origin**: changes `analyzer-fault-containment`, `more-analyzers-render-overabstraction`, `p4-snapshot-get-drift`, `wire-ts-morph-pass2` (2026-05-30)
+**Scope**: analyzer execution ordering, partial-failure diagnostics, persistence boundaries, snapshot population, and lazy type resolution for repository analysis.
 
 ## Purpose
 
-Define analyzer execution ordering, partial-failure diagnostics, and persistence boundaries for repository analysis.
+Define analyzer execution ordering, partial-failure diagnostics, persistence boundaries, snapshot population, and lazy type resolution for repository analysis.
 
 ## Requirement: Analyzer Crash Isolation
 
@@ -132,8 +132,42 @@ The `snapshot` table MUST be treated as a derived materialized view of T3 (findi
 - THEN finding rows MUST remain unchanged
 - AND snapshot failures MUST NOT roll back persisted findings
 
+## Requirement: Lazy Pass-2 Type Resolution
+
+`AnalysisContext.types.typeOf(span)` MUST provide a lazy Pass-2 type lookup backed by `ts-morph`. The resolver MUST NOT construct the semantic project until an analyzer calls `typeOf`. Analysis runs whose analyzers never call `typeOf` MUST pay no Pass-2 project construction cost.
+
+### Scenario: No type lookup keeps Pass-2 cold
+
+- GIVEN analyzers execute without calling `ctx.types.typeOf`
+- WHEN `analyzeRepo` runs
+- THEN the Pass-2 project MUST NOT be constructed
+
+### Scenario: Type lookup returns stable type info
+
+- GIVEN a component span from Pass-1 with typed props
+- WHEN an analyzer calls `ctx.types.typeOf(span)`
+- THEN the resolver MUST return stable `TypeInfo` with a deterministic `text` value
+- AND the resolver MUST NOT expose raw `ts-morph` nodes or TypeScript compiler objects
+
+## Requirement: Type Resolver Cache and Stale Span Boundary
+
+`typeOf(span)` MUST memoize lookups by span coordinates plus the current module content hash. If the file content changes, the changed hash MUST force a fresh lookup rather than serving a stale cached result. A span that no longer resolves in the current file MUST return `null`.
+
+### Scenario: Same span and same hash are memoized
+
+- GIVEN `typeOf` is called twice with the same span and same file content hash
+- WHEN the second lookup runs
+- THEN the cached `TypeInfo` result MAY be returned
+
+### Scenario: Changed file hash recomputes
+
+- GIVEN a span from a prior file version
+- WHEN a resolver is built for a changed file with a different content hash
+- THEN lookup MUST use the changed file content
+- AND MUST NOT serve cached type info from the previous hash
+
 ## References
 
-- Implementation: `packages/core/src/engine/pipeline.ts`, `packages/core/src/types.ts`
-- Tests: `packages/core/src/engine/pipeline.test.ts`
-- Source changes: `analyzer-fault-containment`, `more-analyzers-render-overabstraction`, `p4-snapshot-get-drift`
+- Implementation: `packages/core/src/engine/pipeline.ts`, `packages/core/src/types.ts`, `packages/core/src/parse/type-resolver.ts`
+- Tests: `packages/core/src/engine/pipeline.test.ts`, `packages/core/src/parse/type-resolver.test.ts`
+- Source changes: `analyzer-fault-containment`, `more-analyzers-render-overabstraction`, `p4-snapshot-get-drift`, `wire-ts-morph-pass2`

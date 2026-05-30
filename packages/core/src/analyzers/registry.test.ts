@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { AnalyzerRegistry } from "./registry.js";
+import { AnalyzerRegistry, createDefaultAnalyzerRegistry } from "./registry.js";
 import type { Analyzer } from "./analyzer.js";
 
 const fake: Analyzer = {
@@ -17,4 +17,13 @@ test("duplicate ruleId throws", () => {
   const r = new AnalyzerRegistry();
   r.register(fake);
   expect(() => r.register(fake)).toThrow(/already registered/);
+});
+
+test("default registry includes hook topology after structural analyzers", () => {
+  expect(createDefaultAnalyzerRegistry().list().map((a) => a.ruleId)).toEqual([
+    "react/shared-extraction",
+    "react/render-coupling",
+    "react/over-abstraction",
+    "react/hook-topology",
+  ]);
 });

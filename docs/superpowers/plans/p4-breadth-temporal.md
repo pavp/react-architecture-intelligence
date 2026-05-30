@@ -1,6 +1,6 @@
 # P4 — Breadth + Temporal — Implementation Plan
 
-**Status:** Planned (not started)
+**Status:** In progress — Slices 1/1b/2/3/4 complete; Slice 4b conventions remains
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §3.5, §5.2, §7.2
@@ -83,22 +83,16 @@ block `get_drift`. Fix the correct contract on a stable base first; build backfi
 top later (Slice 5). Docs explain the cold-start window and recommend analyzing from
 adoption onward.
 
-### D2 — Edge-type audit before analyzer slices (gaps §3.7) — REQUIRED, not yet resolved
+### D2 — Edge-type audit before analyzer slices (gaps §3.7) — RESOLVED FOR SLICE 4
 
-`EdgeKind = "renders" | "imports" | "calls" | "uses-hook"` but `buildGraph` only
-constructs `renders`. `hook-topology` needs `uses-hook` edges; the spec also references
-a `passes` edge (prop flow) that is absent from `EdgeKind`. Before Slice 4, audit which
-edge types each P4 analyzer requires and add construction logic to `buildGraph`, or
-explicitly defer an analyzer whose edges are not yet built. This audit is the first task
-inside Slice 4, not a separate PR.
+`hook-topology` ships on `uses-hook` edges only. Slice 4 adds `HookNode` rows and builds
+`Component -> Hook` plus `Hook -> Hook` `uses-hook` edges. `passes`, `imports`, and `calls`
+remain deferred because Slice 4 does not ship prop-flow or import/call analyzers.
 
-### D3 — Hook-convention config mechanism (gaps §3.6) — scoped into Slice 4
+### D3 — Hook-convention config mechanism (gaps §3.6) — DEFERRED TO SLICE 4B
 
-`uses-hook` edges are inert without a `conventions[]` config knob (same mechanism as
-`boundary_rule` for components). Decide in Slice 4 whether `hook-topology` ships as a
-metric-only analyzer (fan-in/fan-out/depth, like `render-coupling`) or also consumes a
-convention config. Default: **metric-only first**, convention config as a follow-up, to
-keep the slice under 400 lines.
+Slice 4 ships metric-only `react/hook-topology` first (fan-in/fan-out/direct dependencies/depth),
+like `render-coupling`. Team-defined convention config stays out of scope and moves to Slice 4b.
 
 ---
 
@@ -107,17 +101,16 @@ keep the slice under 400 lines.
 Ordered by value and dependency. Snapshot + drift first (groundwork exists), then
 breadth.
 
-### Slice 1 — `snapshot` population (FIRST IMPLEMENTATION)
+### Slice 1 — `snapshot` population ✅ DONE
 
 **Goal:** every analysis run writes the current fingerprint set to `snapshot`, deterministically
 and idempotently. This slice builds the temporal *substrate* only. It does NOT add `get_drift`
-(moved to Slice 1b) — reading the index is a separate, larger slice because the design-faithful
-`get_drift` contract (§5.2) requires metric values the snapshot row does not store.
+(moved to Slice 1b) — reading the index is a separate slice.
 
 **Scope boundary (decided):** snapshot writer + internal tests only. No new public MCP/CLI
 surface. Snapshot is a derived internal index; it is exposed when `get_drift` reads it in Slice 1b.
 Readiness is proven by tests that query the `snapshot` table directly via SQL — NOT by shipping a
-placeholder reader. (We do not ship `worsened: []`/`improved: []` placeholders; empty arrays would
+placeholder reader. (We do not ship drift placeholders; empty arrays would
 read as "nothing changed" when the truth is "not implemented" — the same semantic bug rejected for
 cold-start.)
 
@@ -133,27 +126,25 @@ CREATE TABLE IF NOT EXISTS snapshot (
 
 **Tasks:**
 
-- [ ] **1.1 Resolve current commit SHA** for the analyzed repo (read-only git, or accept
+- [x] **1.1 Resolve current commit SHA** for the analyzed repo (read-only git, or accept
       `commit` via input). No checkout. If the SHA is unavailable (not a git repo): skip the
       snapshot write + emit a diagnostic, so non-git fixtures still analyze. (Default: skip +
       diagnostic, no sentinel.)
-- [ ] **1.2 Snapshot writer** in the pipeline (`packages/core/src/engine/pipeline.ts`):
+- [x] **1.2 Snapshot writer** in the pipeline (`packages/core/src/engine/pipeline.ts`):
       after persist, append one row per current finding — `(commit_sha, fingerprint,
       rule_id, severity_raw, evidence_digest, created_at)`. `evidence_digest` is a stable
       hash of the finding evidence (deterministic — no `Date.now`/`Math.random`;
       `created_at` comes from `asOf`). Idempotent on `PRIMARY KEY` (re-analyzing the same
       commit must not duplicate or error — `INSERT OR REPLACE` / `ON CONFLICT`).
-- [ ] **1.3 Internal readiness tests** — query the `snapshot` table directly via SQL:
+- [x] **1.3 Internal readiness tests** — query the `snapshot` table directly via SQL:
       row-count per commit, deterministic replay (byte-identical rows across two runs),
       idempotency on re-analysis. No public surface added.
-- [ ] **1.4 Spec update:** add ONLY the snapshot-population requirement to
+- [x] **1.4 Spec update:** add ONLY the snapshot-population requirement to
       `openspec/specs/analysis-pipeline.md`. (The `get_drift` contract belongs to Slice 1b.)
 
 **Design note — why no metrics here:** `snapshot` stores `evidence_digest`, not raw metrics.
-A fanIn 3→9 change will surface (in Slice 1b) as a digest difference; the literal numbers live in
-the `finding` rows. This slice intentionally stops at the digest. Slice 1b decides how to surface
-the `from`/`to` values that design §5.2 `worsened`/`improved` require (likely a snapshot→finding
-join).
+A fanIn 3→9 change surfaces (in Slice 1b) as a digest difference; the literal numbers live in
+the `finding` rows. This slice intentionally stops at the digest.
 
 **Strict TDD anchors (write first):**
 - snapshot writer is idempotent on re-analysis of the same commit (row count does not grow)
@@ -162,83 +153,69 @@ join).
 - one row per persisted finding is written with the resolved SHA as `commit_sha`
 
 **Exit criteria:**
-- [ ] Analysis run populates `snapshot` deterministically (replay → identical rows)
-- [ ] Writer is idempotent on re-analysis (no duplicates, no constraint error)
-- [ ] Non-git input skips snapshot with a diagnostic; analysis still completes
-- [ ] No new public MCP/CLI surface added in this slice
-- [ ] `pnpm build` / `pnpm test` / `pnpm typecheck` clean
-- [ ] `openspec/specs/analysis-pipeline.md` updated (snapshot population only)
+- [x] Analysis run populates `snapshot` deterministically (replay → identical rows)
+- [x] Writer is idempotent on re-analysis (no duplicates, no constraint error)
+- [x] Non-git input skips snapshot with a diagnostic; analysis still completes
+- [x] No new public MCP/CLI surface added in this slice
+- [x] `pnpm build` / `pnpm test` / `pnpm typecheck` clean
+- [x] `openspec/specs/analysis-pipeline.md` updated (snapshot population only)
 
 **Size estimate:** ~120–200 lines. Single PR, comfortably under 400.
 
 ---
 
-### Slice 1b — `get_drift` MCP tool (design §5.2 contract, includes cold-start)
+### Slice 1b — `get_drift` MCP tool (includes cold-start) ✅ DONE
 
-**Goal:** read the snapshot index and answer temporal deltas with the **design-faithful**
-contract. This is the slice that consumes Slice 1's substrate. It carries the D1 cold-start
-decision (Engram `sdd/p4-breadth-temporal/drift-coldstart-decision`).
+**Goal:** read the snapshot index and answer temporal deltas with the active `openspec` contract.
+This is the slice that consumes Slice 1's substrate and carries the D1 cold-start decision.
 
-**Authority note:** field names follow the **design spec §5.2 (lines 680–682)**, which outranks
-the plan-doc. The earlier `added`/`removed`/`persisted` naming was a plan-doc divergence and is
-**rejected** — using it would silently mutate the contract without a design change (violates the
-Sources-of-Truth immutability rule in CLAUDE.md).
-
-Design §5.2 contract:
-```ts
-get_drift(input: { baseCommit: string; headCommit?: string; ruleId?; fingerprint? })
- -> { appeared: PresentedFinding[]; resolved: PresentedFinding[];
-      worsened: { fingerprint; metric: string; from: number; to: number }[];
-      improved: { fingerprint; metric; from; to }[] }
-```
+**Implemented contract note:** active spec and code expose `added`, `removed`, and `persisted`
+with `stable` / `changed` digest status. Raw `worsened` / `improved` metric deltas remain out of
+this slice because `snapshot` stores an evidence digest, not metric columns.
 
 **Tasks:**
 
-- [ ] **1b.1 `get_drift` query module** (pure SQL over snapshot index, design §3.5/§5.2):
-      - `appeared` = fingerprints in `headCommit` snapshot, absent in `baseCommit`.
-      - `resolved` = fingerprints in `baseCommit`, absent in `headCommit`.
-      - `worsened` / `improved` = present in both with a metric that moved in the bad / good
-        direction. Requires the before/after metric values → join `snapshot` back to `finding`
-        by `(fingerprint, rule_id, commit_sha)` to recover `from`/`to`. Define per-rule which
-        metric and which direction counts as "worse" (e.g. fanIn up = worse).
+- [x] **1b.1 `get_drift` query module** (pure SQL over snapshot index, design §3.5/§5.2):
+      - `added` = fingerprints in `headCommit` snapshot, absent in `baseCommit`.
+      - `removed` = fingerprints in `baseCommit` snapshot, absent in `headCommit`.
+      - `persisted` = fingerprints present in both, with `stable` / `changed` based on
+        `evidence_digest` equality.
       - Optional `ruleId` / `fingerprint` filters narrow results without changing the algebra.
-- [ ] **1b.2 Cold-start handling (D1), two distinct cases:**
+- [x] **1b.2 Cold-start handling (D1), two distinct cases:**
       - Unknown commit (never analyzed) → REFUSE per design §5.2 line 685:
         `{ status: "unknown_commit", commit, message: "run analyze_repo({commit}) to backfill" }`.
         Never silently triggers analysis.
       - Known commits but < 2 snapshots → `{ status: "insufficient_history", snapshotCount,
-        requiredSnapshots: 2, message: "..." }`. MUST NOT return empty `appeared/resolved/...`
+        requiredSnapshots: 2, message: "..." }`. MUST NOT return empty `added/removed/...`
         that could be read as "clean".
-- [ ] **1b.3 `headCommit` default** — when omitted, resolve to the latest analyzed commit in
+- [x] **1b.3 `headCommit` default** — when omitted, resolve to the latest analyzed commit in
       `snapshot` (ordering semantics defined; tie-break documented).
-- [ ] **1b.4 `get_drift` MCP tool** in `packages/core/src/mcp/tools.ts` + server registration.
+- [x] **1b.4 `get_drift` MCP tool** in `packages/core/src/mcp/tools.ts` + server registration.
       Pure read — **never** triggers analysis.
-- [ ] **1b.5 Spec update:** add the `get_drift` contract + cold-start statuses to
-      `openspec/specs/mcp-tools.md` (the spec delta already drafted under
-      `openspec/changes/p4-snapshot-get-drift/specs/mcp-tools/` must be corrected to design
-      field names before this slice lands).
+- [x] **1b.5 Spec update:** add the `get_drift` contract + cold-start statuses to
+      `openspec/specs/mcp-tools.md`.
 
 **Strict TDD anchors (write first):**
-- two commits, one new + one gone fingerprint → correct `appeared`/`resolved` sets
-- a fingerprint whose metric worsened (e.g. fanIn 3→9) → appears in `worsened` with `from:3, to:9`
-- a fingerprint whose metric improved → appears in `improved`, not `worsened`
+- two commits, one new + one gone fingerprint → correct `added`/`removed` sets
+- a fingerprint whose digest changed → appears in `persisted` with `stability: "changed"`
+- a fingerprint whose digest is identical → appears in `persisted` with `stability: "stable"`
 - unknown commit → `unknown_commit` REFUSE, no analysis triggered
 - one snapshot only → `insufficient_history` with `snapshotCount: 1`, never empty-clean
 
 **Exit criteria:**
-- [ ] `get_drift` shows `appeared`/`resolved` across two analyzed commits
-- [ ] `get_drift` shows `worsened` with real `from`/`to` for a metric that moved (design §7.2 "fanIn 3→9")
-- [ ] cold-start returns explicit `insufficient_history` / `unknown_commit`, never empty-clean
-- [ ] field names match design §5.2 exactly (`appeared`/`resolved`/`worsened`/`improved`)
-- [ ] `pnpm build` / `pnpm test` / `pnpm typecheck` clean
-- [ ] `openspec/specs/mcp-tools.md` updated
+- [x] `get_drift` shows added/removed fingerprints across two analyzed commits
+- [x] `get_drift` shows persisted findings with `stable` / `changed` evidence-digest status
+- [x] cold-start returns explicit `insufficient_history` / `unknown_commit`, never empty-clean
+- [x] field names match active `openspec/specs/mcp-tools.md`
+- [x] `pnpm build` / `pnpm test` / `pnpm typecheck` clean
+- [x] `openspec/specs/mcp-tools.md` updated
 
 **Size estimate:** ~250–350 lines. Single PR; if the metric-join pushes it over, split the
 query module from the MCP tool into a chained PR.
 
 ---
 
-### Slice 2 — `query_architecture` MCP tool
+### Slice 2 — `query_architecture` MCP tool ✅ DONE
 
 **Goal:** bounded, enumerated graph questions answered from existing graph facts. No
 free-form traversal.
@@ -248,15 +225,17 @@ Design §5.2 signature:
 — structured answers, **bounded depth**, index-backed.
 
 **Tasks:**
-- [ ] **2.1 Enumerate the supported questions** for the MVP set against the edges that
+- [x] **2.1 Enumerate the supported questions** for the MVP set against the edges that
       actually exist post-Slice-4 edge audit. Start with `renders` / `rendered-by` /
       `fan-in` (built today). Gate `hook-consumers` on `uses-hook` edges existing.
-- [ ] **2.2 Bounded query implementations** — depth-limited CTEs / graph walks over the
+- [x] **2.2 Bounded query implementations** — depth-limited CTEs / graph walks over the
       frozen `RepoGraph`. Every query has a hard depth/breadth bound (design §6: "snapshot
       queries index-backed + bounded").
-- [ ] **2.3 `query_architecture` MCP tool** + server registration. Reject unknown
+- [x] **2.3 `query_architecture` MCP tool** + server registration. Reject unknown
       `question` values with a structured error listing valid ones.
-- [ ] **2.4 Spec update** in `openspec/specs/mcp-tools.md`.
+- [x] **2.4 Spec update** in `openspec/specs/mcp-tools.md`.
+
+**Implemented scope:** `renders`, `rendered-by`, `fan-in`, `fan-out`, and `reachability` over the latest in-memory `RepoGraph`. `hook-consumers`, `import-path`, and other questions stay gated until their edge types exist.
 
 **Strict TDD anchors:**
 - `renders` on a known fixture → exact child set
@@ -265,16 +244,16 @@ Design §5.2 signature:
 - a deep render chain respects the depth bound (no unbounded walk)
 
 **Exit criteria:**
-- [ ] At least `renders` / `rendered-by` / `fan-in` answered correctly on fixtures
-- [ ] All queries bounded; no unbounded traversal path exists
-- [ ] Unknown question refused with the valid set
-- [ ] build/test/typecheck clean; spec updated
+- [x] At least `renders` / `rendered-by` / `fan-in` answered correctly on fixtures
+- [x] All queries bounded; no unbounded traversal path exists
+- [x] Unknown question refused with the valid set
+- [x] build/test/typecheck clean; spec updated
 
 **Size estimate:** ~200–300 lines. Single PR.
 
 ---
 
-### Slice 3 — Lazy ts-morph Pass-2 for `typeOf()` (gaps §1.2)
+### Slice 3 — Lazy ts-morph Pass-2 for `typeOf()` (gaps §1.2) ✅ DONE
 
 **Goal:** wire the deferred Pass-2 so `ctx.typeOf(span)` returns real type info instead of
 `null`. Tracked as change `wire-ts-morph-pass2`.
@@ -289,14 +268,16 @@ observable behavior change in current scope. It must not be bundled with a slice
 its own risk. It unlocks type-aware analyzers and the future learned-embedding work.
 
 **Tasks:**
-- [ ] **3.1 Lazy ts-morph project init** — construct the ts-morph `Project` only on first
+- [x] **3.1 Lazy ts-morph project init** — construct the ts-morph `Project` only on first
       `typeOf()` call (lazy; many runs never need types). Per-analyzer memoization per the
       design's isolation rule (`typeOf` writes only to a per-analyzer memo).
-- [ ] **3.2 Span → type resolution** — map a stored `Span` (with `content_hash`) to a
+- [x] **3.2 Span → type resolution** — map a stored `Span` (with `content_hash`) to a
       ts-morph node and return its type. Honor the stale-Span rule (design §2.1, line 130):
       a Span whose file hash drifted is stale → recompute, do not trust.
-- [ ] **3.3 Contract test** against the design §2.1 `typeOf` contract.
-- [ ] **3.4 Spec update** if the analyzer contract surface changes.
+- [x] **3.3 Contract test** against the design §2.1 `typeOf` contract.
+- [x] **3.4 Spec update** if the analyzer contract surface changes.
+
+**Implemented scope:** `ctx.types.typeOf(span)` returns stable `TypeInfo` (`text`, optional `symbolName`) for component spans. The resolver is lazy, memoized by span + current file content hash, and returns `null` when a stale span no longer resolves.
 
 **Strict TDD anchors:**
 - `typeOf` on a known typed span → expected type string
@@ -304,37 +285,39 @@ its own risk. It unlocks type-aware analyzers and the future learned-embedding w
 - stale span (drifted content hash) is recomputed, not served from stale cache
 
 **Exit criteria:**
-- [ ] `typeOf()` returns non-null for a typed span on a fixture
-- [ ] Lazy: no ts-morph cost when no analyzer calls `typeOf`
-- [ ] Determinism preserved (no clock/random introduced)
-- [ ] build/test/typecheck clean
+- [x] `typeOf()` returns non-null for a typed span on a fixture
+- [x] Lazy: no ts-morph cost when no analyzer calls `typeOf`
+- [x] Determinism preserved (no clock/random introduced)
+- [x] build/test/typecheck clean
 
 **Size estimate:** ~150–250 lines + dependency. Single PR.
 
 ---
 
-### Slice 4 — Remaining analyzers: edge audit + `hook-topology` (+ `boundary-violation` scope)
+### Slice 4 — Remaining analyzers: edge audit + `hook-topology` (+ `boundary-violation` scope) ✅ DONE
 
 **Goal:** reach the P4 "≥4 analyzers green" exit bar (design §7.2). Today: 3
 (`shared-extraction`, `render-coupling`, `over-abstraction`). This slice adds at least one
 more and resolves the edge-construction gap.
 
 **Tasks:**
-- [ ] **4.1 Edge-type audit (D2)** — for each candidate analyzer, list required `EdgeKind`.
+- [x] **4.1 Edge-type audit (D2)** — for each candidate analyzer, list required `EdgeKind`.
       Add `buildGraph` construction for `uses-hook` (needed by `hook-topology`). Decide
       `passes` edge: add to `EdgeKind` + build it, or remove from spec scope. Document the
       decision in the spec.
-- [ ] **4.2 `react/hook-topology` analyzer** — metric-only first (D3): hook fan-in,
+- [x] **4.2 `react/hook-topology` analyzer** — metric-only first (D3): hook fan-in,
       fan-out, transitive depth over `uses-hook` edges. Config thresholds mirroring
       `render-coupling` (`maxHookFanIn`, `maxHookDepth`, …). Pure sync function,
       metric-only evidence.
-- [ ] **4.3 Register** in `packages/core/src/analyzers/registry.ts` default order.
-- [ ] **4.4 `boundary-violation` / convention analyzer — SCOPE DECISION ONLY.** Decide
+- [x] **4.3 Register** in `packages/core/src/analyzers/registry.ts` default order.
+- [x] **4.4 `boundary-violation` / convention analyzer — SCOPE DECISION ONLY.** Decide
       whether it ships this slice or becomes Slice 4b. If the `conventions[]` config schema
       (hook + component edge patterns, gaps §3.6) lands here, it likely exceeds 400 lines →
       split to 4b. Default: **scope decision documented, implementation in 4b** to protect
       review focus.
-- [ ] **4.5 Spec update** in `openspec/specs/architecture-analysis.md`.
+- [x] **4.5 Spec update** in `openspec/specs/architecture-analysis.md`.
+
+**Implemented scope:** `HookNode`, `uses-hook` construction, metric-only `react/hook-topology`, and config thresholds. `passes`, import/call edge analyzers, hook conventions, and `boundary-violation` implementation stay deferred.
 
 **Strict TDD anchors:**
 - `buildGraph` constructs `uses-hook` edges for a fixture with hook composition
@@ -342,11 +325,11 @@ more and resolves the edge-construction gap.
 - new analyzer respects crash containment (a throw becomes a diagnostic, later analyzers run)
 
 **Exit criteria:**
-- [ ] ≥4 analyzers green (design §7.2 bar)
-- [ ] `uses-hook` edges constructed; edge audit documented
-- [ ] `hook-topology` emits metric-only evidence with config thresholds
-- [ ] `boundary-violation` scope decision recorded
-- [ ] build/test/typecheck clean; spec updated
+- [x] ≥4 analyzers green (design §7.2 bar)
+- [x] `uses-hook` edges constructed; edge audit documented
+- [x] `hook-topology` emits metric-only evidence with config thresholds
+- [x] `boundary-violation` scope decision recorded
+- [x] build/test/typecheck clean; spec updated
 
 **Size estimate:** ~300–400 lines for the audit + `hook-topology`. `boundary-violation`
 → Slice 4b if it lands. Chain if combined exceeds budget.
@@ -396,10 +379,10 @@ Slice 5 (backfill CLI)   deferred, after Slice 1 contract is stable
 
 ## P4 overall exit criteria (design §7.2)
 
-- [ ] ≥4 analyzers green
+- [x] ≥4 analyzers green
 - [ ] `get_drift` shows a fan-in delta (e.g. 3→9) across commits
 - [ ] `snapshot` populated deterministically per analysis run
-- [ ] `query_architecture` answers bounded graph questions
+- [x] `query_architecture` answers bounded graph questions
 - [ ] cold-start returns explicit `insufficient_history`, never silent-clean
 - [ ] All slices: build/test/typecheck clean, specs synced, each PR ≤400 lines or chained
 

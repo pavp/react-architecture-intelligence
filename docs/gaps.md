@@ -18,17 +18,17 @@ These are deferred features inside the already-completed P0–P3 scope. They are
 
 ---
 
-### 1.2 `typeOf()` always returns null (Pass-2 not wired) — split into `wire-ts-morph-pass2`
+### 1.2 `typeOf()` always returns null (Pass-2 not wired) ✅ FIXED in `wire-ts-morph-pass2`
 
-> Note: §1.2 was split out of `wire-deferred-mvp-gaps` into a separate future change `wire-ts-morph-pass2` — adds ~130–190 LOC and a ~5 MB ts-morph dependency for zero observable behavior change in current scope. The stub remains until that change lands.
+**Fix applied:** `ctx.types.typeOf(span)` now uses a lazy `ts-morph` resolver. It constructs the project only on first lookup, returns stable `TypeInfo`, memoizes by span + current file content hash, and returns `null` for stale spans that no longer resolve.
 
-**Location:** [packages/core/src/engine/pipeline.ts](../packages/core/src/engine/pipeline.ts) line 45
+**Location:** [packages/core/src/engine/pipeline.ts](../packages/core/src/engine/pipeline.ts), [packages/core/src/parse/type-resolver.ts](../packages/core/src/parse/type-resolver.ts)
 ```ts
-types: { typeOf: () => null }, // lazy Pass-2 wired in P4
+types: createTypeResolver({ files: input.files, graph, hooks: input.typeResolverHooks })
 ```
-**Impact:** All type-level analysis is unavailable. Analyzers that call `ctx.typeOf(span)` always get `null`. This also blocks the learned-embedding work (§future-ideas §5) since richer type information is a prerequisite.
+**Impact resolved:** Type-level analyzer work is now unblocked for component spans.
 
-**Fix:** Wire ts-morph lazy Pass-2 in `pipeline.ts`. Contract defined in spec §2.1. Tracked in `wire-ts-morph-pass2`.
+**Change:** `wire-ts-morph-pass2` — branch `feat/rai-mvp-p0-p3`.
 
 ---
 
@@ -58,23 +58,23 @@ types: { typeOf: () => null }, // lazy Pass-2 wired in P4
 
 ---
 
-## 2. P4–P6 gaps — listed in STATUS.md, no executable plan
+## 2. P4–P6 gaps — roadmap state
 
-The [docs/superpowers/STATUS.md](superpowers/STATUS.md) lists these under "Next steps" and explicitly states each should get its own plan file. None exist yet.
+The [docs/superpowers/STATUS.md](superpowers/STATUS.md) lists these under "Next steps". P4 now has an executable plan; P5 and P6 still need phase plans.
 
 ### 2.1 P4 — Breadth + temporal
 
-Missing plan file: `docs/superpowers/plans/p4-breadth-temporal.md`
+Plan file exists: [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md)
 
 Tasks that need to be formalized:
 - Fix KI-1 (1.4 above) — ✅ done
-- Wire `typeOf()` Pass-2 (1.2 above)
+- Wire `typeOf()` Pass-2 (1.2 above) — ✅ done
 - Wire `boundary_rule` → `architectural-conflict` (1.1 above) — ✅ done
 - Wire config severity-clamp in overlay (1.3 above) — ✅ done
-- Populate `snapshot` table on each analysis run
-- Implement `get_drift` MCP tool (pure SQL set-algebra over snapshots — spec §3.5/§5.2)
-- Implement `query_architecture` MCP tool (enumerated graph questions, bounded CTEs — spec §5.2)
-- Add more analyzers: `coupling`, `hook-topology`, `over-abstraction`, `boundary-violation` — ✅ first slice done: `react/render-coupling` + `react/over-abstraction`; remaining analyzer slices still need scope decisions
+- Populate `snapshot` table on each analysis run — ✅ done
+- Implement `get_drift` MCP tool (pure SQL set-algebra over snapshots — spec §3.5/§5.2) — ✅ done
+- Implement `query_architecture` MCP tool (enumerated graph questions, bounded traversal — spec §5.2) — ✅ done for current `renders` graph facts
+- Add more analyzers: `coupling`, `hook-topology`, `over-abstraction`, `boundary-violation` — ✅ `react/render-coupling`, `react/over-abstraction`, and metric-only `react/hook-topology` done; `boundary-violation` / conventions deferred
 - Analyzer fault containment: crash isolation ✅ done; hard sync-CPU timeout still deferred until worker isolation exists
 - Band C MCP tools: `get_node`, `raw_graph_query` (spec §5.4)
 
@@ -157,15 +157,15 @@ These are issues identified in the spec or through architectural review that hav
 
 **Change:** `wire-deferred-mvp-gaps` — branch `feat/rai-mvp-p0-p3`.
 
-### 3.6 Hook coupling conventions — edges planned but no config mechanism
+### 3.6 Hook coupling conventions — metric analyzer done; convention config deferred
 
-**Problem:** The spec (§2.2) defines `uses-hook Hook → Hook` edges so RAI can trace hook composition chains. In P4, `buildGraph` will create these edges. But there is no config mechanism to declare forbidden or required hook dependency patterns — no way to say "useCheckout must not depend on useCart directly".
+**Problem:** `wire-hook-topology` now builds `uses-hook` edges and emits metric-only `react/hook-topology` findings. But there is still no config mechanism to declare forbidden or required hook dependency patterns — no way to say "useCheckout must not depend on useCart directly".
 
-The edges will exist in the graph. The `Analyzer` interface supports pure graph traversal. But without a `conventions[]` config knob for edge patterns, the data is invisible to any finding.
+The edges now exist in the graph and are visible to the metric analyzer. Without a `conventions[]` config knob for edge patterns, team-specific rule violations remain invisible.
 
-**Impact:** Hook coupling is architecturally meaningful (a hook that transitively depends on 5 other hooks is harder to maintain and test), but it produces no finding. The entire `uses-hook` edge type is inert from a detection standpoint until conventions are wired. This is the same mechanism as §1.1 (boundary_rule for components) — a feature that needs to be implemented before the graph data is useful.
+**Impact:** Hook coupling depth/fan-in/fan-out now produces findings, but team-specific conventions still cannot be enforced. This is the same mechanism as §1.1 (boundary_rule for components).
 
-**Fix:** Implement the team-defined convention analyzer (future-ideas §1) before or during P4. The `uses-hook` edge case should be a first-class example in the convention config schema.
+**Fix:** Implement the team-defined convention analyzer in Slice 4b. The `uses-hook` edge case should be a first-class example in the convention config schema.
 
 ---
 
@@ -180,11 +180,11 @@ export type EdgeKind = "renders" | "imports" | "calls" | "uses-hook";
 // "passes" is absent — spec §2.2 says it should exist
 ```
 
-`buildGraph` also only creates `renders` edges today — `imports`, `calls`, and `uses-hook` are defined in `EdgeKind` but never constructed. The `pass1` result includes `imports` but `buildGraph` ignores them.
+`buildGraph` now creates `renders` and `uses-hook` edges. `imports` and `calls` are defined in `EdgeKind` but still not constructed. The `pass1` result includes `imports` but `buildGraph` ignores them.
 
-**Impact:** Prop drilling (same prop passed through N levels without being consumed) is detectable from `passes` edges but can never be analyzed because the edge type doesn't exist. More broadly, three of the four `EdgeKind` types are phantom — defined but never built.
+**Impact:** Prop drilling (same prop passed through N levels without being consumed) is detectable from `passes` edges but can never be analyzed because the edge type doesn't exist. Import/call topology also remains unavailable until those edges are built.
 
-**Fix:** Before P4, audit which edge types are needed for which P4 analyzers and add construction logic to `buildGraph` for each. Add `passes` to `EdgeKind` or decide to remove it from the spec if not planned.
+**Fix:** Slice 4 audit decided `uses-hook` was required now and `passes` / import / call edges are deferred until a concrete analyzer needs them. Add `passes` to `EdgeKind` only when prop-flow analysis is scheduled.
 
 ---
 
@@ -228,7 +228,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 | Phase | Plan file | Status |
 |---|---|---|
 | P0–P3 | [docs/superpowers/plans/2026-05-29-rai-mvp-p0-p3.md](superpowers/plans/2026-05-29-rai-mvp-p0-p3.md) | ✅ Exists, all 24 tasks complete |
-| P4 | `docs/superpowers/plans/p4-breadth-temporal.md` | ❌ Missing; several preparatory slices are now complete |
+| P4 | [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md) | ✅ Exists; temporal + `query_architecture` slices complete |
 | P5 | `docs/superpowers/plans/p5-codemod-apply.md` | ❌ Missing |
 | P6 | `docs/superpowers/plans/p6-adapter-next.md` | ❌ Missing |
 
@@ -236,12 +236,13 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 
 ## 5. Recommended resolution order
 
-1. **Write the P4 plan** — formalizes remaining breadth + temporal work into executable checkboxes with exit criteria.
-2. **Resolve §3.1 (drift cold-start)** — decide no-backfill vs backfill CLI vs graceful no-history response before `get_drift`.
-3. **Implement snapshot population + `get_drift`** — next highest-value P4 feature because drift already has schema/fingerprint groundwork.
-4. **Implement `query_architecture`** — bounded graph questions over existing graph facts.
-5. **Wire lazy ts-morph Pass-2** (§1.2) — unlocks type-aware future work, but should remain a separate slice.
-6. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
+1. ~~**Write the P4 plan**~~ — ✅ complete.
+2. ~~**Resolve §3.1 (drift cold-start)**~~ — ✅ complete via explicit `unknown_commit` / `insufficient_history` statuses.
+3. ~~**Implement snapshot population + `get_drift`**~~ — ✅ complete.
+4. ~~**Implement `query_architecture`**~~ — ✅ complete for current render graph facts.
+5. ~~**Wire lazy ts-morph Pass-2** (§1.2)~~ — ✅ complete.
+6. **Implement `boundary-violation` / conventions** if P4 continues beyond metric analyzers.
+7. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
 
 ---
 

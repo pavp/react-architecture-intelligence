@@ -1,9 +1,10 @@
 import { parseSync } from "oxc-parser";
-import type { ComponentNode, Span } from "../types.js";
+import type { ComponentNode, HookNode, Span } from "../types.js";
 
 export interface Pass1Result {
   file: string;
   components: ComponentNode[];
+  hooks: HookNode[];
   imports: { from: string }[];
 }
 
@@ -17,9 +18,11 @@ export function pass1(file: string, source: string): Pass1Result {
   const parsed = parseSync(source, { sourceFilename: file });
   const program = JSON.parse(parsed.program) as any;
   const components: ComponentNode[] = [];
+  const hooks: HookNode[] = [];
   const imports: { from: string }[] = [];
 
   let cid = 0;
+  let hid = 0;
   const span = (node: any, kind: string, astPath: string): Span => ({
     file, start: node.start, end: node.end, kind, astPath,
   });
@@ -45,6 +48,21 @@ export function pass1(file: string, source: string): Pass1Result {
     });
   };
 
+  const walkHook = (
+    name: string, node: any, idx: number,
+    exportKind: HookNode["exportKind"],
+  ) => {
+    const facts = collectRenderFacts(node);
+    hooks.push({
+      id: `${file}#hook-${hid++}`,
+      name,
+      span: span(node, "hook", `module>decl[${idx}]`),
+      file,
+      exportKind,
+      hookCalls: facts.hooks.filter((hook) => hook !== name),
+    });
+  };
+
   const body: any[] = program.body ?? [];
   body.forEach((stmt: any, idx: number) => {
     if (stmt.type === "ImportDeclaration") { imports.push({ from: stmt.source.value }); return; }
@@ -59,11 +77,17 @@ export function pass1(file: string, source: string): Pass1Result {
     if (s.type === "FunctionDeclaration" && s.id && COMPONENT_NAME.test(s.id.name)) {
       walkComponent(s.id.name, "fn", s, idx, exportKind);
     }
+    if (s.type === "FunctionDeclaration" && s.id && HOOK_NAME.test(s.id.name)) {
+      walkHook(s.id.name, s, idx, exportKind);
+    }
     if (s.type === "VariableDeclaration") {
       for (const d of s.declarations) {
         if (d.id?.type === "Identifier" && COMPONENT_NAME.test(d.id.name) && d.init) {
           const kind = arrowKind(d.init);
           if (kind) walkComponent(d.id.name, kind, d.init, idx, exportKind);
+        }
+        if (d.id?.type === "Identifier" && HOOK_NAME.test(d.id.name) && d.init) {
+          walkHook(d.id.name, d.init, idx, exportKind);
         }
       }
     }
@@ -75,16 +99,18 @@ export function pass1(file: string, source: string): Pass1Result {
     if (stmt.type === "ExportDefaultDeclaration" && stmt.declaration) {
       const name = exportedComponentName(stmt.declaration);
       if (name) setExportKind(components, name, "default");
+      if (name) setExportKind(hooks, name, "default");
     }
     if (stmt.type === "ExportNamedDeclaration" && Array.isArray(stmt.specifiers)) {
       for (const spec of stmt.specifiers) {
         const name = spec?.local?.name ?? spec?.exported?.name;
         if (name) setExportKind(components, name, "named");
+        if (name) setExportKind(hooks, name, "named");
       }
     }
   }
 
-  return { file, components, imports };
+  return { file, components, hooks, imports };
 }
 
 /** Name referenced by a default export: `Button`, or `memo(Button)`/`forwardRef(Button)`. */
@@ -100,8 +126,8 @@ function exportedComponentName(decl: any): string | null {
   return null;
 }
 
-function setExportKind(components: ComponentNode[], name: string, kind: ComponentNode["exportKind"]): void {
-  const c = components.find((x) => x.name === name);
+function setExportKind<T extends { name: string; exportKind: ComponentNode["exportKind"] }>(nodes: T[], name: string, kind: ComponentNode["exportKind"]): void {
+  const c = nodes.find((x) => x.name === name);
   // don't downgrade an already-detected inline export
   if (c && c.exportKind === "none") c.exportKind = kind;
 }

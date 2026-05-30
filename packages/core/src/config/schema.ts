@@ -55,6 +55,12 @@ export const ConfigSchema = z.object({
     maxCompositionMarkers: z.number().int().min(0).default(2),
     maxConditionalBranches: z.number().int().min(0).default(5),
   }).strict().default({}),
+  hookTopology: z.object({
+    maxFanIn: z.number().int().min(0).default(5),
+    maxFanOut: z.number().int().min(0).default(5),
+    maxDirectDependencies: z.number().int().min(0).default(5),
+    maxReachableDepth: z.number().int().min(0).default(3),
+  }).strict().default({}),
   excludeGlobs: z.array(z.string()).default([
     "**/*.test.*", "**/*.stories.*", "**/shared/**", "**/ui/**", "**/components/common/**",
   ]),

@@ -104,6 +104,18 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("get_drift");
 
+  server.tool("query_architecture", "Answer bounded graph questions from the latest analyzed repo graph.",
+    {
+      question: z.string(),
+      target: z.string(),
+      depth: z.number().optional(),
+    },
+    async (args) => {
+      const r = session.queryArchitecture(args);
+      return { content: [{ type: "text", text: JSON.stringify(r, null, 2) }] };
+    });
+  toolNames.push("query_architecture");
+
   return { server, session, toolNames };
 }
 

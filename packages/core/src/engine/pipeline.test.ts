@@ -129,13 +129,14 @@ test("persists successful findings while failed analyzer writes zero T3 findings
   expect(rows.some((row) => row.evidence_json.includes("rule/failing"))).toBe(false);
 });
 
-test("executes shared extraction, render coupling, and over abstraction in registry order", () => {
+test("executes default analyzers in registry order", () => {
   const registry = createDefaultAnalyzerRegistry();
 
   expect(registry.list().map((registered) => registered.ruleId)).toEqual([
     "react/shared-extraction",
     "react/render-coupling",
     "react/over-abstraction",
+    "react/hook-topology",
   ]);
 });
 
@@ -269,6 +270,53 @@ test("C3 isolation lets later new analyzer findings survive failed earlier analy
   ]);
   expect(res.presented.map((finding) => finding.ruleId)).toEqual(["react/over-abstraction"]);
   expect(res.presented[0]!.evidence).toMatchObject({ kind: "over-abstraction", propCount: 3 });
+});
+
+test("lazy Pass-2 is not initialized when analyzers do not call typeOf", () => {
+  const { findings, feedback } = setup();
+  const registry = new AnalyzerRegistry();
+  let called = false;
+  registry.register({
+    ruleId: "rule/no-type",
+    framework: "react",
+    analyze: () => [],
+  });
+
+  analyzeRepo({
+    files,
+    registry,
+    findings,
+    feedback,
+    config: DEFAULT_CONFIG,
+    runId: "run1",
+    commitSha: "c1",
+    asOf: 0,
+    typeResolverHooks: { onProjectCreate: () => { called = true; } },
+  });
+
+  expect(called).toBe(false);
+});
+
+test("lazy Pass-2 returns a non-null type when an analyzer calls typeOf", () => {
+  const { findings, feedback } = setup();
+  const registry = new AnalyzerRegistry();
+  let observed: unknown = null;
+  registry.register({
+    ruleId: "rule/type-aware",
+    framework: "react",
+    analyze: (ctx) => {
+      observed = ctx.types.typeOf(ctx.graph.components[0]!.span);
+      return [];
+    },
+  });
+  const typedFiles = [{
+    file: "Profile.tsx",
+    source: "type Props = { name: string }; export function Profile({ name }: Props) { return <div>{name}</div>; }",
+  }];
+
+  analyzeRepo({ files: typedFiles, registry, findings, feedback, config: DEFAULT_CONFIG, runId: "run1", commitSha: "c1", asOf: 0 });
+
+  expect(observed).toEqual({ text: "{ name: string }", symbolName: "Profile" });
 });
 
 test("returns deterministic analyzer diagnostics without finding or volatile fields", () => {

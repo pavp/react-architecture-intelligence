@@ -6,6 +6,8 @@ import { FindingsStore } from "../memory/findings-store.js";
 import { FeedbackStore } from "../memory/feedback-store.js";
 import { analyzeRepo } from "../engine/pipeline.js";
 import type { SourceFile } from "../parse/graph-build.js";
+import type { RepoGraph } from "../graph/repograph.js";
+import type { ComponentNode, GraphEdge } from "../types.js";
 
 export interface SessionOpts { config: RaiConfig; dbPath?: string; }
 
@@ -68,6 +70,34 @@ export type DriftResult =
   | { status: "unknown_commit"; commit: string; message: string }
   | { status: "insufficient_history"; snapshotCount: number; requiredSnapshots: 2; added: []; removed: []; message: string };
 
+const QUERY_ARCHITECTURE_QUESTIONS = ["renders", "rendered-by", "fan-in", "fan-out", "reachability"] as const;
+type QueryArchitectureQuestion = typeof QUERY_ARCHITECTURE_QUESTIONS[number];
+const MAX_QUERY_ARCHITECTURE_DEPTH = 5;
+
+export interface QueryArchitectureInput {
+  question: string;
+  target: string;
+  depth?: number | undefined;
+}
+
+export interface NodeRef {
+  id: string;
+  name: string;
+  file: string;
+}
+
+export interface EdgeRef {
+  srcId: string;
+  dstId: string;
+  kind: string;
+}
+
+export type QueryArchitectureResult =
+  | { status: "ok"; answer: Record<string, unknown>; nodes: NodeRef[]; edges: EdgeRef[] }
+  | { status: "no_analysis"; message: string }
+  | { status: "unknown_question"; question: string; validQuestions: QueryArchitectureQuestion[] }
+  | { status: "unknown_target"; target: string };
+
 /** Engine session backing the MCP tools. One per repo. */
 export class Session {
   private db: Db;
@@ -75,6 +105,7 @@ export class Session {
   private findings: FindingsStore;
   private feedback: FeedbackStore;
   private lastPresented: PresentedFinding[] = [];
+  private lastGraph: Readonly<RepoGraph> | null = null;
 
   constructor(private opts: SessionOpts) {
     this.db = openDb(opts.dbPath ?? ":memory:");
@@ -90,6 +121,7 @@ export class Session {
       asOf: input.asOf, analysisVersion: input.analysisVersion,
     });
     this.lastPresented = res.presented;
+    this.lastGraph = res.graph;
     const active = res.presented.filter((p) => p.status !== "suppressed");
     return {
       runId: res.runId,
@@ -119,6 +151,26 @@ export class Session {
       opportunities: pool.filter((p) => p.type === "opportunity"),
       conflicts: pool.filter((p) => p.type === "architectural-conflict"),
     };
+  }
+
+  // ── query_architecture (§5.2) — bounded graph questions over last analysis ──
+  queryArchitecture(input: QueryArchitectureInput): QueryArchitectureResult {
+    if (!isQueryArchitectureQuestion(input.question)) {
+      return { status: "unknown_question", question: input.question, validQuestions: [...QUERY_ARCHITECTURE_QUESTIONS] };
+    }
+    if (!this.lastGraph) {
+      return { status: "no_analysis", message: "run analyze_repo before query_architecture" };
+    }
+
+    const target = this.findComponent(input.target);
+    if (!target) return { status: "unknown_target", target: input.target };
+
+    const edges = this.renderEdges();
+    if (input.question === "renders") return this.renderChildren(target, edges);
+    if (input.question === "rendered-by") return this.renderParents(target, edges);
+    if (input.question === "fan-in") return this.renderCount(target, edges, "fan-in");
+    if (input.question === "fan-out") return this.renderCount(target, edges, "fan-out");
+    return this.renderReachability(target, edges, input.depth);
   }
 
   // ── explain_finding (§5.2) — evidence + groundingFields, NO prose (§5-Fix-1) ──
@@ -161,6 +213,113 @@ export class Session {
       question: "Which findings should be accepted, rejected, confirmed, dismissed, or marked wontfix?",
       results,
       ...(input.summary !== undefined ? { summary: input.summary } : {}),
+    };
+  }
+
+  private findComponent(target: string): ComponentNode | null {
+    const graph = this.lastGraph;
+    if (!graph) return null;
+    return graph.components.find((component) => component.id === target || component.name === target) ?? null;
+  }
+
+  private renderEdges(): GraphEdge[] {
+    return this.lastGraph?.edges.filter((edge) => edge.kind === "renders") ?? [];
+  }
+
+  private nodeRef(component: ComponentNode): NodeRef {
+    return { id: component.id, name: component.name, file: component.file };
+  }
+
+  private edgeRef(edge: GraphEdge): EdgeRef {
+    return { srcId: edge.srcId, dstId: edge.dstId, kind: edge.kind };
+  }
+
+  private componentsForEdges(edges: GraphEdge[], includeTarget: ComponentNode): NodeRef[] {
+    const ids = new Set<string>([includeTarget.id]);
+    for (const edge of edges) {
+      ids.add(edge.srcId);
+      ids.add(edge.dstId);
+    }
+    return [...ids]
+      .map((id) => this.findComponent(id))
+      .filter((component): component is ComponentNode => component !== null)
+      .map((component) => this.nodeRef(component))
+      .sort(compareNodeRef);
+  }
+
+  private renderChildren(target: ComponentNode, edges: GraphEdge[]): QueryArchitectureResult {
+    const selectedEdges = edges.filter((edge) => edge.srcId === target.id).sort(compareEdge);
+    const children = selectedEdges
+      .map((edge) => this.findComponent(edge.dstId))
+      .filter((component): component is ComponentNode => component !== null)
+      .map((component) => this.nodeRef(component))
+      .sort(compareNodeRef);
+    return {
+      status: "ok",
+      answer: { question: "renders", target: this.nodeRef(target), children },
+      nodes: this.componentsForEdges(selectedEdges, target),
+      edges: selectedEdges.map((edge) => this.edgeRef(edge)),
+    };
+  }
+
+  private renderParents(target: ComponentNode, edges: GraphEdge[]): QueryArchitectureResult {
+    const selectedEdges = edges.filter((edge) => edge.dstId === target.id).sort(compareEdge);
+    const parents = selectedEdges
+      .map((edge) => this.findComponent(edge.srcId))
+      .filter((component): component is ComponentNode => component !== null)
+      .map((component) => this.nodeRef(component))
+      .sort(compareNodeRef);
+    return {
+      status: "ok",
+      answer: { question: "rendered-by", target: this.nodeRef(target), parents },
+      nodes: this.componentsForEdges(selectedEdges, target),
+      edges: selectedEdges.map((edge) => this.edgeRef(edge)),
+    };
+  }
+
+  private renderCount(target: ComponentNode, edges: GraphEdge[], question: "fan-in" | "fan-out"): QueryArchitectureResult {
+    const selectedEdges = edges.filter((edge) => question === "fan-in" ? edge.dstId === target.id : edge.srcId === target.id).sort(compareEdge);
+    return {
+      status: "ok",
+      answer: { question, target: this.nodeRef(target), count: selectedEdges.length },
+      nodes: this.componentsForEdges(selectedEdges, target),
+      edges: selectedEdges.map((edge) => this.edgeRef(edge)),
+    };
+  }
+
+  private renderReachability(target: ComponentNode, edges: GraphEdge[], requestedDepth: number | undefined): QueryArchitectureResult {
+    const maxDepth = normalizeDepth(requestedDepth);
+    const visited = new Set<string>([target.id]);
+    const selectedEdges: GraphEdge[] = [];
+    let frontier = [target.id];
+
+    for (let depth = 0; depth < maxDepth && frontier.length > 0; depth++) {
+      const next: string[] = [];
+      for (const srcId of frontier) {
+        const outgoing = edges.filter((edge) => edge.srcId === srcId).sort(compareEdge);
+        for (const edge of outgoing) {
+          selectedEdges.push(edge);
+          if (!visited.has(edge.dstId)) {
+            visited.add(edge.dstId);
+            next.push(edge.dstId);
+          }
+        }
+      }
+      frontier = next;
+    }
+
+    const reachable = [...visited]
+      .filter((id) => id !== target.id)
+      .map((id) => this.findComponent(id))
+      .filter((component): component is ComponentNode => component !== null)
+      .map((component) => this.nodeRef(component))
+      .sort(compareNodeRef);
+    const uniqueEdges = uniqueGraphEdges(selectedEdges).sort(compareEdge);
+    return {
+      status: "ok",
+      answer: { question: "reachability", target: this.nodeRef(target), depth: maxDepth, reachable },
+      nodes: this.componentsForEdges(uniqueEdges, target),
+      edges: uniqueEdges.map((edge) => this.edgeRef(edge)),
     };
   }
 
@@ -297,6 +456,30 @@ export class Session {
       ...(recorded.refusedReason !== undefined ? { refusedReason: recorded.refusedReason } : {}),
     };
   }
+}
+
+function isQueryArchitectureQuestion(question: string): question is QueryArchitectureQuestion {
+  return (QUERY_ARCHITECTURE_QUESTIONS as readonly string[]).includes(question);
+}
+
+function normalizeDepth(depth: number | undefined): number {
+  if (depth === undefined) return 1;
+  if (!Number.isFinite(depth) || depth < 1) return 1;
+  return Math.min(Math.floor(depth), MAX_QUERY_ARCHITECTURE_DEPTH);
+}
+
+function compareNodeRef(a: NodeRef, b: NodeRef): number {
+  return a.name.localeCompare(b.name) || a.file.localeCompare(b.file) || a.id.localeCompare(b.id);
+}
+
+function compareEdge(a: GraphEdge, b: GraphEdge): number {
+  return a.srcId.localeCompare(b.srcId) || a.dstId.localeCompare(b.dstId) || a.kind.localeCompare(b.kind);
+}
+
+function uniqueGraphEdges(edges: GraphEdge[]): GraphEdge[] {
+  const byKey = new Map<string, GraphEdge>();
+  for (const edge of edges) byKey.set(`${edge.kind}:${edge.srcId}:${edge.dstId}`, edge);
+  return [...byKey.values()];
 }
 
 export function createSession(opts: SessionOpts): Session {

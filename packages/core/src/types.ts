@@ -22,6 +22,14 @@ export interface ComponentNode {
   compositionMarkers: string[]; // memo|forwardRef|lazy|hoc
   conditionalBranches: number; // count of ternary/&&/switch in render
 }
+export interface HookNode {
+  id: string;
+  name: string;
+  span: Span;
+  file: string;
+  exportKind: "default" | "named" | "none";
+  hookCalls: string[]; // hook names invoked by this hook
+}
 export interface ModuleNode { id: string; file: string; contentHash: string; }
 export type EdgeKind = "renders" | "imports" | "calls" | "uses-hook";
 export interface GraphEdge { srcId: string; dstId: string; kind: EdgeKind; }
@@ -67,7 +75,16 @@ export interface OverAbstractionEvidence {
   conditionalBranchCount: number;
 }
 
-export type Evidence = SharedExtractionEvidence | RenderCouplingEvidence | OverAbstractionEvidence;
+export interface HookTopologyEvidence {
+  kind: "hook-topology";
+  hook: { name: string; span: Span; fingerprint: string };
+  fanIn: number;
+  fanOut: number;
+  directDependencies: number;
+  reachableDepth: number;
+}
+
+export type Evidence = SharedExtractionEvidence | RenderCouplingEvidence | OverAbstractionEvidence | HookTopologyEvidence;
 
 export interface Finding {
   id: string;

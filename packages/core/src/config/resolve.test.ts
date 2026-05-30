@@ -41,14 +41,21 @@ test("resolveConfig provides conservative render-coupling and over-abstraction t
   expect(c.overAbstraction.maxChildren).toBe(8);
   expect(c.overAbstraction.maxCompositionMarkers).toBe(2);
   expect(c.overAbstraction.maxConditionalBranches).toBe(5);
+  expect(c.hookTopology.maxFanIn).toBe(5);
+  expect(c.hookTopology.maxFanOut).toBe(5);
+  expect(c.hookTopology.maxDirectDependencies).toBe(5);
+  expect(c.hookTopology.maxReachableDepth).toBe(3);
 });
 
 test("resolveConfig accepts partial threshold overrides without adding non-metric fields", () => {
-  const c = resolveConfig({ renderCoupling: { maxFanIn: 2 }, overAbstraction: { maxProps: 3 } });
+  const c = resolveConfig({ renderCoupling: { maxFanIn: 2 }, overAbstraction: { maxProps: 3 }, hookTopology: { maxReachableDepth: 1 } });
   expect(c.renderCoupling.maxFanIn).toBe(2);
   expect(c.renderCoupling.maxFanOut).toBe(DEFAULT_CONFIG.renderCoupling.maxFanOut);
   expect(c.overAbstraction.maxProps).toBe(3);
   expect(c.overAbstraction.maxHooks).toBe(DEFAULT_CONFIG.overAbstraction.maxHooks);
+  expect(c.hookTopology.maxReachableDepth).toBe(1);
   // @ts-expect-error import/module coupling config is intentionally out of scope.
   expect(() => resolveConfig({ renderCoupling: { maxImports: 1 } })).toThrow();
+  // @ts-expect-error convention config is intentionally out of scope for Slice 4.
+  expect(() => resolveConfig({ hookTopology: { forbiddenHooks: [] } })).toThrow();
 });

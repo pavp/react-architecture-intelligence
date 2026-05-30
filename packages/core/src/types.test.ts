@@ -3,6 +3,7 @@ import type {
   Fingerprint,
   Finding,
   FindingType,
+  HookTopologyEvidence,
   OverAbstractionEvidence,
   RenderCouplingEvidence,
   Severity,
@@ -33,7 +34,7 @@ test("isFinding rejects a non-finding", () => {
   expect(isFinding(null)).toBe(false);
 });
 
-test("finding evidence accepts metric-only render-coupling and over-abstraction variants", () => {
+test("finding evidence accepts metric-only render-coupling, over-abstraction, and hook-topology variants", () => {
   const span: Span = { file: "Card.tsx", start: 0, end: 10, kind: "component", astPath: "module>fn[0]" };
   const renderEvidence: RenderCouplingEvidence = {
     kind: "render-coupling",
@@ -52,6 +53,14 @@ test("finding evidence accepts metric-only render-coupling and over-abstraction 
     compositionMarkerCount: 2,
     conditionalBranchCount: 3,
   };
+  const hookEvidence: HookTopologyEvidence = {
+    kind: "hook-topology",
+    hook: { name: "useCheckout", span, fingerprint: "fp-hook" },
+    fanIn: 2,
+    fanOut: 3,
+    directDependencies: 3,
+    reachableDepth: 2,
+  };
 
   const fp: Fingerprint = { structural: "s", nominal: "n", positional: "p" };
   const renderFinding: Finding = {
@@ -68,7 +77,9 @@ test("finding evidence accepts metric-only render-coupling and over-abstraction 
     createdAt: 0,
   };
   const abstractionFinding: Finding = { ...renderFinding, id: "01O", ruleId: "react/over-abstraction", evidence: abstractionEvidence };
+  const hookFinding: Finding = { ...renderFinding, id: "01H", ruleId: "react/hook-topology", evidence: hookEvidence };
 
   expect(isFinding(renderFinding)).toBe(true);
   expect(isFinding(abstractionFinding)).toBe(true);
+  expect(isFinding(hookFinding)).toBe(true);
 });

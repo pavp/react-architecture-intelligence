@@ -1,12 +1,12 @@
 # Capability Spec: MCP Tools
 
 **Status**: Active (RFC 2119)  
-**Origin**: change `wire-deferred-mvp-gaps` (2026-05-30)  
-**Scope**: feedback reason surface in `explainFinding`, explicit `close_session` feedback closure, and analyzer diagnostic metadata in `analyze_repo`.
+**Origin**: changes `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture` (2026-05-30)
+**Scope**: MCP tool contracts for analyze diagnostics, feedback closure, temporal drift, and bounded graph questions.
 
 ## Purpose
 
-Define the durable contract for exposing the latest human feedback reason through MCP explain output and closing MCP analysis sessions with explicit feedback decisions. These surfaces MUST preserve existing feedback write paths and MUST NOT infer verdicts from narrative text.
+Define durable MCP tool contracts. These surfaces MUST preserve existing feedback write paths, MUST NOT infer verdicts from narrative text, and MUST answer graph or drift questions only from available deterministic data.
 
 ## `lastReason` Contract
 
@@ -272,8 +272,73 @@ Response shape:
 - THEN the response MUST NOT have `status: "ok"` or equivalent with empty arrays only
 - AND a named status MUST distinguish the case from a genuine clean drift
 
+## Requirement: query_architecture Tool Registration
+
+The MCP server MUST expose `query_architecture` as a registered tool. The tool MUST accept `{ question: string; target: string; depth?: number }` and return structured graph answers with `answer`, `nodes`, and `edges` fields when successful.
+
+### Scenario: Tool is listed
+
+- GIVEN an MCP server starts normally
+- WHEN the client requests the available tools
+- THEN `query_architecture` MUST be present in the tool list
+
+## Requirement: query_architecture Supported Questions
+
+`query_architecture` MUST answer only enumerated questions backed by currently constructed graph facts. This capability version supports `renders`, `rendered-by`, `fan-in`, `fan-out`, and `reachability` over `renders` edges from the latest analyzed `RepoGraph`.
+
+Unsupported questions MUST return `{ status: "unknown_question", question, validQuestions }` and MUST NOT fall back to free-form traversal, import inference, hook inference, or analysis execution.
+
+### Scenario: Unknown question is refused
+
+- GIVEN a client asks `query_architecture` with an unsupported question
+- WHEN the tool runs
+- THEN the response MUST have `status: "unknown_question"`
+- AND `validQuestions` MUST list the supported question enum
+
+## Requirement: query_architecture Requires Current Graph Context
+
+`query_architecture` MUST answer from the most recent in-memory graph produced by `analyze_repo`. If no analysis has run in the current session, it MUST return `{ status: "no_analysis", message }`. It MUST NOT trigger analysis as a side effect.
+
+If `target` does not match a component id or component name in the latest graph, the tool MUST return `{ status: "unknown_target", target }`.
+
+### Scenario: No prior analysis is explicit
+
+- GIVEN no `analyze_repo` call has populated the current session graph
+- WHEN `query_architecture` is called
+- THEN the response MUST have `status: "no_analysis"`
+- AND no analysis MUST be triggered
+
+### Scenario: Unknown target is explicit
+
+- GIVEN a latest analyzed graph exists
+- WHEN `query_architecture` references a target absent from the graph
+- THEN the response MUST have `status: "unknown_target"`
+
+## Requirement: query_architecture Bounded Graph Answers
+
+All `query_architecture` traversal MUST be bounded. `renders`, `rendered-by`, `fan-in`, and `fan-out` MUST inspect only direct `renders` edges for the target component. `reachability` MUST walk only outgoing `renders` edges up to a bounded depth, cap requested depth at an implementation maximum, and avoid revisiting nodes.
+
+### Scenario: Direct render children are returned
+
+- GIVEN the latest graph has `Page -> Card` and `Page -> Sidebar` `renders` edges
+- WHEN `query_architecture({ question: "renders", target: "Page" })` runs
+- THEN `answer.children` MUST include `Card` and `Sidebar`
+- AND returned `edges` MUST include only matching `renders` edges
+
+### Scenario: Fan-in counts incoming render edges
+
+- GIVEN the latest graph has two parents rendering `Leaf`
+- WHEN `query_architecture({ question: "fan-in", target: "Leaf" })` runs
+- THEN `answer.count` MUST be `2`
+
+### Scenario: Reachability respects depth bound
+
+- GIVEN a render chain extends beyond depth 1
+- WHEN `query_architecture({ question: "reachability", target, depth: 1 })` runs
+- THEN results MUST include only nodes reachable within one render hop
+
 ## References
 
-- Implementation: `packages/core/src/mcp/tools.ts`
-- Tests: `packages/core/src/mcp/tools.test.ts`
-- Source changes: `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`
+- Implementation: `packages/core/src/mcp/tools.ts`, `packages/core/src/mcp/server.ts`
+- Tests: `packages/core/src/mcp/tools.test.ts`, `packages/core/src/mcp/server.test.ts`
+- Source changes: `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`

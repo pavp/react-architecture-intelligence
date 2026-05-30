@@ -27,7 +27,7 @@ function renders(srcId: string, dstId: string): GraphEdge {
 
 function ctx(components: ComponentNode[], edges: GraphEdge[], config: RaiConfig = DEFAULT_CONFIG): AnalysisContext {
   return {
-    graph: { components, modules: [], edges },
+    graph: { components, hooks: [], modules: [], edges },
     memory: { weight: () => ({ fingerprint: "", ruleId: "", value: 0, confidence: 0, eventCount: 0, lastEvent: 0 }) } as any,
     config,
     types: { typeOf: () => null },

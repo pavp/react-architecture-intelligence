@@ -5,8 +5,10 @@ import type { MemoryReader } from "../memory/memory-reader.js";
 
 export type FrameworkId = "react" | "next" | "tanstack" | "remix" | "expo";
 
-/** Type escalation handle (lazy Pass-2). MVP: minimal — returns null until P4 wires ts-morph. */
-export interface TypeResolver { typeOf(span: Span): unknown | null; }
+export interface TypeInfo { text: string; symbolName?: string | undefined; }
+
+/** Type escalation handle (lazy Pass-2). */
+export interface TypeResolver { typeOf(span: Span): TypeInfo | null; }
 
 /** A config-declared boundary between two glob patterns (§1.1). Source: config.boundaries[]. */
 export interface BoundaryRule {
