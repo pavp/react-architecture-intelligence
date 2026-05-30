@@ -135,9 +135,11 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - ✅ Slice 6 complete: `codemod_proof` stores append-only patch, verification output, rollback patch, fingerprint, status, commit SHA, and timestamp.
 - `propose_refactor` (proposal-only) → `apply_refactor` with the §4.6 capability-token gate (current+active+opportunity finding) → DRY-RUN → TYPECHECK → TESTS → GIT-clean → commit + reversal patch. NO `--force`.
 - Append-only codemod proof artifacts (patch + verification output + rollback patch + originating fingerprint)
-- **P5 complete. Next:** Resolve §3.4 Next.js variant guard design before P6 adapter planning.
+- **P5 complete. Next:** Start P6 Slice 1: `@rai/adapter-next` scaffold + detection.
 
 ### P6 — First framework adapter (prove the seam)
+- ✅ Formal P6 plan exists: [`docs/superpowers/plans/p6-adapter-next.md`](plans/p6-adapter-next.md).
+- ✅ Variant guard design resolved: `app-router`, `pages-router`, `mixed-router`, and structured `variant-mismatch` diagnostics.
 - `@rai/adapter-next`: detect + enrich (RSC/client/route tags, frozen-input append-only) + 2–3 Next analyzers + variant-guard diagnostics + nominal/positional-only fp extension
 - CI lint: `grep framework-name packages/core == 0`
 - **Adapter storage rule**: adapters may NOT introduce independent persistence — all truth stays core-owned

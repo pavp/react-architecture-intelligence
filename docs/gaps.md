@@ -137,14 +137,11 @@ These are issues identified in the spec or through architectural review that hav
 
 **Follow-up:** Add worker isolation only if/when real CPU-hung analyzer interruption becomes required.
 
-### 3.4 Next.js variant guard design not detailed
+### 3.4 Next.js variant guard design ✅ RESOLVED for P6 plan
 
-**Problem:** The spec (§6.5) states that app-router vs pages-router should be treated as different variants, and that a variant mismatch must fail loudly with a diagnostic event — never silently fall back. The adapter contract mentions `supportedVariants` on the `Analyzer` interface, but there is no spec for:
-- How `detect()` distinguishes app-router from pages-router
-- What the `variant-mismatch` diagnostic event looks like
-- Whether a repo can have both (monorepo with mixed Next versions)
+**Problem (resolved in plan):** The spec (§6.5) states that app-router vs pages-router should be treated as different variants, and that a variant mismatch must fail loudly with a diagnostic event — never silently fall back.
 
-**Fix:** Resolve before writing the P6 plan. Decisions here affect the adapter contract and the `detect()` return type.
+**Fix planned:** `docs/superpowers/plans/p6-adapter-next.md` defines `NextVariant = "app-router" | "pages-router" | "mixed-router"`, detection signals, explicit `mixed-router`, and `variant-mismatch` diagnostic shape. Implementation remains pending in P6.
 
 ### 3.5 `reason` field in T4 is inert ✅ FIXED in wire-deferred-mvp-gaps
 
@@ -227,7 +224,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 | P0–P3 | [docs/superpowers/plans/2026-05-29-rai-mvp-p0-p3.md](superpowers/plans/2026-05-29-rai-mvp-p0-p3.md) | ✅ Exists, all 24 tasks complete |
 | P4 | [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md) | ✅ Complete; temporal + `query_architecture` + Band C + backfill complete |
 | P5 | [docs/superpowers/plans/p5-codemod-apply.md](superpowers/plans/p5-codemod-apply.md) | ✅ Exists; complete |
-| P6 | `docs/superpowers/plans/p6-adapter-next.md` | ❌ Missing |
+| P6 | [docs/superpowers/plans/p6-adapter-next.md](superpowers/plans/p6-adapter-next.md) | ✅ Exists; planned |
 
 ---
 
@@ -250,7 +247,8 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 15. ~~**Implement P5 Slice 5b1.5**~~ — ✅ complete: dry-run patch output is valid `git apply` input.
 16. ~~**Implement P5 Slice 5b2**~~ — ✅ complete: `apply_refactor` MCP tool over the existing pipeline.
 17. ~~**Implement P5 Slice 6**~~ — ✅ complete: append-only codemod proof artifacts.
-18. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
+18. ~~**Resolve §3.4 (Next.js variant guard design)**~~ — ✅ complete in P6 plan.
+19. **Start P6 Slice 1** — adapter package scaffold + Next detection.
 
 ---
 
