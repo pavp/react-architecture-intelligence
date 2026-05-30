@@ -133,23 +133,23 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 3 — Next enrichment over frozen graph
+### Slice 3 — Next enrichment over frozen graph ✅ DONE
 
 **Goal:** tag core graph nodes with Next roles without mutating core graph structures.
 
 **Tasks:**
 
-- [ ] Implement enrichment tags: `RouteSegment`, `Layout`, `ClientComponent`, `ServerComponent`, `ServerAction`.
-- [ ] Build role index for route segments and layouts.
-- [ ] Add framework edges only in enrichment output, not in core `RepoGraph`.
-- [ ] Prove frozen input graph cannot be mutated by enrichment.
+- [x] Implement enrichment tags: `RouteSegment`, `Layout`, `ClientComponent`, `ServerComponent`, `ServerAction`.
+- [x] Build role index for route segments and layouts.
+- [x] Add framework edges only in enrichment output, not in core `RepoGraph`.
+- [x] Prove frozen input graph cannot be mutated by enrichment.
 
 **Exit criteria:**
 
-- [ ] App-router fixtures get route/layout/client/server tags.
-- [ ] Pages-router fixtures get route tags.
-- [ ] Core graph nodes and structural fingerprints remain unchanged.
-- [ ] build/test/typecheck clean.
+- [x] App-router fixtures get route/layout/client/server tags.
+- [x] Pages-router fixtures get route tags.
+- [x] Core graph nodes and structural fingerprints remain unchanged.
+- [x] build/test/typecheck clean.
 
 ---
 
