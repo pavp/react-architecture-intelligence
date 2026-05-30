@@ -9,7 +9,7 @@ import type { RaiConfig } from "../config/schema.js";
 export interface McpServerOpts { config: RaiConfig; rootDir: string; }
 
 /** Reads .tsx/.ts source files under rootDir (excluding node_modules/dist) for analysis. */
-function readSources(rootDir: string): { file: string; source: string }[] {
+export function readSources(rootDir: string): { file: string; source: string }[] {
   const out: { file: string; source: string }[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir)) {

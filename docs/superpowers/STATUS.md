@@ -1,7 +1,7 @@
 # RAI — Build Status & Resume Guide
 
 **Last updated:** 2026-05-30
-**Branch:** `feat/rai-mvp-p0-p3` (30 commits, not yet merged to `main`)
+**Branch:** `feat/rai-mvp-p0-p3` (not yet merged to `main`)
 **State:** ✅ **P0–P3 MVP complete and green.**
 
 ---
@@ -12,9 +12,10 @@ The MVP vertical slice is done, tested, builds, and runs end-to-end from the com
 
 ```
 typecheck:  0 errors (strict: noUncheckedIndexedAccess + exactOptionalPropertyTypes)
-tests:      95 passing / 22 files (Vitest)
+tests:      101 passing / 23 files (Vitest)
 build:      both packages compile; schema.sql copied to dist
 CLI smoke:  rai analyze fixtures/duplication/buttons → { opportunity: 1, warn: 1 }
+            rai mcp fixtures/duplication/buttons    → stdio handshake + 4 tools listed
 ```
 
 The thesis is proven: a deterministic engine produces structured findings, persists them
@@ -40,7 +41,7 @@ append-only, and **a human rejection survives re-analysis and suppresses the fin
 | Engine | `core/src/engine/pipeline.ts` | `analyzeRepo`: graph→analyze→persist→overlay |
 | Golden | `fixtures/`, `engine/golden.test.ts` | corpus + rebuild/determinism-replay |
 | MCP | `core/src/mcp/` | Band-A tools session + stdio server |
-| CLI | `cli/src/index.ts` | `rai analyze [dir]` / `rai mcp [dir]` |
+| CLI | `cli/src/{index,cli}.ts` | `rai analyze [dir]` (prints §5.2 counts) / `rai mcp [dir]` (serves stdio); reuses core `readSources` |
 
 ## Verified invariants (P3 exit criteria)
 - ✅ Findings/feedback are **append-only** (no UPDATE/DELETE on those tables anywhere)
@@ -54,10 +55,11 @@ append-only, and **a human rejection survives re-analysis and suppresses the fin
 
 ```bash
 pnpm install            # IMPORTANT: wires workspace symlinks (@rai/core ← cli) + builds better-sqlite3
-pnpm test               # 95 passing
+pnpm test               # 101 passing
 pnpm typecheck          # clean
 pnpm build              # both packages → dist/ (+ schema.sql copy)
-node packages/cli/dist/index.js analyze fixtures/duplication/buttons   # → 1 opportunity
+node packages/cli/dist/index.js analyze fixtures/duplication/buttons   # → { opportunity: 1, warn: 1 }
+node packages/cli/dist/index.js mcp    fixtures/duplication/buttons    # → MCP stdio server (Band-A tools)
 ```
 
 ### Environment gotchas (already solved, but know them)
