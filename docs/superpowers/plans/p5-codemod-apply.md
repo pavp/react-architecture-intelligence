@@ -1,6 +1,6 @@
 # P5 — Codemod Apply — Implementation Plan
 
-**Status:** In progress — Slices 1, 2, 3, 4, 5a, and 5b1 complete
+**Status:** In progress — Slices 1, 2, 3, 4, 5a, 5b1, and 5b1.5 complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §1, §4.6, §5.2, §7
@@ -230,6 +230,23 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 - [x] Adapter behavior is proven in an isolated temporary git repo.
 - [x] No public mutation tool exists yet.
+
+---
+
+### Slice 5b1.5 — real patch-format hardening ✅ DONE
+
+**Goal:** ensure dry-run patch previews are valid `git apply` input before wiring the public apply tool.
+
+**Tasks:**
+
+- [x] Emit `diff --git` patch text for generated target files.
+- [x] Emit rollback patch text that deletes generated target files.
+- [x] Prove both patch and rollback patch apply in an isolated temporary git repo.
+
+**Exit criteria:**
+
+- [x] `previewSharedExtractionPatch(...).patch` is accepted by `git apply`.
+- [x] `previewSharedExtractionPatch(...).rollbackPatch` is accepted by `git apply` after the forward patch.
 
 ---
 

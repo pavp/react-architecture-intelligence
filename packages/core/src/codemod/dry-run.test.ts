@@ -3,6 +3,10 @@ import { buildSharedExtractionProposal } from "./proposal.js";
 import { previewSharedExtractionPatch } from "./dry-run.js";
 import type { Finding, Span } from "../types.js";
 import { pass1 } from "../parse/pass1.js";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const aSource = `export function LoginButton({ label, onClick, variant }) {
   return <button onClick={onClick} data-variant={variant}>{label}</button>;
@@ -66,9 +70,9 @@ test("dry-run returns deterministic patch and rollback preview without mutating 
   expect(first).toEqual(second);
   expect(first.status).toBe("ok");
   expect(first.touchedFiles).toEqual(["CtaButton.tsx", "LoginButton.tsx", "SharedButton.tsx", "SignupButton.tsx"]);
-  expect(first.patch).toContain("+++ SharedButton.tsx");
+  expect(first.patch).toContain("+++ b/SharedButton.tsx");
   expect(first.patch).toContain("export function SharedButton({ label, onClick, size, variant })");
-  expect(first.rollbackPatch).toContain("--- SharedButton.tsx");
+  expect(first.rollbackPatch).toContain("--- a/SharedButton.tsx");
   expect(sources).toEqual(before);
 });
 
@@ -96,3 +100,37 @@ test("dry-run refuses unsafe variance parameters", () => {
 
   expect(result).toEqual({ status: "refused", reason: "unsafe-variance-parameter", parameter: "not-safe" });
 });
+
+test("dry-run patch and rollback patch apply with git", () => {
+  const proposal = buildSharedExtractionProposal(finding());
+  if (proposal.status !== "ok") throw new Error("bad fixture");
+  const result = previewSharedExtractionPatch({ proposal, sources, targetFile: "SharedButton.tsx" });
+  if (result.status !== "ok") throw new Error("bad preview");
+  const dir = mkdtempSync(join(tmpdir(), "rai-dry-run-"));
+  try {
+    git(dir, "init");
+    git(dir, "config", "user.email", "test@example.com");
+    git(dir, "config", "user.name", "Test User");
+    for (const source of sources) writeFileSync(join(dir, source.file), source.source);
+    git(dir, "add", ".");
+    git(dir, "commit", "-m", "init");
+
+    gitApply(dir, result.patch);
+    expect(readFileSync(join(dir, "SharedButton.tsx"), "utf8")).toContain("export function SharedButton");
+
+    gitApply(dir, result.rollbackPatch);
+    expect(readFileSync(join(dir, "LoginButton.tsx"), "utf8")).toBe(aSource);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+function git(cwd: string, ...args: string[]) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+}
+
+function gitApply(cwd: string, patch: string) {
+  const result = spawnSync("git", ["apply", "--whitespace=nowarn"], { cwd, input: patch, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+}

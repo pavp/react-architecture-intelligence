@@ -229,7 +229,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 |---|---|---|
 | P0–P3 | [docs/superpowers/plans/2026-05-29-rai-mvp-p0-p3.md](superpowers/plans/2026-05-29-rai-mvp-p0-p3.md) | ✅ Exists, all 24 tasks complete |
 | P4 | [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md) | ✅ Exists; temporal + `query_architecture` slices complete |
-| P5 | [docs/superpowers/plans/p5-codemod-apply.md](superpowers/plans/p5-codemod-apply.md) | ✅ Exists; Slices 1–4 + 5a + 5b1 complete |
+| P5 | [docs/superpowers/plans/p5-codemod-apply.md](superpowers/plans/p5-codemod-apply.md) | ✅ Exists; Slices 1–4 + 5a + 5b1 + 5b1.5 complete |
 | P6 | `docs/superpowers/plans/p6-adapter-next.md` | ❌ Missing |
 
 ---
@@ -249,8 +249,9 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 11. ~~**Implement P5 Slice 4**~~ — ✅ complete: dry-run transform and patch preview; workspace remains unchanged.
 12. ~~**Implement P5 Slice 5a**~~ — ✅ complete: verification pipeline orchestrator.
 13. ~~**Implement P5 Slice 5b1**~~ — ✅ complete: real git workspace adapter.
-14. **Implement P5 Slice 5b2** — `apply_refactor` MCP tool over the existing pipeline.
-15. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
+14. ~~**Implement P5 Slice 5b1.5**~~ — ✅ complete: dry-run patch output is valid `git apply` input.
+15. **Implement P5 Slice 5b2** — `apply_refactor` MCP tool over the existing pipeline.
+16. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
 
 ---
 

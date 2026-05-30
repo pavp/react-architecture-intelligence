@@ -36,25 +36,43 @@ export function previewSharedExtractionPatch(input: DryRunPatchInput): DryRunPat
 
   const touchedFiles = [...new Set([...proposal.sourceInstances.map((instance) => instance.span.file), input.targetFile])].sort();
   const componentSource = sharedComponentSource(proposal);
-  const patch = [
-    `--- /dev/null`,
-    `+++ ${input.targetFile}`,
-    componentSource,
-    ...proposal.sourceInstances.flatMap((instance) => [`--- ${instance.span.file}`, `+++ ${instance.span.file}`, `@@ replace ${instance.name}`, `<${proposal.componentName} />`]),
-  ].join("\n") + "\n";
-  const rollbackPatch = [
-    `--- ${input.targetFile}`,
-    `+++ /dev/null`,
-    componentSource,
-    ...proposal.sourceInstances.flatMap((instance) => [`--- ${instance.span.file}`, `+++ ${instance.span.file}`, `@@ restore ${instance.name}`]),
-  ].join("\n") + "\n";
+  const patch = addFilePatch(input.targetFile, componentSource);
+  const rollbackPatch = deleteFilePatch(input.targetFile, componentSource);
 
   return { status: "ok", touchedFiles, patch, rollbackPatch };
 }
 
 function sharedComponentSource(proposal: Extract<SharedExtractionProposal, { status: "ok" }>): string {
   const props = [...new Set([...proposal.sharedProps, ...proposal.varianceParameters])].sort();
-  return `export function ${proposal.componentName}({ ${props.join(", ")} }) {\n  return null;\n}`;
+  return `export function ${proposal.componentName}({ ${props.join(", ")} }) {\n  return null;\n}\n`;
+}
+
+function addFilePatch(file: string, source: string): string {
+  const lines = source.split("\n").slice(0, -1);
+  return [
+    `diff --git a/${file} b/${file}`,
+    `new file mode 100644`,
+    `index 0000000..0000000`,
+    `--- /dev/null`,
+    `+++ b/${file}`,
+    `@@ -0,0 +1,${lines.length} @@`,
+    ...lines.map((line) => `+${line}`),
+    "",
+  ].join("\n");
+}
+
+function deleteFilePatch(file: string, source: string): string {
+  const lines = source.split("\n").slice(0, -1);
+  return [
+    `diff --git a/${file} b/${file}`,
+    `deleted file mode 100644`,
+    `index 0000000..0000000`,
+    `--- a/${file}`,
+    `+++ /dev/null`,
+    `@@ -1,${lines.length} +0,0 @@`,
+    ...lines.map((line) => `-${line}`),
+    "",
+  ].join("\n");
 }
 
 function isSafeIdentifier(name: string): boolean {
