@@ -45,3 +45,18 @@ test("overlay does NOT mutate the finding row", () => {
   expect((f as any).status).toBeUndefined();
   expect((f as any).severity).toBeUndefined();
 });
+
+test("severityMap: error->warn clamps severity and does not mutate severityRaw", () => {
+  const f = mk(); // severityRaw: "warn" — override to "error"
+  (f as any).severityRaw = "error";
+  const cfgWithMap = { ...cfg, severityMap: { error: "warn" as const } };
+  const p = overlay(f, null, cfgWithMap);
+  expect(p.severity).toBe("warn");
+  expect(f.severityRaw).toBe("error"); // source finding unchanged
+});
+
+test("severityMap: no map -> identity (severity === severityRaw)", () => {
+  const f = mk(); // severityRaw: "warn"
+  const p = overlay(f, null, cfg); // cfg has no severityMap
+  expect(p.severity).toBe("warn");
+});

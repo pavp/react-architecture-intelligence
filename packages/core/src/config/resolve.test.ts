@@ -21,3 +21,11 @@ test("resolveConfig rejects invalid types", () => {
 test("resolveConfig carries a configVersion string", () => {
   expect(typeof resolveConfig({}).configVersion).toBe("string");
 });
+
+test("resolveConfig rejects upward severityMap (info->error raises severity)", () => {
+  expect(() => resolveConfig({ memory: { severityMap: { info: "error" } } })).toThrow();
+});
+
+test("resolveConfig accepts downward severityMap (error->warn is a valid clamp)", () => {
+  expect(() => resolveConfig({ memory: { severityMap: { error: "warn" } } })).not.toThrow();
+});

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Severity } from "../types.js";
 
 export const ConfigSchema = z.object({
   configVersion: z.string().default("1"),
@@ -28,10 +29,28 @@ export const ConfigSchema = z.object({
     suppressBelow: z.number().min(-1).max(1).default(-0.3),
     amplifyAbove: z.number().min(-1).max(1).default(0.3),
     minConf: z.number().min(0).max(1).default(0.4),
-  }).default({}),
+    severityMap: z.record(z.enum(["info", "warn", "error"]), z.enum(["info", "warn", "error"])).optional(),
+  }).default({})
+  .superRefine((m, ctx) => {
+    const rank = { info: 0, warn: 1, error: 2 } as const;
+    for (const [k, v] of Object.entries(m.severityMap ?? {})) {
+      if (rank[v as Severity] > rank[k as Severity]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `severityMap may only clamp DOWN: ${k} -> ${v} raises severity`,
+        });
+      }
+    }
+  }),
   excludeGlobs: z.array(z.string()).default([
     "**/*.test.*", "**/*.stories.*", "**/shared/**", "**/ui/**", "**/components/common/**",
   ]),
+  boundaries: z.array(z.object({
+    from: z.string(),
+    to: z.string(),
+    kind: z.string().optional(),
+    reason: z.string(),
+  })).default([]),
 });
 
 export type RaiConfig = z.infer<typeof ConfigSchema>;
