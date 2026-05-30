@@ -9,6 +9,11 @@ test("buildMcpServer returns a server with the expected tool names registered", 
   }
 });
 
+test("get_drift is listed in toolNames", () => {
+  const { toolNames } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
+  expect(toolNames).toContain("get_drift");
+});
+
 test("analyze_repo handler passes resolved SHA (not literal 'head') to session.analyzeRepo", async () => {
   const { session, server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
   const spy = vi.spyOn(session, "analyzeRepo");

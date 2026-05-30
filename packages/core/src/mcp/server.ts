@@ -91,6 +91,19 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("close_session");
 
+  server.tool("get_drift", "Return snapshot diff between two analyzed commits (read-only).",
+    {
+      baseCommit: z.string(),
+      headCommit: z.string().optional(),
+      ruleId: z.string().optional(),
+      fingerprint: z.string().optional(),
+    },
+    async (args) => {
+      const r = session.getDrift(args);
+      return { content: [{ type: "text", text: JSON.stringify(r, null, 2) }] };
+    });
+  toolNames.push("get_drift");
+
   return { server, session, toolNames };
 }
 
