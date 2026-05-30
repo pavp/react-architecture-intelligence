@@ -9,6 +9,7 @@ import { MemoryReader } from "../memory/memory-reader.js";
 import { overlay } from "../memory/overlay.js";
 import { EMBED_MODEL_VERSION } from "../similarity/embed.js";
 import type { Analyzer, AnalysisContext, BoundaryRule } from "../analyzers/analyzer.js";
+import { SnapshotStore } from "../memory/snapshot-store.js";
 
 export interface AnalyzeRepoInput {
   files: SourceFile[];
@@ -60,11 +61,36 @@ export function analyzeRepo(input: AnalyzeRepoInput): AnalyzeRepoResult {
 
   // 7. persist findings (append-only) + 8. overlay with memory
   const presented: PresentedFinding[] = [];
+  const persistedFindings: Finding[] = [];
   for (const f of raw) {
     const persisted = { ...f, createdAt: input.asOf };
     input.findings.insert(persisted);
+    persistedFindings.push(persisted);
     const w = memory.weight(f.fingerprint.structural, f.ruleId);
     presented.push(overlay(persisted, w, input.config.memory));
+  }
+
+  // 9. snapshot population — derived view (§3.5). Skip if no SHA; wrap in try/catch for integrity.
+  if (!input.commitSha) {
+    diagnostics.push({ kind: "snapshot-skipped", message: "no git SHA available" });
+  } else {
+    try {
+      const db = (input.findings as any).db;
+      const snapStore = new SnapshotStore(db);
+      for (const f of persistedFindings) {
+        snapStore.insert({
+          commitSha: input.commitSha,
+          fingerprint: f.fingerprint.structural,
+          ruleId: f.ruleId,
+          severityRaw: f.severityRaw,
+          evidence: f.evidence,
+          createdAt: input.asOf,
+        });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      diagnostics.push({ kind: "snapshot-skipped", message });
+    }
   }
 
   presented.sort((a, b) => a.fingerprint.structural.localeCompare(b.fingerprint.structural));
