@@ -2,20 +2,22 @@
 
 **Last updated:** 2026-05-30
 **Branch:** `feat/rai-mvp-p0-p3` (not yet merged to `main`)
-**State:** ✅ **P0–P3 MVP complete and green.**
+**State:** ✅ **P0–P3 MVP complete, C4a analyzer slice complete, CI/PR workflow active.**
 
 ---
 
 ## TL;DR
 
-The MVP vertical slice is done, tested, builds, and runs end-to-end from the compiled CLI.
+The MVP vertical slice is done, the first P4 analyzer slice is merged, and GitHub PRs now run CI.
 
 ```
 typecheck:  0 errors (strict: noUncheckedIndexedAccess + exactOptionalPropertyTypes)
-tests:      101 passing / 23 files (Vitest)
+tests:      142 passing / 25 files (Vitest)
 build:      both packages compile; schema.sql copied to dist
 CLI smoke:  rai analyze fixtures/duplication/buttons → { opportunity: 1, warn: 1 }
             rai mcp fixtures/duplication/buttons    → stdio handshake + 4 tools listed
+github:     https://github.com/pavp/react-architecture-intelligence
+ci:         .github/workflows/ci.yml runs pnpm build/test/typecheck on PRs
 ```
 
 The thesis is proven: a deterministic engine produces structured findings, persists them
@@ -37,8 +39,8 @@ append-only, and **a human rejection survives re-analysis and suppresses the fin
 | DB | `core/src/db/` | SQLite (T1–T5 + snapshot) + **better-sqlite3 + sqlite-vec** |
 | Memory | `core/src/memory/` | T3 append-only findings · T4 feedback (anti-self-loop+phantom guard) · pure reducer · overlay · MemoryReader |
 | Similarity | `core/src/similarity/` | deterministic feature-hash embedding + cosine clustering |
-| Analyzers | `core/src/analyzers/` | contract + registry + **shared-extraction killer rule** (boolean-AND) |
-| Engine | `core/src/engine/pipeline.ts` | `analyzeRepo`: graph→analyze→persist→overlay |
+| Analyzers | `core/src/analyzers/` | contract + registry + `shared-extraction`, `render-coupling`, `over-abstraction` |
+| Engine | `core/src/engine/pipeline.ts` | `analyzeRepo`: graph→analyze→persist→overlay, with per-analyzer crash diagnostics |
 | Golden | `fixtures/`, `engine/golden.test.ts` | corpus + rebuild/determinism-replay |
 | MCP | `core/src/mcp/` | Band-A tools session + stdio server |
 | CLI | `cli/src/{index,cli}.ts` | `rai analyze [dir]` (prints §5.2 counts) / `rai mcp [dir]` (serves stdio); reuses core `readSources` |
@@ -55,7 +57,7 @@ append-only, and **a human rejection survives re-analysis and suppresses the fin
 
 ```bash
 pnpm install            # IMPORTANT: wires workspace symlinks (@rai/core ← cli) + builds better-sqlite3
-pnpm test               # 101 passing
+pnpm test               # 142 passing
 pnpm typecheck          # clean
 pnpm build              # both packages → dist/ (+ schema.sql copy)
 node packages/cli/dist/index.js analyze fixtures/duplication/buttons   # → { opportunity: 1, warn: 1 }
@@ -98,18 +100,19 @@ The MVP run produced **2 findings**. One is a true positive, one was a false pos
 
 ---
 
-## Next steps (not started — separate plans)
+## Next steps (post-MVP — separate plans)
 
 These are explicitly **post-MVP** per the design's §7 phasing. Each should get its own
 `docs/superpowers/plans/` doc via the writing-plans skill, then subagent-driven execution.
 
 ### P4 — Breadth + temporal (highest value next)
 - ~~**Fix KI-1 (component detector too loose)**~~ — ✅ Done in `fix-ki1-component-detector`. JSX-return guard added to `pass1`; route handlers no longer admitted as components.
-- More analyzers: `coupling`, `hook-topology`, `over-abstraction`, `boundary-violation` (all pure, into the registry)
-- `snapshot` table population + `get_drift` MCP tool (pure SQL set-algebra over snapshots — §3.5/§5)
-- `query_architecture` MCP tool (enumerated graph questions, bounded-depth recursive CTEs)
-- **Analyzer fault containment**: per-analyzer timeout + crash isolation (one analyzer panic ≠ run failure)
-- Wire the deferred bits: `boundary_rule` → `architectural-conflict` finding type in shared-extraction; lazy ts-morph Pass-2 in `typeOf()` (currently returns null); config severity-clamp in overlay (currently identity)
+- ~~Wire `boundary_rule` → `architectural-conflict` in shared-extraction~~ — ✅ Done in `wire-deferred-mvp-gaps`.
+- ~~Wire config severity clamp in overlay~~ — ✅ Done in `wire-deferred-mvp-gaps`.
+- ~~Analyzer crash containment~~ — ✅ Done in `analyzer-fault-containment`; hard sync-CPU timeout remains out of scope until worker isolation exists.
+- ~~Close-session feedback capture~~ — ✅ Done in `close-session-feedback`; only explicit human `decisions[]` write T4.
+- ~~First analyzer slice: render coupling + over-abstraction~~ — ✅ Done in `more-analyzers-render-overabstraction`.
+- **Still next:** write the formal P4 plan, then implement `snapshot` population + `get_drift`, `query_architecture`, lazy ts-morph Pass-2, and remaining analyzer slices (`hook-topology`, `boundary-violation` / conventions as scoped).
 
 ### P5 — Codemod apply (dangerous — sequenced last, gated)
 - `propose_refactor` (proposal-only) → `apply_refactor` with the §4.6 capability-token gate (current+active+opportunity finding) → DRY-RUN → TYPECHECK → TESTS → GIT-clean → commit + reversal patch. NO `--force`.
@@ -121,8 +124,10 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - **Adapter storage rule**: adapters may NOT introduce independent persistence — all truth stays core-owned
 
 ### Repo/release engineering (§9 of the design — not yet set up)
-- Adopt storywright's setup: commitlint + husky + semantic-release + the 3 workflows (ci/pr-title/release) + PR template + CONTRIBUTING/RELEASING. Monorepo: per-package release (semantic-release-monorepo or changesets) lands with P6; locked single-version is fine through P5.
-- No GitHub remote yet. `@rai/*` npm scope is a placeholder — swap to the real scope before first publish.
+- ✅ GitHub remote exists under `pavp/react-architecture-intelligence`.
+- ✅ CI workflow exists for PR build/test/typecheck.
+- ✅ PR template exists.
+- Still missing: commitlint, husky, PR-title validation, release workflow, CONTRIBUTING, RELEASING, and publishing strategy. Monorepo release tooling can wait until P6; locked single-version remains fine through P5.
 
 ---
 
