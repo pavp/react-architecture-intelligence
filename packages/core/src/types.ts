@@ -47,7 +47,7 @@ export type FindingType = "opportunity" | "architectural-conflict";
 
 export interface SharedExtractionEvidence {
   kind: "shared-extraction";
-  instances: { name: string; span: Span; fingerprint: string }[];
+  instances: { name: string; span: Span; fingerprint: string; exportKind: ComponentNode["exportKind"] }[];
   cosine: number;
   propOverlap: number;
   hookOverlap: number;

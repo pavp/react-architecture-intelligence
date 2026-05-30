@@ -51,6 +51,14 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("find_shared_opportunities");
 
+  server.tool("propose_refactor", "Return a deterministic no-write refactor proposal for a current finding fingerprint.",
+    { fingerprint: z.string() },
+    async (args) => {
+      const r = session.proposeRefactor({ fingerprint: args.fingerprint });
+      return { content: [{ type: "text", text: JSON.stringify(r, null, 2) }] };
+    });
+  toolNames.push("propose_refactor");
+
   server.tool("explain_finding", "Return a finding's structured evidence + grounding fields (render only these; do not infer).",
     { fingerprint: z.string() },
     async (args) => {

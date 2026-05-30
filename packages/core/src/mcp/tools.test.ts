@@ -181,6 +181,45 @@ test("find_shared_opportunities separates opportunities from conflicts", () => {
   expect(r.conflicts.length).toBe(0);
 });
 
+test("proposeRefactor returns a deterministic no-write proposal for a current opportunity", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0 });
+  const fp = a.topFingerprints[0]!;
+  const before = countRows(s, "feedback_event");
+
+  const first = s.proposeRefactor({ fingerprint: fp });
+  const second = s.proposeRefactor({ fingerprint: fp });
+
+  expect(first).toEqual(second);
+  expect(first).toMatchObject({
+    status: "ok",
+    fingerprint: fp,
+    ruleId: "react/shared-extraction",
+    componentName: "SharedButton",
+    varianceParameters: ["size", "variant"],
+    writeMode: "proposal-only",
+  });
+  expect((first as any).patch).toBeUndefined();
+  expect(countRows(s, "feedback_event")).toBe(before);
+});
+
+test("proposeRefactor refuses unknown fingerprints", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  s.analyzeRepo({ files, asOf: 0 });
+
+  expect(s.proposeRefactor({ fingerprint: "missing" })).toEqual({ status: "refused", reason: "unknown-current-finding" });
+});
+
+test("proposeRefactor refuses suppressed findings", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0 });
+  const fp = a.topFingerprints[0]!;
+  s.recordFeedback({ fingerprint: fp, ruleId: "react/shared-extraction", verdict: "reject", source: "human", asOf: 1 });
+  s.analyzeRepo({ files, asOf: 2, analysisVersion: 2 });
+
+  expect(s.proposeRefactor({ fingerprint: fp })).toEqual({ status: "refused", reason: "suppressed-finding" });
+});
+
 test("explain_finding returns evidence + groundingFields, no prose", () => {
   const s = createSession({ config: DEFAULT_CONFIG });
   const a = s.analyzeRepo({ files, asOf: 0 });

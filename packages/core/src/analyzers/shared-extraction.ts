@@ -73,7 +73,7 @@ export const sharedExtraction: Analyzer = {
         severityRaw: severityFor(cluster.length, c.shared),
         evidence: {
           kind: "shared-extraction",
-          instances: comps.map((x) => ({ name: x.name, span: x.span, fingerprint: structuralFingerprint(x) })),
+          instances: comps.map((x) => ({ name: x.name, span: x.span, fingerprint: structuralFingerprint(x), exportKind: x.exportKind })),
           cosine: minCosine,
           propOverlap,
           hookOverlap,

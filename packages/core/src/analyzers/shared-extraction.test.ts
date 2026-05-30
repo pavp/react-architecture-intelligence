@@ -74,6 +74,21 @@ test("evidence captures shared surface and variance points", () => {
   expect(f.evidence.variancePoints.sort()).toEqual(["size", "variant"]);
 });
 
+test("evidence captures export kind per instance for codemod risk", () => {
+  const cs = [
+    { ...comp("A", ["label", "onClick", "variant"], ["useTheme"]), exportKind: "none" as const },
+    { ...comp("B", ["label", "onClick", "size"], ["useTheme"]), exportKind: "named" as const },
+    { ...comp("C", ["label", "onClick", "variant"], ["useTheme"]), exportKind: "default" as const },
+  ];
+  const f = sharedExtraction.analyze(ctx(cs))[0]!;
+
+  expect(f.evidence.instances.map((instance) => ({ name: instance.name, exportKind: instance.exportKind }))).toEqual([
+    { name: "A", exportKind: "none" },
+    { name: "B", exportKind: "named" },
+    { name: "C", exportKind: "default" },
+  ]);
+});
+
 test("severity escalates with instance count", () => {
   const five = ["A", "B", "C", "D", "E"].map((n) => comp(n, ["label", "onClick", "variant"], ["useTheme"]));
   expect(sharedExtraction.analyze(ctx(five))[0]!.severityRaw).toBe("error");

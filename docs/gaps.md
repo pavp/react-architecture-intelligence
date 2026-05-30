@@ -60,7 +60,7 @@ types: createTypeResolver({ files: input.files, graph, hooks: input.typeResolver
 
 ## 2. P4–P6 gaps — roadmap state
 
-The [docs/superpowers/STATUS.md](superpowers/STATUS.md) lists these under "Next steps". P4 now has an executable plan; P5 and P6 still need phase plans.
+The [docs/superpowers/STATUS.md](superpowers/STATUS.md) lists these under "Next steps". P4 and P5 now have executable plans; P6 still needs a phase plan.
 
 ### 2.1 P4 — Breadth + temporal
 
@@ -82,14 +82,14 @@ Exit criteria (to be defined in the plan): same format as P0–P3 plan checkboxe
 
 ### 2.2 P5 — Codemod apply
 
-Missing plan file: `docs/superpowers/plans/p5-codemod-apply.md`
+Plan file exists: [docs/superpowers/plans/p5-codemod-apply.md](superpowers/plans/p5-codemod-apply.md)
 
 Tasks that need to be formalized:
-- `propose_refactor` (proposal-only, no file writes)
-- `apply_refactor` with the §4.6 capability-token gate
-- Pipeline: DRY-RUN → TYPECHECK → TESTS → GIT-clean → commit + reversal patch
-- Append-only codemod proof artifacts (patch + verification output + rollback patch + originating fingerprint)
-- Type-safety of generated code when Pass-2 returns non-null types
+- `propose_refactor` (proposal-only, no file writes) — ✅ done
+- `apply_refactor` with the §4.6 capability-token gate — planned, not implemented
+- Pipeline: DRY-RUN → TYPECHECK → TESTS → GIT-clean → commit + reversal patch — planned, not implemented
+- Append-only codemod proof artifacts (patch + verification output + rollback patch + originating fingerprint) — planned, not implemented
+- Type-safety of generated code when Pass-2 returns non-null types — planned, not implemented
 
 ### 2.3 P6 — First framework adapter (Next.js)
 
@@ -229,7 +229,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 |---|---|---|
 | P0–P3 | [docs/superpowers/plans/2026-05-29-rai-mvp-p0-p3.md](superpowers/plans/2026-05-29-rai-mvp-p0-p3.md) | ✅ Exists, all 24 tasks complete |
 | P4 | [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md) | ✅ Exists; temporal + `query_architecture` slices complete |
-| P5 | `docs/superpowers/plans/p5-codemod-apply.md` | ❌ Missing |
+| P5 | [docs/superpowers/plans/p5-codemod-apply.md](superpowers/plans/p5-codemod-apply.md) | ✅ Exists; Slices 1–2 complete |
 | P6 | `docs/superpowers/plans/p6-adapter-next.md` | ❌ Missing |
 
 ---
@@ -242,7 +242,11 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 4. ~~**Implement `query_architecture`**~~ — ✅ complete for current render graph facts.
 5. ~~**Wire lazy ts-morph Pass-2** (§1.2)~~ — ✅ complete.
 6. ~~**Implement `boundary-violation` / conventions**~~ — ✅ complete for `renders` / `uses-hook`.
-7. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
+7. ~~**Write the P5 codemod-apply plan**~~ — ✅ complete.
+8. ~~**Implement P5 Slice 1**~~ — ✅ complete: proposal contract + shared-extraction evidence readiness.
+9. ~~**Implement P5 Slice 2**~~ — ✅ complete: `propose_refactor` MCP tool over the pure proposal builder.
+10. **Implement P5 Slice 3** — capability-token gate for apply, without applying code yet.
+11. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
 
 ---
 

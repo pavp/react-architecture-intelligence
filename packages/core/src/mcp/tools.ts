@@ -8,6 +8,7 @@ import { analyzeRepo } from "../engine/pipeline.js";
 import type { SourceFile } from "../parse/graph-build.js";
 import type { RepoGraph } from "../graph/repograph.js";
 import type { ComponentNode, GraphEdge } from "../types.js";
+import { buildSharedExtractionProposal, type SharedExtractionProposal } from "../codemod/proposal.js";
 
 export interface SessionOpts { config: RaiConfig; dbPath?: string; }
 
@@ -98,6 +99,10 @@ export type QueryArchitectureResult =
   | { status: "unknown_question"; question: string; validQuestions: QueryArchitectureQuestion[] }
   | { status: "unknown_target"; target: string };
 
+export type ProposeRefactorResult =
+  | SharedExtractionProposal
+  | { status: "refused"; reason: "unknown-current-finding" | "suppressed-finding" };
+
 /** Engine session backing the MCP tools. One per repo. */
 export class Session {
   private db: Db;
@@ -151,6 +156,14 @@ export class Session {
       opportunities: pool.filter((p) => p.type === "opportunity"),
       conflicts: pool.filter((p) => p.type === "architectural-conflict"),
     };
+  }
+
+  // ── propose_refactor (P5 Slice 2) — proposal-only, no writes ────────────
+  proposeRefactor(input: { fingerprint: string }): ProposeRefactorResult {
+    const finding = this.lastPresented.find((p) => p.fingerprint.structural === input.fingerprint);
+    if (!finding) return { status: "refused", reason: "unknown-current-finding" };
+    if (finding.status === "suppressed") return { status: "refused", reason: "suppressed-finding" };
+    return buildSharedExtractionProposal(finding);
   }
 
   // ── query_architecture (§5.2) — bounded graph questions over last analysis ──

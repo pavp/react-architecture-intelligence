@@ -1,8 +1,8 @@
 # Capability Spec: MCP Tools
 
 **Status**: Active (RFC 2119)  
-**Origin**: changes `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture` (2026-05-30)
-**Scope**: MCP tool contracts for analyze diagnostics, feedback closure, temporal drift, and bounded graph questions.
+**Origin**: changes `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`, `p5-propose-refactor` (2026-05-30)
+**Scope**: MCP tool contracts for analyze diagnostics, feedback closure, temporal drift, bounded graph questions, and proposal-only refactor suggestions.
 
 ## Purpose
 
@@ -337,8 +337,56 @@ All `query_architecture` traversal MUST be bounded. `renders`, `rendered-by`, `f
 - WHEN `query_architecture({ question: "reachability", target, depth: 1 })` runs
 - THEN results MUST include only nodes reachable within one render hop
 
+## Requirement: propose_refactor Tool Registration
+
+The MCP server MUST expose `propose_refactor` as a registered tool. The tool MUST accept `{ fingerprint: string }` and return a deterministic proposal or structured refusal.
+
+### Scenario: Tool is listed
+
+- GIVEN an MCP server starts normally
+- WHEN the client requests the available tools
+- THEN `propose_refactor` MUST be present in the tool list
+
+## Requirement: propose_refactor Is Proposal-Only
+
+`propose_refactor` MUST NOT write files, stage files, commit, record feedback, create codemod proof rows, or mutate analysis history. It MAY only read the current in-memory presented finding set and return proposal data.
+
+### Scenario: Proposal creates no writes
+
+- GIVEN a current `react/shared-extraction` opportunity finding exists
+- WHEN `propose_refactor({ fingerprint })` runs
+- THEN the response MUST have `status: "ok"`
+- AND the response MUST include `writeMode: "proposal-only"`
+- AND no feedback, finding, snapshot, or file write MUST occur
+
+## Requirement: propose_refactor Current Finding Refusals
+
+`propose_refactor` MUST only act on findings currently present in the session's last analysis result. Unknown current fingerprints MUST return `{ status: "refused", reason: "unknown-current-finding" }`. Suppressed findings MUST return `{ status: "refused", reason: "suppressed-finding" }`.
+
+Unsupported rules MUST return `{ status: "refused", reason: "unsupported-rule" }`. Architectural conflicts MUST return `{ status: "refused", reason: "conflict-not-executable" }`.
+
+### Scenario: Unknown fingerprint is refused
+
+- GIVEN the current session has no presented finding for a fingerprint
+- WHEN `propose_refactor({ fingerprint })` runs
+- THEN the response MUST have `status: "refused"`
+- AND `reason` MUST be `"unknown-current-finding"`
+
+### Scenario: Suppressed finding is refused
+
+- GIVEN a current finding is suppressed by memory overlay
+- WHEN `propose_refactor({ fingerprint })` runs
+- THEN the response MUST have `status: "refused"`
+- AND `reason` MUST be `"suppressed-finding"`
+
+## Requirement: propose_refactor Shared-Extraction Proposal Shape
+
+For supported `react/shared-extraction` opportunities, `propose_refactor` MUST return structured data sufficient for review without executing a codemod. The response MUST include the originating fingerprint, rule id, source instances, component name candidate, variance parameters, shared props, risk classification, and `writeMode: "proposal-only"`.
+
+Risk classification MUST surface export and source-shape risks available from evidence: default exports, named exports, invalid spans, unsafe variance parameter names, and duplicate source files.
+
 ## References
 
 - Implementation: `packages/core/src/mcp/tools.ts`, `packages/core/src/mcp/server.ts`
 - Tests: `packages/core/src/mcp/tools.test.ts`, `packages/core/src/mcp/server.test.ts`
-- Source changes: `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`
+- Source changes: `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`, `p5-propose-refactor`
