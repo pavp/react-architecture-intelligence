@@ -235,10 +235,30 @@ test("applyRefactor runs the gated pipeline with an injected workspace", () => {
     commit: () => { events.push("commit"); return "a".repeat(40); },
   };
 
-  const result = s.applyRefactor({ fingerprint: fp, sources: files, targetFile: "SharedButton.tsx", workspace, commitMessage: "refactor: extract shared button" });
+  const result = s.applyRefactor({ fingerprint: fp, sources: files, targetFile: "SharedButton.tsx", workspace, commitMessage: "refactor: extract shared button", asOf: 9 });
 
   expect(result.status).toBe("applied");
   expect(events).toEqual(["apply", "typecheck", "test", "git-clean", "commit"]);
+  expect(countRows(s, "codemod_proof")).toBe(1);
+});
+
+test("applyRefactor persists rolled-back proof after verification failure", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0, analysisVersion: 1 });
+  const fp = a.topFingerprints[0]!;
+  const workspace: ApplyWorkspace = {
+    isDirty: () => false,
+    applyPatch: () => {},
+    run: (command) => command.kind === "typecheck" ? { ok: false, output: "typecheck failed" } : { ok: true, output: "ok" },
+    hasUnexpectedChanges: () => false,
+    rollback: () => {},
+    commit: () => "a".repeat(40),
+  };
+
+  const result = s.applyRefactor({ fingerprint: fp, sources: files, targetFile: "SharedButton.tsx", workspace, asOf: 10 });
+
+  expect(result.status).toBe("rolled-back");
+  expect(countRows(s, "codemod_proof")).toBe(1);
 });
 
 test("applyRefactor refuses suppressed findings before workspace mutation", () => {
@@ -261,6 +281,7 @@ test("applyRefactor refuses suppressed findings before workspace mutation", () =
 
   expect(result).toEqual({ status: "refused", reason: "suppressed-by-memory" });
   expect(events).toEqual([]);
+  expect(countRows(s, "codemod_proof")).toBe(0);
 });
 
 test("explain_finding returns evidence + groundingFields, no prose", () => {

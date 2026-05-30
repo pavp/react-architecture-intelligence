@@ -21,3 +21,5 @@ export { runApplyRefactorPipeline } from "./codemod/apply-pipeline.js";
 export type { ApplyPipelineInput, ApplyPipelineResult, ApplyWorkspace, VerificationCommand, VerificationResult, VerificationStage } from "./codemod/apply-pipeline.js";
 export { createGitWorkspace } from "./codemod/git-workspace.js";
 export type { GitWorkspaceOpts } from "./codemod/git-workspace.js";
+export { CodemodProofStore } from "./memory/codemod-proof-store.js";
+export type { CodemodProofInput, CodemodProofRow, CodemodProofStatus } from "./memory/codemod-proof-store.js";

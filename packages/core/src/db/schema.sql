@@ -50,3 +50,18 @@ CREATE TABLE IF NOT EXISTS snapshot (
   severity_raw TEXT NOT NULL, evidence_digest TEXT NOT NULL, created_at INTEGER NOT NULL,
   PRIMARY KEY (commit_sha, fingerprint, rule_id)
 );
+
+-- codemod proof artifacts — append-only audit trail (P5) ------------------
+CREATE TABLE IF NOT EXISTS codemod_proof (
+  id TEXT PRIMARY KEY,
+  fingerprint TEXT NOT NULL,
+  rule_id TEXT NOT NULL,
+  analysis_version INTEGER NOT NULL,
+  patch TEXT NOT NULL,
+  verification_output TEXT NOT NULL,
+  rollback_patch TEXT NOT NULL,
+  status TEXT NOT NULL,
+  commit_sha TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_codemod_proof_fp ON codemod_proof(fingerprint, rule_id);

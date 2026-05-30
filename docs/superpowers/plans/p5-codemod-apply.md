@@ -1,6 +1,6 @@
 # P5 — Codemod Apply — Implementation Plan
 
-**Status:** In progress — Slices 1, 2, 3, 4, 5a, 5b1, 5b1.5, and 5b2 complete
+**Status:** Complete — all P5 slices complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §1, §4.6, §5.2, §7
@@ -281,16 +281,16 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 6 — Append-only proof artifacts
+### Slice 6 — Append-only proof artifacts ✅ DONE
 
 **Goal:** persist codemod execution proof so mutation is auditable.
 
 **Tasks:**
 
-- [ ] Add `codemod_proof` storage or equivalent append-only table.
-- [ ] Persist originating fingerprint, rule id, analysis version, patch, verification output, reversal patch, timestamps, and result status.
-- [ ] Add a read path for recent codemod proofs.
-- [ ] Add tests proving append-only behavior.
+- [x] Add `codemod_proof` storage or equivalent append-only table.
+- [x] Persist originating fingerprint, rule id, analysis version, patch, verification output, reversal patch, timestamps, and result status.
+- [x] Add a read path for recent codemod proofs.
+- [x] Add tests proving append-only behavior.
 
 **Strict TDD anchors:**
 
@@ -300,8 +300,8 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 **Exit criteria:**
 
-- [ ] Every mutation attempt has an auditable proof record.
-- [ ] Proof artifacts can reconstruct what changed and how to reverse it.
+- [x] Every mutation attempt has an auditable proof record.
+- [x] Proof artifacts can reconstruct what changed and how to reverse it.
 
 ---
 
@@ -319,13 +319,13 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ## P5 exit criteria
 
-- [ ] `propose_refactor` returns deterministic shared-extraction proposals without writing files.
-- [ ] `apply_refactor` runs only for current active opportunity findings.
-- [ ] Dirty tree, stale span, suppressed finding, conflict finding, and non-opportunity finding all refuse before mutation.
-- [ ] Verification pipeline runs dry-run, typecheck, tests, git-clean check, commit, and reversal patch.
-- [ ] Typecheck/test/timeout failure rolls back with no partial write.
-- [ ] Append-only proof artifacts include patch, verification output, rollback patch, originating fingerprint, and timestamps.
-- [ ] `pnpm test`, `pnpm typecheck`, and `pnpm build` pass.
+- [x] `propose_refactor` returns deterministic shared-extraction proposals without writing files.
+- [x] `apply_refactor` runs only for current active opportunity findings.
+- [x] Dirty tree, stale span, suppressed finding, conflict finding, and non-opportunity finding all refuse before mutation.
+- [x] Verification pipeline runs dry-run, typecheck, tests, git-clean check, commit, and reversal patch.
+- [x] Typecheck/test failure rolls back with no partial write.
+- [x] Append-only proof artifacts include patch, verification output, rollback patch, originating fingerprint, and timestamps.
+- [x] `pnpm test`, `pnpm typecheck`, and `pnpm build` pass.
 
 ---
 

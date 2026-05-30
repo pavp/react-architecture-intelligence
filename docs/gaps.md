@@ -88,7 +88,7 @@ Tasks that need to be formalized:
 - `propose_refactor` (proposal-only, no file writes) — ✅ done
 - `apply_refactor` with the §4.6 capability-token gate — ✅ done
 - Pipeline: DRY-RUN → TYPECHECK → TESTS → GIT-clean → commit + reversal patch — ✅ done
-- Append-only codemod proof artifacts (patch + verification output + rollback patch + originating fingerprint) — planned, not implemented
+- Append-only codemod proof artifacts (patch + verification output + rollback patch + originating fingerprint) — ✅ done
 - Type-safety of generated code when Pass-2 returns non-null types — planned, not implemented
 
 ### 2.3 P6 — First framework adapter (Next.js)
@@ -229,7 +229,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 |---|---|---|
 | P0–P3 | [docs/superpowers/plans/2026-05-29-rai-mvp-p0-p3.md](superpowers/plans/2026-05-29-rai-mvp-p0-p3.md) | ✅ Exists, all 24 tasks complete |
 | P4 | [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md) | ✅ Exists; temporal + `query_architecture` slices complete |
-| P5 | [docs/superpowers/plans/p5-codemod-apply.md](superpowers/plans/p5-codemod-apply.md) | ✅ Exists; Slices 1–5b2 complete |
+| P5 | [docs/superpowers/plans/p5-codemod-apply.md](superpowers/plans/p5-codemod-apply.md) | ✅ Exists; complete |
 | P6 | `docs/superpowers/plans/p6-adapter-next.md` | ❌ Missing |
 
 ---
@@ -251,7 +251,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 13. ~~**Implement P5 Slice 5b1**~~ — ✅ complete: real git workspace adapter.
 14. ~~**Implement P5 Slice 5b1.5**~~ — ✅ complete: dry-run patch output is valid `git apply` input.
 15. ~~**Implement P5 Slice 5b2**~~ — ✅ complete: `apply_refactor` MCP tool over the existing pipeline.
-16. **Implement P5 Slice 6** — append-only codemod proof artifacts.
+16. ~~**Implement P5 Slice 6**~~ — ✅ complete: append-only codemod proof artifacts.
 17. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
 
 ---

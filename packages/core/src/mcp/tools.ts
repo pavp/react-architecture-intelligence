@@ -13,6 +13,7 @@ import { RULE_ID as SHARED_EXTRACTION_RULE_ID } from "../analyzers/shared-extrac
 import { mayExecuteCodemod, type CodemodGateResult } from "../codemod/capability-gate.js";
 import { previewSharedExtractionPatch, type DryRunPatchPreview } from "../codemod/dry-run.js";
 import { runApplyRefactorPipeline, type ApplyPipelineResult, type ApplyWorkspace } from "../codemod/apply-pipeline.js";
+import { CodemodProofStore } from "../memory/codemod-proof-store.js";
 
 export interface SessionOpts { config: RaiConfig; dbPath?: string; }
 
@@ -118,6 +119,7 @@ export class Session {
   private registry = createDefaultAnalyzerRegistry();
   private findings: FindingsStore;
   private feedback: FeedbackStore;
+  private proofs: CodemodProofStore;
   private lastPresented: PresentedFinding[] = [];
   private lastGraph: Readonly<RepoGraph> | null = null;
   private lastAnalysisVersion = 0;
@@ -126,6 +128,7 @@ export class Session {
     this.db = openDb(opts.dbPath ?? ":memory:");
     this.findings = new FindingsStore(this.db);
     this.feedback = new FeedbackStore(this.db, this.findings);
+    this.proofs = new CodemodProofStore(this.db);
   }
 
   // ── analyze_repo (§5.2) — counts + handles, never a finding dump ──────
@@ -178,7 +181,7 @@ export class Session {
   }
 
   // ── apply_refactor (P5 Slice 5b2) — gated mutation through injected workspace ──
-  applyRefactor(input: { fingerprint: string; sources: SourceFile[]; targetFile: string; workspace: ApplyWorkspace; commitMessage?: string | undefined }): ApplyRefactorResult {
+  applyRefactor(input: { fingerprint: string; sources: SourceFile[]; targetFile: string; workspace: ApplyWorkspace; commitMessage?: string | undefined; asOf?: number | undefined }): ApplyRefactorResult {
     const gate = mayExecuteCodemod(input.fingerprint, {
       ruleId: SHARED_EXTRACTION_RULE_ID,
       analysisVersion: this.lastAnalysisVersion,
@@ -192,12 +195,26 @@ export class Session {
     const preview = previewSharedExtractionPatch({ proposal, sources: input.sources, targetFile: input.targetFile });
     if (preview.status !== "ok") return preview;
 
-    return runApplyRefactorPipeline({
+    const result = runApplyRefactorPipeline({
       gate,
       preview,
       workspace: input.workspace,
       commitMessage: input.commitMessage ?? `refactor: apply ${SHARED_EXTRACTION_RULE_ID}`,
     });
+    if (result.status === "applied" || result.status === "rolled-back") {
+      this.proofs.insert({
+        fingerprint: input.fingerprint,
+        ruleId: SHARED_EXTRACTION_RULE_ID,
+        analysisVersion: this.lastAnalysisVersion,
+        patch: preview.patch,
+        verificationOutput: JSON.stringify(result.verification),
+        rollbackPatch: preview.rollbackPatch,
+        status: result.status,
+        commitSha: result.status === "applied" ? result.commitSha : null,
+        createdAt: input.asOf ?? Date.now(),
+      });
+    }
+    return result;
   }
 
   // ── query_architecture (§5.2) — bounded graph questions over last analysis ──
