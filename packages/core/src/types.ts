@@ -47,7 +47,27 @@ export interface SharedExtractionEvidence {
   sharedSurface: string[]; // props shared by all → proposed shared props
   conflict?: { rule: string; why: string };
 }
-export type Evidence = SharedExtractionEvidence; // union grows in P4
+
+export interface RenderCouplingEvidence {
+  kind: "render-coupling";
+  component: { name: string; span: Span; fingerprint: string };
+  fanIn: number;
+  fanOut: number;
+  directChildren: number;
+  reachableDepth: number;
+}
+
+export interface OverAbstractionEvidence {
+  kind: "over-abstraction";
+  component: { name: string; span: Span; fingerprint: string };
+  propCount: number;
+  hookCount: number;
+  childCount: number;
+  compositionMarkerCount: number;
+  conditionalBranchCount: number;
+}
+
+export type Evidence = SharedExtractionEvidence | RenderCouplingEvidence | OverAbstractionEvidence;
 
 export interface Finding {
   id: string;

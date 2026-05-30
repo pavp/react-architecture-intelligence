@@ -25,15 +25,15 @@ Chain strategy: feature-branch-chain
 
 ## Phase 1: Shared Contracts (RED → GREEN)
 
-- [ ] 1.1 RED: Add failing type/config tests for `RenderCouplingEvidence`, `OverAbstractionEvidence`, and threshold defaults in `packages/core/src/types.ts` and `packages/core/src/config/schema.ts`.
-- [ ] 1.2 GREEN: Add metric-only evidence variants and conservative `renderCoupling` / `overAbstraction` threshold groups; no parser, import, module, hook-topology, ts-morph, or type-aware fields.
-- [ ] 1.3 Verify focused: run matching Vitest tests plus `pnpm typecheck` for contract compile safety.
+- [x] 1.1 RED: Add failing type/config tests for `RenderCouplingEvidence`, `OverAbstractionEvidence`, and threshold defaults in `packages/core/src/types.ts` and `packages/core/src/config/schema.ts`.
+- [x] 1.2 GREEN: Add metric-only evidence variants and conservative `renderCoupling` / `overAbstraction` threshold groups; no parser, import, module, hook-topology, ts-morph, or type-aware fields.
+- [x] 1.3 Verify focused: run matching Vitest tests plus `pnpm typecheck` for contract compile safety.
 
 ## Phase 2: Render Coupling Analyzer (RED → GREEN)
 
-- [ ] 2.1 RED: Create `packages/core/src/analyzers/render-coupling.test.ts` with hand-built `AnalysisContext` cases for fan-in, fan-out, direct children, reachable depth, below-threshold silence, evidence, and deterministic order.
-- [ ] 2.2 GREEN: Create `packages/core/src/analyzers/render-coupling.ts` using only `ctx.graph.components` and `RepoGraph` `renders` edges; emit `react/render-coupling` opportunity findings with stable fingerprints.
-- [ ] 2.3 Verify focused: run render-coupling tests and inspect assertions for no import/module/boundary coupling claims.
+- [x] 2.1 RED: Create `packages/core/src/analyzers/render-coupling.test.ts` with hand-built `AnalysisContext` cases for fan-in, fan-out, direct children, reachable depth, below-threshold silence, evidence, and deterministic order.
+- [x] 2.2 GREEN: Create `packages/core/src/analyzers/render-coupling.ts` using only `ctx.graph.components` and `RepoGraph` `renders` edges; emit `react/render-coupling` opportunity findings with stable fingerprints.
+- [x] 2.3 Verify focused: run render-coupling tests and inspect assertions for no import/module/boundary coupling claims.
 
 ## Phase 3: Over-Abstraction Analyzer (RED → GREEN)
 
