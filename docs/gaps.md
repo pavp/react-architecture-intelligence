@@ -67,15 +67,15 @@ The [docs/superpowers/STATUS.md](superpowers/STATUS.md) lists these under "Next 
 Missing plan file: `docs/superpowers/plans/p4-breadth-temporal.md`
 
 Tasks that need to be formalized:
-- Fix KI-1 (1.4 above) — first task of P4
+- Fix KI-1 (1.4 above) — ✅ done
 - Wire `typeOf()` Pass-2 (1.2 above)
-- Wire `boundary_rule` → `architectural-conflict` (1.1 above)
-- Wire config severity-clamp in overlay (1.3 above)
+- Wire `boundary_rule` → `architectural-conflict` (1.1 above) — ✅ done
+- Wire config severity-clamp in overlay (1.3 above) — ✅ done
 - Populate `snapshot` table on each analysis run
 - Implement `get_drift` MCP tool (pure SQL set-algebra over snapshots — spec §3.5/§5.2)
 - Implement `query_architecture` MCP tool (enumerated graph questions, bounded CTEs — spec §5.2)
-- Add more analyzers: `coupling`, `hook-topology`, `over-abstraction`, `boundary-violation`
-- Analyzer fault containment: per-analyzer timeout + crash isolation (see §3 below)
+- Add more analyzers: `coupling`, `hook-topology`, `over-abstraction`, `boundary-violation` — ✅ first slice done: `react/render-coupling` + `react/over-abstraction`; remaining analyzer slices still need scope decisions
+- Analyzer fault containment: crash isolation ✅ done; hard sync-CPU timeout still deferred until worker isolation exists
 - Band C MCP tools: `get_node`, `raw_graph_query` (spec §5.4)
 
 Exit criteria (to be defined in the plan): same format as P0–P3 plan checkboxes.
@@ -132,13 +132,13 @@ These are issues identified in the spec or through architectural review that hav
 - Surface distribution stats in `analyze_repo` output (e.g. "median cosine between all component pairs: 0.43") so teams can self-diagnose
 - Document a calibration guide in the README
 
-### 3.3 Analyzer fault containment not implemented
+### 3.3 Analyzer fault containment ✅ crash isolation implemented
 
-**Problem:** The spec states "one analyzer panic ≠ run failure" (STATUS.md P4 list) but there is no timeout, try/catch isolation, or crash boundary around individual analyzer execution in `pipeline.ts`. A hung or throwing analyzer currently fails the entire run.
+**Problem (resolved for thrown analyzers):** The spec states "one analyzer panic ≠ run failure" (STATUS.md P4 list). `analyzer-fault-containment` now catches thrown analyzer errors, emits stable diagnostics, and allows later analyzers to run.
 
-**Impact:** As more analyzers are added in P4, a bug in one analyzer silently breaks all analysis.
+**Remaining limitation:** Hard timeout / worker-level interruptibility is still out of scope. `Promise.race` cannot preempt sync CPU hangs.
 
-**Fix:** Wrap each `analyzer.analyze(ctx)` call in an isolated try/catch with a configurable timeout. Emit a `diagnostic` event on failure rather than propagating the error. Log the failure with enough context to debug.
+**Follow-up:** Add worker isolation only if/when real CPU-hung analyzer interruption becomes required.
 
 ### 3.4 Next.js variant guard design not detailed
 
@@ -188,18 +188,18 @@ export type EdgeKind = "renders" | "imports" | "calls" | "uses-hook";
 
 ---
 
-### 3.8 `renders` graph topology captured but never analyzed
+### 3.8 `renders` graph topology partly analyzed ✅ first slice implemented
 
-**Problem:** `buildGraph` creates `renders` edges (Component A → renders → Component B). These are in the RepoGraph, visible to all analyzers. But no analyzer in any phase plan uses the renders graph topology.
+**Problem (partly resolved):** `buildGraph` creates `renders` edges (Component A → renders → Component B). `more-analyzers-render-overabstraction` added `react/render-coupling`, which now analyzes fan-in, fan-out, direct children, and reachable render depth from current `renders` edges.
 
 Detectable patterns that are currently invisible:
 - **God components by composition** — a component that directly renders 12+ child components (distinct from god components by props, which `over-abstraction` in P4 could detect)
 - **Orphan components** — components that are never rendered by anything (candidates for deletion, not extraction)
 - **Composition depth** — a render chain of depth 8+ is an architectural signal that the intermediate layers may be candidates for flattening
 
-**Impact:** The most structurally informative edges in the graph (who renders what) produce no findings. A new analyzer (`renders-topology`) is needed in P4 to make this data useful.
+**Remaining gap:** Orphan component detection and richer topology questions still belong in `query_architecture` or future analyzer slices.
 
-**Fix:** Add `renders-topology` to the P4 analyzer list. Define thresholds in config (e.g., `maxDirectChildren`, `maxRenderDepth`). The edge data already exists — only the analyzer is missing.
+**Fix applied:** `react/render-coupling` uses config thresholds (`maxFanIn`, `maxFanOut`, `maxDirectChildren`, `maxReachableDepth`) and emits metric-only evidence.
 
 ---
 
@@ -228,7 +228,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 | Phase | Plan file | Status |
 |---|---|---|
 | P0–P3 | [docs/superpowers/plans/2026-05-29-rai-mvp-p0-p3.md](superpowers/plans/2026-05-29-rai-mvp-p0-p3.md) | ✅ Exists, all 24 tasks complete |
-| P4 | `docs/superpowers/plans/p4-breadth-temporal.md` | ❌ Missing |
+| P4 | `docs/superpowers/plans/p4-breadth-temporal.md` | ❌ Missing; several preparatory slices are now complete |
 | P5 | `docs/superpowers/plans/p5-codemod-apply.md` | ❌ Missing |
 | P6 | `docs/superpowers/plans/p6-adapter-next.md` | ❌ Missing |
 
@@ -236,19 +236,18 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 
 ## 5. Recommended resolution order
 
-1. **Fix KI-1** (§1.4) — blocks real-world Next.js usage today. Smallest code change in P4.
-2. **Write the P4 plan** — formalizes the 10+ known tasks into executable checkboxes with exit criteria.
-3. **Resolve §3.1 (drift cold-start)** and **§3.4 (variant guard design)** — both are decisions that affect the P4/P6 plan structure. Decide before writing those plans.
-4. **Fix §3.5 (`reason` as first-class)** — low effort, high value, no architectural change needed.
-5. **Fix §1.1, §1.2, §1.3** — straightforward wiring tasks, first tasks of P4.
-6. **Fix §3.3 (analyzer fault containment)** — implement as part of P4 alongside new analyzers.
-7. **Implement `close_session`** (§6) — the single highest-impact change. Implement before P4 ships to users. Required for the memory layer to provide practical value.
+1. **Write the P4 plan** — formalizes remaining breadth + temporal work into executable checkboxes with exit criteria.
+2. **Resolve §3.1 (drift cold-start)** — decide no-backfill vs backfill CLI vs graceful no-history response before `get_drift`.
+3. **Implement snapshot population + `get_drift`** — next highest-value P4 feature because drift already has schema/fingerprint groundwork.
+4. **Implement `query_architecture`** — bounded graph questions over existing graph facts.
+5. **Wire lazy ts-morph Pass-2** (§1.2) — unlocks type-aware future work, but should remain a separate slice.
+6. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
 
 ---
 
-## 6. Feedback friction — implicit decisions are never captured
+## 6. Feedback friction — explicit session closure capture ✅ implemented
 
-**Severity: Critical.** This is the single highest-impact gap in RAI. Without solving it, the memory layer has no practical value regardless of how correct the architecture is.
+**Severity (resolved): Critical.** This was the single highest-impact gap in RAI. `close-session-feedback` added explicit closure capture without allowing inferred feedback writes.
 
 ### The problem
 
@@ -273,11 +272,11 @@ An implicit feedback tier where the agent infers "wontfix" from "not now" introd
 - **Auditability loss** — T4 contains signals nobody consciously declared. The audit trail becomes untrustworthy.
 - **Replay non-determinism** — same code + same `asOf` may produce different T5 if inference differed between sessions.
 
-### The recommended solution: `close_session` MCP tool
+### The implemented solution: `close_session` MCP tool
 
 The core insight is: **reduce friction, not remove the explicit call**. The human must still decide — but the agent prompts them at the right moment and makes one word sufficient.
 
-A `close_session` tool is added to the MCP server. The agent calls it at the end of any session where findings were discussed:
+A `close_session` tool was added to the MCP layer. The agent can call it at the end of any session where findings were discussed:
 
 ```
 Agent → close_session({ discussed: ["fp-a1b2c3", "fp-d4e5f6"] })
@@ -320,9 +319,24 @@ dev: "ignore for now"  → idem with verdict: "dismiss"
 
 Only when intent is unambiguous and the developer is already engaged with the finding. Never inferred retroactively.
 
-### What this requires to implement
+### What was implemented
 
-- `close_session` MCP tool in `packages/core/src/mcp/tools.ts` — reads session's `lastPresented`, returns structured prompt, accepts confirmed verdicts, calls `FeedbackStore.record()` for each
-- Agent routing rule in `AGENTS.md`: call `close_session` at the end of any session where `analyze_repo` or `find_shared_opportunities` was called
-- No schema changes to T4
-- No changes to the integrity model
+- `close_session` MCP tool in `packages/core/src/mcp/tools.ts` reads current `lastPresented`, returns structured prompt items, accepts explicit `decisions[]`, and calls `FeedbackStore.record()` only for known current findings.
+- No schema changes to T4.
+- No changes to the integrity model.
+- No inferred agent feedback writes.
+
+---
+
+## 7. Repo workflow gaps — partly resolved
+
+**Resolved:**
+- GitHub remote exists: `https://github.com/pavp/react-architecture-intelligence`.
+- CI workflow exists: `.github/workflows/ci.yml` runs `pnpm build`, `pnpm test`, and `pnpm typecheck`.
+- PR template exists: `.github/PULL_REQUEST_TEMPLATE.md`.
+
+**Still missing:**
+- Commitlint and husky.
+- PR title validation workflow.
+- Release workflow and publishing strategy.
+- CONTRIBUTING and RELEASING docs.
