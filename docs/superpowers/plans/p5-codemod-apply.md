@@ -1,6 +1,6 @@
 # P5 — Codemod Apply — Implementation Plan
 
-**Status:** In progress — Slices 1, 2, 3, 4, 5a, 5b1, and 5b1.5 complete
+**Status:** In progress — Slices 1, 2, 3, 4, 5a, 5b1, 5b1.5, and 5b2 complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §1, §4.6, §5.2, §7
@@ -250,20 +250,20 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 5b2 — `apply_refactor` MCP tool over real adapter
+### Slice 5b2 — `apply_refactor` MCP tool over real adapter ✅ DONE
 
 **Goal:** apply the patch only after all safety gates pass.
 
 **Tasks:**
 
-- [ ] Apply patch to workspace.
-- [ ] Run configured typecheck command.
-- [ ] Run configured test command.
-- [ ] Check git-clean state for untracked/unexpected files after verification.
-- [ ] Create commit with a Conventional Commit message.
-- [ ] Generate reversal patch.
-- [ ] Auto-rollback on typecheck/test/timeout failure.
-- [ ] Register `apply_refactor` in MCP only after the pipeline exists end-to-end.
+- [x] Apply patch to workspace.
+- [x] Run configured typecheck command.
+- [x] Run configured test command.
+- [x] Check git-clean state for untracked/unexpected files after verification.
+- [x] Create commit with a Conventional Commit message.
+- [x] Generate reversal patch.
+- [x] Auto-rollback on typecheck/test/git-clean failure.
+- [x] Register `apply_refactor` in MCP only after the pipeline exists end-to-end.
 
 **Strict TDD anchors:**
 
@@ -275,9 +275,9 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 **Exit criteria:**
 
-- [ ] Successful shared-extraction codemod typechecks, tests, commits, and produces reversal patch.
-- [ ] Failed verification leaves no partial write.
-- [ ] No `--force` behavior exists.
+- [x] Successful shared-extraction codemod typechecks, tests, commits, and produces reversal patch.
+- [x] Failed verification leaves no partial write.
+- [x] No `--force` behavior exists.
 
 ---
 

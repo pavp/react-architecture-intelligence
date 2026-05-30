@@ -3,6 +3,7 @@ import { createSession } from "./tools.js";
 import { DEFAULT_CONFIG } from "../config/resolve.js";
 import type { Analyzer } from "../analyzers/analyzer.js";
 import type { Finding } from "../types.js";
+import type { ApplyWorkspace } from "../codemod/apply-pipeline.js";
 
 const A = `function LoginButton({ label, onClick, variant }) { const t = useTheme(); return <button onClick={onClick}>{label}</button>; }
 export default LoginButton;`;
@@ -218,6 +219,48 @@ test("proposeRefactor refuses suppressed findings", () => {
   s.analyzeRepo({ files, asOf: 2, analysisVersion: 2 });
 
   expect(s.proposeRefactor({ fingerprint: fp })).toEqual({ status: "refused", reason: "suppressed-finding" });
+});
+
+test("applyRefactor runs the gated pipeline with an injected workspace", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0, analysisVersion: 1 });
+  const fp = a.topFingerprints[0]!;
+  const events: string[] = [];
+  const workspace: ApplyWorkspace = {
+    isDirty: () => false,
+    applyPatch: () => { events.push("apply"); },
+    run: (command) => { events.push(command.kind); return { ok: true, output: `${command.kind}:ok` }; },
+    hasUnexpectedChanges: () => { events.push("git-clean"); return false; },
+    rollback: () => { events.push("rollback"); },
+    commit: () => { events.push("commit"); return "a".repeat(40); },
+  };
+
+  const result = s.applyRefactor({ fingerprint: fp, sources: files, targetFile: "SharedButton.tsx", workspace, commitMessage: "refactor: extract shared button" });
+
+  expect(result.status).toBe("applied");
+  expect(events).toEqual(["apply", "typecheck", "test", "git-clean", "commit"]);
+});
+
+test("applyRefactor refuses suppressed findings before workspace mutation", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0, analysisVersion: 1 });
+  const fp = a.topFingerprints[0]!;
+  s.recordFeedback({ fingerprint: fp, ruleId: "react/shared-extraction", verdict: "reject", source: "human", asOf: 1 });
+  s.analyzeRepo({ files, asOf: 2, analysisVersion: 2 });
+  const events: string[] = [];
+  const workspace: ApplyWorkspace = {
+    isDirty: () => { events.push("dirty-check"); return false; },
+    applyPatch: () => { events.push("apply"); },
+    run: () => ({ ok: true, output: "ok" }),
+    hasUnexpectedChanges: () => false,
+    rollback: () => { events.push("rollback"); },
+    commit: () => "a".repeat(40),
+  };
+
+  const result = s.applyRefactor({ fingerprint: fp, sources: files, targetFile: "SharedButton.tsx", workspace });
+
+  expect(result).toEqual({ status: "refused", reason: "suppressed-by-memory" });
+  expect(events).toEqual([]);
 });
 
 test("explain_finding returns evidence + groundingFields, no prose", () => {

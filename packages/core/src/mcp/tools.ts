@@ -9,6 +9,10 @@ import type { SourceFile } from "../parse/graph-build.js";
 import type { RepoGraph } from "../graph/repograph.js";
 import type { ComponentNode, GraphEdge } from "../types.js";
 import { buildSharedExtractionProposal, type SharedExtractionProposal } from "../codemod/proposal.js";
+import { RULE_ID as SHARED_EXTRACTION_RULE_ID } from "../analyzers/shared-extraction.js";
+import { mayExecuteCodemod, type CodemodGateResult } from "../codemod/capability-gate.js";
+import { previewSharedExtractionPatch, type DryRunPatchPreview } from "../codemod/dry-run.js";
+import { runApplyRefactorPipeline, type ApplyPipelineResult, type ApplyWorkspace } from "../codemod/apply-pipeline.js";
 
 export interface SessionOpts { config: RaiConfig; dbPath?: string; }
 
@@ -103,6 +107,11 @@ export type ProposeRefactorResult =
   | SharedExtractionProposal
   | { status: "refused"; reason: "unknown-current-finding" | "suppressed-finding" };
 
+export type ApplyRefactorResult =
+  | ApplyPipelineResult
+  | DryRunPatchPreview
+  | Exclude<CodemodGateResult, { status: "bound" }>;
+
 /** Engine session backing the MCP tools. One per repo. */
 export class Session {
   private db: Db;
@@ -111,6 +120,7 @@ export class Session {
   private feedback: FeedbackStore;
   private lastPresented: PresentedFinding[] = [];
   private lastGraph: Readonly<RepoGraph> | null = null;
+  private lastAnalysisVersion = 0;
 
   constructor(private opts: SessionOpts) {
     this.db = openDb(opts.dbPath ?? ":memory:");
@@ -127,6 +137,7 @@ export class Session {
     });
     this.lastPresented = res.presented;
     this.lastGraph = res.graph;
+    this.lastAnalysisVersion = res.analysisVersion;
     const active = res.presented.filter((p) => p.status !== "suppressed");
     return {
       runId: res.runId,
@@ -164,6 +175,29 @@ export class Session {
     if (!finding) return { status: "refused", reason: "unknown-current-finding" };
     if (finding.status === "suppressed") return { status: "refused", reason: "suppressed-finding" };
     return buildSharedExtractionProposal(finding);
+  }
+
+  // ── apply_refactor (P5 Slice 5b2) — gated mutation through injected workspace ──
+  applyRefactor(input: { fingerprint: string; sources: SourceFile[]; targetFile: string; workspace: ApplyWorkspace; commitMessage?: string | undefined }): ApplyRefactorResult {
+    const gate = mayExecuteCodemod(input.fingerprint, {
+      ruleId: SHARED_EXTRACTION_RULE_ID,
+      analysisVersion: this.lastAnalysisVersion,
+      findings: this.findings,
+      feedback: this.feedback,
+      memoryConfig: this.opts.config.memory,
+    });
+    if (gate.status !== "bound") return gate;
+
+    const proposal = buildSharedExtractionProposal(gate.finding);
+    const preview = previewSharedExtractionPatch({ proposal, sources: input.sources, targetFile: input.targetFile });
+    if (preview.status !== "ok") return preview;
+
+    return runApplyRefactorPipeline({
+      gate,
+      preview,
+      workspace: input.workspace,
+      commitMessage: input.commitMessage ?? `refactor: apply ${SHARED_EXTRACTION_RULE_ID}`,
+    });
   }
 
   // ── query_architecture (§5.2) — bounded graph questions over last analysis ──

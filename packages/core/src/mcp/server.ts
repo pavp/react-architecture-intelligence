@@ -6,6 +6,7 @@ import { join, relative } from "node:path";
 import { createSession, type Session } from "./tools.js";
 import type { RaiConfig } from "../config/schema.js";
 import { resolveCommitSha } from "../engine/git-sha.js";
+import { createGitWorkspace } from "../codemod/git-workspace.js";
 
 export interface McpServerOpts { config: RaiConfig; rootDir: string; }
 
@@ -58,6 +59,32 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
       return { content: [{ type: "text", text: JSON.stringify(r, null, 2) }] };
     });
   toolNames.push("propose_refactor");
+
+  server.tool("apply_refactor", "Apply a gated refactor after dry-run, typecheck, tests, git-clean, and commit.",
+    {
+      fingerprint: z.string(),
+      targetFile: z.string(),
+      commitMessage: z.string().optional(),
+      typecheckCommand: z.array(z.string()).optional(),
+      testCommand: z.array(z.string()).optional(),
+    },
+    async (args) => {
+      const files = readSources(opts.rootDir);
+      const workspace = createGitWorkspace({
+        rootDir: opts.rootDir,
+        typecheckCommand: args.typecheckCommand ?? ["pnpm", "typecheck"],
+        testCommand: args.testCommand ?? ["pnpm", "test"],
+      });
+      const r = session.applyRefactor({
+        fingerprint: args.fingerprint,
+        targetFile: args.targetFile,
+        commitMessage: args.commitMessage,
+        sources: files,
+        workspace,
+      });
+      return { content: [{ type: "text", text: JSON.stringify(r, null, 2) }] };
+    });
+  toolNames.push("apply_refactor");
 
   server.tool("explain_finding", "Return a finding's structured evidence + grounding fields (render only these; do not infer).",
     { fingerprint: z.string() },

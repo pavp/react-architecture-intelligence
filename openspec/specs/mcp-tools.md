@@ -1,8 +1,8 @@
 # Capability Spec: MCP Tools
 
 **Status**: Active (RFC 2119)  
-**Origin**: changes `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`, `p5-propose-refactor` (2026-05-30)
-**Scope**: MCP tool contracts for analyze diagnostics, feedback closure, temporal drift, bounded graph questions, and proposal-only refactor suggestions.
+**Origin**: changes `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`, `p5-propose-refactor`, `p5-apply-refactor` (2026-05-30)
+**Scope**: MCP tool contracts for analyze diagnostics, feedback closure, temporal drift, bounded graph questions, proposal-only refactor suggestions, and gated refactor apply.
 
 ## Purpose
 
@@ -385,8 +385,49 @@ For supported `react/shared-extraction` opportunities, `propose_refactor` MUST r
 
 Risk classification MUST surface export and source-shape risks available from evidence: default exports, named exports, invalid spans, unsafe variance parameter names, and duplicate source files.
 
+## Requirement: apply_refactor Tool Registration
+
+The MCP server MUST expose `apply_refactor` as a registered tool. The tool MUST accept `{ fingerprint: string; targetFile: string; commitMessage?: string; typecheckCommand?: string[]; testCommand?: string[] }`.
+
+### Scenario: Tool is listed
+
+- GIVEN an MCP server starts normally
+- WHEN the client requests the available tools
+- THEN `apply_refactor` MUST be present in the tool list
+
+## Requirement: apply_refactor Capability Gate
+
+`apply_refactor` MUST call the codemod capability gate before any workspace operation. The gate MUST bind only current active opportunity findings at the current analysis version. Gate refusals MUST return structured refusal output and MUST NOT check dirty state, apply patches, run commands, roll back, or commit.
+
+### Scenario: Suppressed finding refuses before mutation
+
+- GIVEN a finding is suppressed by memory overlay
+- WHEN `apply_refactor({ fingerprint })` runs
+- THEN the response MUST refuse with `reason: "suppressed-by-memory"`
+- AND no workspace mutation method MUST run
+
+## Requirement: apply_refactor Verification Pipeline
+
+When the gate binds and dry-run preview succeeds, `apply_refactor` MUST execute the safety pipeline in this order: dirty-worktree guard, patch apply, typecheck, tests, git-clean check, commit. Typecheck, test, or git-clean failure MUST roll back with the rollback patch and MUST NOT commit.
+
+`apply_refactor` MUST NOT support `force` or any equivalent bypass.
+
+### Scenario: Successful apply commits after verification
+
+- GIVEN the capability gate binds and dry-run preview succeeds
+- AND typecheck, tests, and git-clean check pass
+- WHEN `apply_refactor` runs
+- THEN it MUST apply the patch, run verification, create a commit, and return the rollback patch
+
+### Scenario: Verification failure rolls back
+
+- GIVEN the capability gate binds and dry-run preview succeeds
+- WHEN typecheck, tests, or git-clean check fails
+- THEN `apply_refactor` MUST apply the rollback patch
+- AND MUST NOT create a commit
+
 ## References
 
 - Implementation: `packages/core/src/mcp/tools.ts`, `packages/core/src/mcp/server.ts`
 - Tests: `packages/core/src/mcp/tools.test.ts`, `packages/core/src/mcp/server.test.ts`
-- Source changes: `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`, `p5-propose-refactor`
+- Source changes: `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`, `p5-propose-refactor`, `p5-apply-refactor`
