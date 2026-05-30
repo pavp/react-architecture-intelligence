@@ -1,6 +1,6 @@
 # P5 — Codemod Apply — Implementation Plan
 
-**Status:** In progress — Slices 1, 2, 3, 4, and 5a complete
+**Status:** In progress — Slices 1, 2, 3, 4, 5a, and 5b1 complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §1, §4.6, §5.2, §7
@@ -206,7 +206,34 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 5b — `apply_refactor` real workspace adapter and MCP tool
+### Slice 5b1 — real git workspace adapter ✅ DONE
+
+**Goal:** provide the real workspace adapter used by the apply pipeline, without exposing a public `apply_refactor` tool yet.
+
+**Tasks:**
+
+- [x] Detect dirty worktree with `git status --porcelain`.
+- [x] Apply patch with `git apply`.
+- [x] Run configured typecheck/test commands.
+- [x] Check unexpected changes against touched files.
+- [x] Roll back with `git apply` over the rollback patch.
+- [x] Commit verified changes and return commit SHA.
+
+**Strict TDD anchors:**
+
+- dirty tree detected in a temporary repo
+- apply + rollback restores file content
+- configured verification commands return pass/fail
+- commit returns a 40-character SHA after applying a patch
+
+**Exit criteria:**
+
+- [x] Adapter behavior is proven in an isolated temporary git repo.
+- [x] No public mutation tool exists yet.
+
+---
+
+### Slice 5b2 — `apply_refactor` MCP tool over real adapter
 
 **Goal:** apply the patch only after all safety gates pass.
 

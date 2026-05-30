@@ -19,3 +19,5 @@ export { previewSharedExtractionPatch } from "./codemod/dry-run.js";
 export type { DryRunPatchInput, DryRunPatchPreview, DryRunRefusalReason } from "./codemod/dry-run.js";
 export { runApplyRefactorPipeline } from "./codemod/apply-pipeline.js";
 export type { ApplyPipelineInput, ApplyPipelineResult, ApplyWorkspace, VerificationCommand, VerificationResult, VerificationStage } from "./codemod/apply-pipeline.js";
+export { createGitWorkspace } from "./codemod/git-workspace.js";
+export type { GitWorkspaceOpts } from "./codemod/git-workspace.js";

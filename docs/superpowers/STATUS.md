@@ -2,13 +2,13 @@
 
 **Last updated:** 2026-05-30
 **Branch:** `feat/rai-mvp-p0-p3` (not yet merged to `main`)
-**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Pass-2, hook topology, and conventions slices complete; P5 Slices 1–4 + 5a complete; CI/PR workflow active.**
+**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Pass-2, hook topology, and conventions slices complete; P5 Slices 1–4 + 5a + 5b1 complete; CI/PR workflow active.**
 
 ---
 
 ## TL;DR
 
-The MVP vertical slice is done, temporal drift is active, `query_architecture` is available, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, the codemod capability gate exists, dry-run patch preview exists, apply pipeline orchestration is proven, and GitHub PRs run CI.
+The MVP vertical slice is done, temporal drift is active, `query_architecture` is available, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, the codemod capability gate exists, dry-run patch preview exists, apply pipeline orchestration is proven, real git workspace adapter exists, and GitHub PRs run CI.
 
 ```
 typecheck:  0 errors (strict: noUncheckedIndexedAccess + exactOptionalPropertyTypes)
@@ -127,9 +127,10 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - ✅ Slice 3 complete: `mayExecuteCodemod` binds only current active opportunity findings and refuses absent, stale, suppressed, and conflict/non-opportunity findings.
 - ✅ Slice 4 complete: `previewSharedExtractionPatch` re-runs Pass 1, refuses stale spans/unsafe variance, and returns deterministic in-memory patch + rollback preview without workspace writes.
 - ✅ Slice 5a complete: `runApplyRefactorPipeline` proves dirty guard, typecheck/test/git-clean order, rollback on failure, and commit after verification via an injected workspace adapter.
+- ✅ Slice 5b1 complete: `createGitWorkspace` implements dirty detection, `git apply`, configured verification commands, touched-file clean check, rollback, and commit in isolated temp-repo tests.
 - `propose_refactor` (proposal-only) → `apply_refactor` with the §4.6 capability-token gate (current+active+opportunity finding) → DRY-RUN → TYPECHECK → TESTS → GIT-clean → commit + reversal patch. NO `--force`.
 - Append-only codemod proof artifacts (patch + verification output + rollback patch + originating fingerprint)
-- **Next implementation slice:** real workspace adapter + `apply_refactor` MCP tool over the existing pipeline.
+- **Next implementation slice:** `apply_refactor` MCP tool over the existing gate, dry-run, pipeline, and git adapter.
 
 ### P6 — First framework adapter (prove the seam)
 - `@rai/adapter-next`: detect + enrich (RSC/client/route tags, frozen-input append-only) + 2–3 Next analyzers + variant-guard diagnostics + nominal/positional-only fp extension
