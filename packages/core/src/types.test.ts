@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
 import type {
+  AdapterMetricEvidence,
   Fingerprint,
   BoundaryViolationEvidence,
+  Evidence,
   Finding,
   FindingType,
   HookTopologyEvidence,
@@ -88,10 +90,23 @@ test("finding evidence accepts metric-only analyzer and boundary-violation varia
   };
   const abstractionFinding: Finding = { ...renderFinding, id: "01O", ruleId: "react/over-abstraction", evidence: abstractionEvidence };
   const hookFinding: Finding = { ...renderFinding, id: "01H", ruleId: "react/hook-topology", evidence: hookEvidence };
+  const adapterEvidence: AdapterMetricEvidence = {
+    kind: "adapter-metric",
+    adapterId: "custom-adapter",
+    ruleId: "custom-adapter/boundary-size",
+    subject: { id: "Card", name: "Card", file: "Card.tsx", span, fingerprint: "fp-card" },
+    roles: [{ role: "Boundary", variant: "custom", file: "Card.tsx" }],
+    metrics: { fanOut: 3, reachableDepth: 2 },
+    thresholds: { maxFanOut: 2, maxReachableDepth: 1 },
+    topology: { directChildIds: ["A", "B"], reachableNodeIds: ["A", "B", "C"], exceeded: ["fanOut", "reachableDepth"] },
+  };
+  const evidence: Evidence = adapterEvidence;
   const violationFinding: Finding = { ...renderFinding, id: "01B", ruleId: "react/boundary-violation", type: "architectural-conflict", evidence: violationEvidence };
+  const adapterFinding: Finding = { ...renderFinding, id: "01A", ruleId: "custom-adapter/boundary-size", evidence };
 
   expect(isFinding(renderFinding)).toBe(true);
   expect(isFinding(abstractionFinding)).toBe(true);
   expect(isFinding(hookFinding)).toBe(true);
   expect(isFinding(violationFinding)).toBe(true);
+  expect(isFinding(adapterFinding)).toBe(true);
 });

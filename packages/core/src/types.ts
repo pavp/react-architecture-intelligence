@@ -94,7 +94,18 @@ export interface BoundaryViolationEvidence {
   };
 }
 
-export type Evidence = SharedExtractionEvidence | RenderCouplingEvidence | OverAbstractionEvidence | HookTopologyEvidence | BoundaryViolationEvidence;
+export interface AdapterMetricEvidence {
+  kind: "adapter-metric";
+  adapterId: string;
+  ruleId: string;
+  subject: { id: string; name: string; file: string; span: Span; fingerprint: string };
+  roles: { role: string; variant: string; file: string }[];
+  metrics: Record<string, number>;
+  thresholds: Record<string, number>;
+  topology: { directChildIds: string[]; reachableNodeIds: string[]; exceeded: string[] };
+}
+
+export type Evidence = SharedExtractionEvidence | RenderCouplingEvidence | OverAbstractionEvidence | HookTopologyEvidence | BoundaryViolationEvidence | AdapterMetricEvidence;
 
 export interface Finding {
   id: string;

@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { createSession } from "./tools.js";
 import { DEFAULT_CONFIG } from "../config/resolve.js";
 import type { Analyzer } from "../analyzers/analyzer.js";
-import type { Finding } from "../types.js";
+import type { AdapterMetricEvidence, Finding } from "../types.js";
 import type { ApplyWorkspace } from "../codemod/apply-pipeline.js";
 
 const A = `function LoginButton({ label, onClick, variant }) { const t = useTheme(); return <button onClick={onClick}>{label}</button>; }
@@ -145,6 +145,35 @@ test("getNode returns a component by file and byte range", () => {
   expect((r as any).node).toMatchObject({ kind: "component", name: "Page", file: "Page.tsx" });
   expect((r as any).span.file).toBe("Page.tsx");
   expect((r as any).astPath).toBeTruthy();
+});
+
+test("getNode resolves adapter metric evidence subject spans", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  registerAnalyzer(s, {
+    ruleId: "adapter/metric-rule",
+    framework: "react",
+    analyze: (ctx) => {
+      const page = ctx.graph.components.find((component) => component.name === "Page")!;
+      const evidence: AdapterMetricEvidence = {
+        kind: "adapter-metric",
+        adapterId: "adapter",
+        ruleId: "adapter/metric-rule",
+        subject: { id: page.id, name: page.name, file: page.file, span: page.span, fingerprint: "page-fp" },
+        roles: [{ role: "Boundary", variant: "test", file: page.file }],
+        metrics: { reachableDepth: 2 },
+        thresholds: { maxReachableDepth: 1 },
+        topology: { directChildIds: ["Card", "Sidebar"], reachableNodeIds: ["Card", "Leaf", "Sidebar"], exceeded: ["reachableDepth"] },
+      };
+      return [{ ...makeFinding("adapter/metric-rule"), fingerprint: { structural: "adapter-span-fp", nominal: "n", positional: "p" }, evidence }];
+    },
+  });
+  s.analyzeRepo({ files: graphFiles, asOf: 0 });
+
+  const r = s.getNode({ fingerprint: "adapter-span-fp" });
+
+  expect(r.status).toBe("ok");
+  expect((r as any).node).toMatchObject({ kind: "component", name: "Page", file: "Page.tsx" });
+  expect((r as any).span.file).toBe("Page.tsx");
 });
 
 test("rawGraphQuery refuses before analysis and unknown patterns", () => {

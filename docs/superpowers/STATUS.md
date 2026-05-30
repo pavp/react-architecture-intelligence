@@ -2,13 +2,13 @@
 
 **Last updated:** 2026-05-30
 **Branch:** `feat/rai-mvp-p0-p3` (not yet merged to `main`)
-**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Band C graph tools, backfill, Pass-2, hook topology, conventions, and P5 codemod apply complete; CI/PR workflow active.**
+**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Band C graph tools, backfill, Pass-2, hook topology, conventions, P5 codemod apply, and P6 Next client-boundary-bloat complete; CI/PR workflow active.**
 
 ---
 
 ## TL;DR
 
-The MVP vertical slice is done, temporal drift is active, `rai backfill` can populate historical snapshots, `query_architecture` is available, Band C `get_node` / `raw_graph_query` are bounded read-only escape hatches, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, `apply_refactor` is gated through the verification pipeline, codemod proof artifacts are append-only, and GitHub PRs run CI.
+The MVP vertical slice is done, temporal drift is active, `rai backfill` can populate historical snapshots, `query_architecture` is available, Band C `get_node` / `raw_graph_query` are bounded read-only escape hatches, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, `apply_refactor` is gated through the verification pipeline, codemod proof artifacts are append-only, P6 Next client-boundary-bloat is exported from `@rai/adapter-next`, and GitHub PRs run CI.
 
 ```
 typecheck:  0 errors (strict: noUncheckedIndexedAccess + exactOptionalPropertyTypes)
@@ -143,6 +143,7 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - ✅ Slice 1 complete: `@rai/adapter-next` package scaffold + deterministic Next variant detection + core framework-free lint guard.
 - ✅ Slice 2 complete: `guardNextVariant` emits structured `variant-mismatch` diagnostics without running unsupported analyzers.
 - ✅ Slice 3 complete: `enrichNext` adds route/layout/client/server tags, role index, and enrichment-only layout edges over frozen graph input.
+- ✅ Slice 4 complete: `next/client-boundary-bloat` emits generic adapter metric evidence for App Router `ClientComponent` render-topology breaches and returns `variant-mismatch` diagnostics for Pages/Mixed Router.
 - `@rai/adapter-next`: detect + enrich (RSC/client/route tags, frozen-input append-only) + 2–3 Next analyzers + variant-guard diagnostics + nominal/positional-only fp extension
 - CI lint: `grep framework-name packages/core == 0`
 - **Adapter storage rule**: adapters may NOT introduce independent persistence — all truth stays core-owned

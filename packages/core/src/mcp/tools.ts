@@ -683,6 +683,7 @@ function spanFromEvidence(evidence: Evidence | undefined): Span | null {
   if (evidence.kind === "render-coupling") return evidence.component.span;
   if (evidence.kind === "over-abstraction") return evidence.component.span;
   if (evidence.kind === "hook-topology") return evidence.hook.span;
+  if (evidence.kind === "adapter-metric") return evidence.subject.span;
   return evidence.edge.from.span;
 }
 

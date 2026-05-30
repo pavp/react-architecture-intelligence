@@ -1,6 +1,6 @@
 # P6 — Next.js Adapter — Implementation Plan
 
-**Status:** In progress — Slice 1 complete
+**Status:** In progress — Slice 4 complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-31
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §6, §7.2
@@ -153,23 +153,23 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 4 — `next/client-boundary-bloat`
+### Slice 4 — `next/client-boundary-bloat` ✅ DONE
 
 **Goal:** ship first Next-specific analyzer over enrichment.
 
 **Tasks:**
 
-- [ ] Add analyzer using `ClientComponent` tags and render fan-out/depth signals.
-- [ ] Support app-router only.
-- [ ] Emit metric-only evidence with spans and counts; no prose.
-- [ ] Add threshold config under `next.clientBoundaryBloat`.
+- [x] Add analyzer using `ClientComponent` tags and render fan-out/depth signals.
+- [x] Support app-router only.
+- [x] Emit metric-only evidence with spans and counts; no prose.
+- [x] Add adapter-local thresholds through `createClientBoundaryBloatAnalyzer({ thresholds })`.
 
 **Exit criteria:**
 
-- [ ] Analyzer fires on an oversized client boundary fixture.
-- [ ] Analyzer is silent below thresholds.
-- [ ] Pages-router produces variant-mismatch diagnostic.
-- [ ] build/test/typecheck clean.
+- [x] Analyzer fires on an oversized client boundary fixture.
+- [x] Analyzer is silent below thresholds.
+- [x] Pages-router produces variant-mismatch diagnostic.
+- [x] build/test/typecheck clean.
 
 ---
 
