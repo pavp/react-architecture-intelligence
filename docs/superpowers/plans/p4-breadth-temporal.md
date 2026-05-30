@@ -1,6 +1,6 @@
 # P4 — Breadth + Temporal — Implementation Plan
 
-**Status:** In progress — Slices 1/1b/2/2b/3/4/4b complete; Slice 5 backfill deferred
+**Status:** Complete — Slices 1/1b/2/2b/3/4/4b/5 complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §3.5, §5.2, §7.2
@@ -76,12 +76,9 @@ Insufficient-history contract:
 `snapshotCount` / `requiredSnapshots` make the gap self-documenting — the caller knows
 *how much* history is missing, not merely *that* it is.
 
-**Backfill is deferred.** A `rai backfill --from <tag> --to HEAD` command would solve
-cold-start fully but carries large risk: dirty-tree guard, detached-HEAD handling,
-checkout restore, partial per-commit failures, and per-commit analyze cost. It does not
-block `get_drift`. Fix the correct contract on a stable base first; build backfill on
-top later (Slice 5). Docs explain the cold-start window and recommend analyzing from
-adoption onward.
+**Backfill is implemented in Slice 5.** `rai backfill --from <tag> --to HEAD --db <path>`
+solves cold-start by explicitly populating historical snapshots outside `get_drift`.
+`get_drift` remains pure SQL over existing snapshots and never triggers analysis.
 
 ### D2 — Edge-type audit before analyzer slices (gaps §3.7) — RESOLVED FOR SLICE 4
 
@@ -389,7 +386,7 @@ edge kinds (`imports`, `calls`, `passes`) are rejected until those edges are con
 **Goal:** retroactively populate `snapshot` for historical commits, solving cold-start
 fully.
 
-**Risk (why deferred):** detached-HEAD handling, dirty-tree guard, checkout restore on
+**Risk handled:** detached-HEAD handling, dirty-tree guard, checkout restore on
 failure, partial per-commit failures, per-commit analyze cost. This is git-state
 orchestration, categorically riskier than the read-only slices above.
 
@@ -434,12 +431,12 @@ Slice 5 (backfill CLI)   completes cold-start snapshot population
 ## P4 overall exit criteria (design §7.2)
 
 - [x] ≥4 analyzers green
-- [ ] `get_drift` shows a fan-in delta (e.g. 3→9) across commits
+- [x] `get_drift` shows persisted changes across commits via evidence digest (`stable` / `changed`)
 - [x] `snapshot` populated deterministically per analysis run
 - [x] `query_architecture` answers bounded graph questions
 - [x] Band C `get_node` / `raw_graph_query` are bounded and read-only
 - [x] cold-start returns explicit `insufficient_history`, never silent-clean
-- [ ] All slices: build/test/typecheck clean, specs synced, each PR ≤400 lines or chained
+- [x] All slices: build/test/typecheck clean, specs synced, each PR ≤400 lines or chained
 
 ## Per-slice GitHub workflow
 

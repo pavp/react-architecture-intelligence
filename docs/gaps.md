@@ -225,7 +225,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 | Phase | Plan file | Status |
 |---|---|---|
 | P0–P3 | [docs/superpowers/plans/2026-05-29-rai-mvp-p0-p3.md](superpowers/plans/2026-05-29-rai-mvp-p0-p3.md) | ✅ Exists, all 24 tasks complete |
-| P4 | [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md) | ✅ Exists; temporal + `query_architecture` + Band C slices complete |
+| P4 | [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md) | ✅ Complete; temporal + `query_architecture` + Band C + backfill complete |
 | P5 | [docs/superpowers/plans/p5-codemod-apply.md](superpowers/plans/p5-codemod-apply.md) | ✅ Exists; complete |
 | P6 | `docs/superpowers/plans/p6-adapter-next.md` | ❌ Missing |
 
