@@ -1,19 +1,19 @@
 # RAI — Build Status & Resume Guide
 
-**Last updated:** 2026-05-30
+**Last updated:** 2026-05-31
 **Branch:** `feat/rai-mvp-p0-p3` (not yet merged to `main`)
-**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Band C graph tools, backfill, Pass-2, hook topology, conventions, P5 codemod apply, and P6 Next client-boundary-bloat complete; CI/PR workflow active.**
+**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Band C graph tools, backfill, Pass-2, hook topology, conventions, P5 codemod apply, and P6 Next client-boundary-bloat + route-coupling complete; CI/PR workflow active.**
 
 ---
 
 ## TL;DR
 
-The MVP vertical slice is done, temporal drift is active, `rai backfill` can populate historical snapshots, `query_architecture` is available, Band C `get_node` / `raw_graph_query` are bounded read-only escape hatches, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, `apply_refactor` is gated through the verification pipeline, codemod proof artifacts are append-only, P6 Next client-boundary-bloat is exported from `@rai/adapter-next`, and GitHub PRs run CI.
+The MVP vertical slice is done, temporal drift is active, `rai backfill` can populate historical snapshots, `query_architecture` is available, Band C `get_node` / `raw_graph_query` are bounded read-only escape hatches, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, `apply_refactor` is gated through the verification pipeline, codemod proof artifacts are append-only, P6 Next client-boundary-bloat and route-coupling analyzers are exported from `@rai/adapter-next`, and GitHub PRs run CI.
 
 ```
 typecheck:  0 errors (strict: noUncheckedIndexedAccess + exactOptionalPropertyTypes)
-tests:      200 passing / 30 files (Vitest)
-build:      both packages compile; schema.sql copied to dist
+tests:      270 passing / 42 files (Vitest)
+build:      workspace packages compile; schema.sql copied to dist
 CLI smoke:  rai analyze fixtures/duplication/buttons → { opportunity: 1, warn: 1 }
             rai mcp fixtures/duplication/buttons    → stdio handshake + 4 tools listed
 github:     https://github.com/pavp/react-architecture-intelligence
@@ -57,7 +57,7 @@ append-only, and **a human rejection survives re-analysis and suppresses the fin
 
 ```bash
 pnpm install            # IMPORTANT: wires workspace symlinks (@rai/core ← cli) + builds better-sqlite3
-pnpm test               # 142 passing
+pnpm test               # 270 passing
 pnpm typecheck          # clean
 pnpm build              # both packages → dist/ (+ schema.sql copy)
 node packages/cli/dist/index.js analyze fixtures/duplication/buttons   # → { opportunity: 1, warn: 1 }
@@ -144,6 +144,7 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - ✅ Slice 2 complete: `guardNextVariant` emits structured `variant-mismatch` diagnostics without running unsupported analyzers.
 - ✅ Slice 3 complete: `enrichNext` adds route/layout/client/server tags, role index, and enrichment-only layout edges over frozen graph input.
 - ✅ Slice 4 complete: `next/client-boundary-bloat` emits generic adapter metric evidence for App Router `ClientComponent` render-topology breaches and returns `variant-mismatch` diagnostics for Pages/Mixed Router.
+- ✅ Slice 5 complete: `next/route-coupling` emits route-owned render-topology evidence for App Router and Pages Router `RouteSegment` nodes, with `variant-mismatch` diagnostics for Mixed/Non-Next inputs and no adapter persistence writes.
 - `@rai/adapter-next`: detect + enrich (RSC/client/route tags, frozen-input append-only) + 2–3 Next analyzers + variant-guard diagnostics + nominal/positional-only fp extension
 - CI lint: `grep framework-name packages/core == 0`
 - **Adapter storage rule**: adapters may NOT introduce independent persistence — all truth stays core-owned

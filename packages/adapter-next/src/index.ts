@@ -6,3 +6,5 @@ export { enrichNext } from "./enrich.js";
 export type { NextEdgeKind, NextGraphEnrichment, NextGraphInput, NextRole, NextSourceFile, NextTag } from "./enrich.js";
 export { CLIENT_BOUNDARY_BLOAT_RULE_ID, createClientBoundaryBloatAnalyzer } from "./client-boundary-bloat.js";
 export type { ClientBoundaryBloatAnalyzer, ClientBoundaryBloatInput, ClientBoundaryBloatThresholds, NextAdapterAnalyzerResult } from "./client-boundary-bloat.js";
+export { ROUTE_COUPLING_RULE_ID, createRouteCouplingAnalyzer } from "./route-coupling.js";
+export type { RouteCouplingAnalyzer, RouteCouplingAnalyzerResult, RouteCouplingInput, RouteCouplingThresholds } from "./route-coupling.js";

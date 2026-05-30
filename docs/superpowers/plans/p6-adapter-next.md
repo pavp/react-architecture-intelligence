@@ -1,6 +1,6 @@
 # P6 — Next.js Adapter — Implementation Plan
 
-**Status:** In progress — Slice 4 complete
+**Status:** In progress — Slice 5 complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-31
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §6, §7.2
@@ -173,22 +173,22 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 5 — `next/route-coupling`
+### Slice 5 — `next/route-coupling` ✅ DONE
 
 **Goal:** prove framework lenses can compose core topology.
 
 **Tasks:**
 
-- [ ] Add analyzer using route role index plus existing render edges.
-- [ ] Support app-router and pages-router.
-- [ ] Emit metric-only evidence for route fan-in/fan-out/depth.
-- [ ] Add threshold config under `next.routeCoupling`.
+- [x] Add analyzer using route role index plus existing render edges.
+- [x] Support app-router and pages-router.
+- [x] Emit metric-only evidence for route fan-in/fan-out/depth.
+- [x] Keep adapter-local thresholds through `createRouteCouplingAnalyzer({ thresholds })` until CLI adapter config wiring exists.
 
 **Exit criteria:**
 
-- [ ] Analyzer fires on route coupling fixture.
-- [ ] Plain React repo has no Next analyzer findings.
-- [ ] build/test/typecheck clean.
+- [x] Analyzer fires on route coupling fixture.
+- [x] Plain React repo has no Next analyzer findings; unsupported non-Next input returns a diagnostic skip.
+- [x] build/test/typecheck clean.
 
 ---
 
