@@ -37,17 +37,17 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3: Over-Abstraction Analyzer (RED → GREEN)
 
-- [ ] 3.1 RED: Create `packages/core/src/analyzers/over-abstraction.test.ts` for prop, hook, child, composition marker, conditional branch thresholds, below-threshold silence, metric-only evidence, and deterministic order.
-- [ ] 3.2 GREEN: Create `packages/core/src/analyzers/over-abstraction.ts` using only existing `ComponentNode` counts; emit `react/over-abstraction` opportunity findings with stable fingerprints.
-- [ ] 3.3 Verify focused: run over-abstraction tests and confirm no hook-topology analyzer/naming or parser enrichment appears.
+- [x] 3.1 RED: Create `packages/core/src/analyzers/over-abstraction.test.ts` for prop, hook, child, composition marker, conditional branch thresholds, below-threshold silence, metric-only evidence, and deterministic order.
+- [x] 3.2 GREEN: Create `packages/core/src/analyzers/over-abstraction.ts` using only existing `ComponentNode` counts; emit `react/over-abstraction` opportunity findings with stable fingerprints.
+- [x] 3.3 Verify focused: run over-abstraction tests and confirm no hook-topology analyzer/naming or parser enrichment appears.
 
 ## Phase 4: Registry, Exports, Integration (RED → GREEN)
 
-- [ ] 4.1 RED: Extend `packages/core/src/engine/pipeline.test.ts` to prove registry order and C3 diagnostic isolation still allow later analyzer findings.
-- [ ] 4.2 GREEN: Register analyzers after shared extraction in `packages/core/src/mcp/tools.ts` and export rule IDs/analyzers from `packages/core/src/index.ts` without changing analyzer contract.
-- [ ] 4.3 Verify focused: run pipeline tests; update `packages/core/src/engine/golden.test.ts` only if conservative defaults intentionally change fixture counts.
+- [x] 4.1 RED: Extend `packages/core/src/engine/pipeline.test.ts` to prove registry order and C3 diagnostic isolation still allow later analyzer findings.
+- [x] 4.2 GREEN: Register analyzers after shared extraction in `packages/core/src/mcp/tools.ts` and export rule IDs/analyzers from `packages/core/src/index.ts` without changing analyzer contract.
+- [x] 4.3 Verify focused: run pipeline tests; update `packages/core/src/engine/golden.test.ts` only if conservative defaults intentionally change fixture counts.
 
 ## Phase 5: Final Verification
 
-- [ ] 5.1 Run `pnpm test` and `pnpm typecheck`.
-- [ ] 5.2 Review diff for C4a-only scope: exactly `react/render-coupling` and `react/over-abstraction`; no boundary, hook-topology, parser, import/module, or type-aware logic.
+- [x] 5.1 Run `pnpm test` and `pnpm typecheck`.
+- [x] 5.2 Review diff for C4a-only scope: exactly `react/render-coupling` and `react/over-abstraction`; no boundary, hook-topology, parser, import/module, or type-aware logic.
