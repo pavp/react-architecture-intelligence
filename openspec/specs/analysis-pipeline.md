@@ -20,6 +20,24 @@ The system MUST execute analyzers in registry order. A thrown analyzer MUST NOT 
 - THEN analyzer C MUST still run
 - AND `analyzeRepo` MUST return normally
 
+## Requirement: Deterministic Analyzer Registration
+
+The system MUST register and execute `react/render-coupling` and `react/over-abstraction` through the existing analyzer registry in deterministic order. The analyzer contract MUST NOT change. Existing C3 diagnostic isolation MUST continue to contain failures so one failed analyzer does not block later analyzers or successful findings.
+
+### Scenario: New analyzers execute in registry order
+
+- GIVEN `react/render-coupling` and `react/over-abstraction` are registered with existing analyzers
+- WHEN `analyzeRepo` runs
+- THEN both analyzers MUST execute in registry order
+- AND successful findings MUST be returned through the existing findings path
+
+### Scenario: Diagnostic isolation still protects execution
+
+- GIVEN one registered analyzer throws before either new analyzer completes
+- WHEN `analyzeRepo` runs
+- THEN later registered analyzers MUST still execute
+- AND the thrown analyzer MUST contribute only a C3 diagnostic and zero findings
+
 ## Requirement: Successful Findings Persistence Boundary
 
 The system MUST persist and present findings returned by successful analyzers normally. A failed analyzer MUST contribute zero findings and MUST NOT write a T3 finding.
@@ -57,4 +75,4 @@ This capability version MUST NOT claim hard timeout or worker-level interruptibi
 
 - Implementation: `packages/core/src/engine/pipeline.ts`, `packages/core/src/types.ts`
 - Tests: `packages/core/src/engine/pipeline.test.ts`
-- Source change: `analyzer-fault-containment`
+- Source changes: `analyzer-fault-containment`, `more-analyzers-render-overabstraction`

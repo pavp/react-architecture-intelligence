@@ -42,6 +42,19 @@ export const ConfigSchema = z.object({
       }
     }
   }),
+  renderCoupling: z.object({
+    maxFanIn: z.number().int().min(0).default(5),
+    maxFanOut: z.number().int().min(0).default(7),
+    maxDirectChildren: z.number().int().min(0).default(5),
+    maxReachableDepth: z.number().int().min(0).default(4),
+  }).strict().default({}),
+  overAbstraction: z.object({
+    maxProps: z.number().int().min(0).default(10),
+    maxHooks: z.number().int().min(0).default(6),
+    maxChildren: z.number().int().min(0).default(8),
+    maxCompositionMarkers: z.number().int().min(0).default(2),
+    maxConditionalBranches: z.number().int().min(0).default(5),
+  }).strict().default({}),
   excludeGlobs: z.array(z.string()).default([
     "**/*.test.*", "**/*.stories.*", "**/shared/**", "**/ui/**", "**/components/common/**",
   ]),

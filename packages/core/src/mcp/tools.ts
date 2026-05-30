@@ -1,8 +1,7 @@
 import { openDb, type Db } from "../db/db.js";
 import type { RaiConfig } from "../config/schema.js";
 import type { PresentedFinding, Verdict, FeedbackSource, FindingType, PresentedStatus, Severity } from "../types.js";
-import { AnalyzerRegistry } from "../analyzers/registry.js";
-import { sharedExtraction } from "../analyzers/shared-extraction.js";
+import { createDefaultAnalyzerRegistry } from "../analyzers/registry.js";
 import { FindingsStore } from "../memory/findings-store.js";
 import { FeedbackStore } from "../memory/feedback-store.js";
 import { analyzeRepo } from "../engine/pipeline.js";
@@ -49,14 +48,13 @@ export interface CloseSessionResult {
 /** Engine session backing the MCP tools. One per repo. */
 export class Session {
   private db: Db;
-  private registry = new AnalyzerRegistry();
+  private registry = createDefaultAnalyzerRegistry();
   private findings: FindingsStore;
   private feedback: FeedbackStore;
   private lastPresented: PresentedFinding[] = [];
 
   constructor(private opts: SessionOpts) {
     this.db = openDb(opts.dbPath ?? ":memory:");
-    this.registry.register(sharedExtraction);
     this.findings = new FindingsStore(this.db);
     this.feedback = new FeedbackStore(this.db, this.findings);
   }
