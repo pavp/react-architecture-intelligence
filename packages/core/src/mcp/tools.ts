@@ -178,23 +178,7 @@ export class Session {
       headCommit = row.commit_sha;
     }
 
-    // Count distinct commits
-    const { cnt } = this.db.prepare(
-      "SELECT COUNT(DISTINCT commit_sha) AS cnt FROM snapshot"
-    ).get() as { cnt: number };
-
-    if (cnt < 2) {
-      return {
-        status: "insufficient_history",
-        snapshotCount: cnt,
-        requiredSnapshots: 2,
-        added: [],
-        removed: [],
-        message: "No historical snapshots available yet. Run analysis on at least two commits.",
-      };
-    }
-
-    // Verify baseCommit present
+    // Verify baseCommit present (must happen before cnt check — spec: absent commit → unknown_commit regardless of count)
     const baseExists = this.db.prepare(
       "SELECT 1 AS found FROM snapshot WHERE commit_sha=? LIMIT 1"
     ).get(input.baseCommit) as { found: number } | undefined;
@@ -208,6 +192,22 @@ export class Session {
     ).get(headCommit) as { found: number } | undefined;
     if (!headExists) {
       return { status: "unknown_commit", commit: headCommit, message: "run analyze_repo({commit}) to backfill" };
+    }
+
+    // Both commits present — count distinct commits for history guard
+    const { cnt } = this.db.prepare(
+      "SELECT COUNT(DISTINCT commit_sha) AS cnt FROM snapshot"
+    ).get() as { cnt: number };
+
+    if (cnt < 2) {
+      return {
+        status: "insufficient_history",
+        snapshotCount: cnt,
+        requiredSnapshots: 2,
+        added: [],
+        removed: [],
+        message: "No historical snapshots available yet. Run analysis on at least two commits.",
+      };
     }
 
     // Build optional filter fragment

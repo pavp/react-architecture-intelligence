@@ -380,3 +380,50 @@ test("getDrift: unknown state is never silent-clean (no ok with empty arrays)", 
   // must be one of the named error statuses
   expect(["unknown_commit", "insufficient_history"]).toContain(r.status);
 });
+
+// ─── CRITICAL-1: presence checks must fire before insufficient_history ────────
+
+test("getDrift: absent base with 1 snapshot row → unknown_commit(base), not insufficient_history", () => {
+  // Spec scenario 8: "Unknown base commit is refused" — regardless of snapshot count
+  const s = createSession({ config: DEFAULT_CONFIG });
+  // Only 1 distinct commit in DB — cnt < 2 would fire first under the buggy order
+  seedSnapshot(s, [
+    { commit_sha: "known-sha", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+  ]);
+  const r = s.getDrift({ baseCommit: "absent-sha", headCommit: "known-sha" });
+  expect(r.status).toBe("unknown_commit");
+  expect((r as any).commit).toBe("absent-sha");
+});
+
+test("getDrift: absent head with 1 snapshot row → unknown_commit(head), not insufficient_history", () => {
+  // Symmetric case: head absent, base present, cnt = 1
+  const s = createSession({ config: DEFAULT_CONFIG });
+  seedSnapshot(s, [
+    { commit_sha: "known-sha", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+  ]);
+  const r = s.getDrift({ baseCommit: "known-sha", headCommit: "absent-sha" });
+  expect(r.status).toBe("unknown_commit");
+  expect((r as any).commit).toBe("absent-sha");
+});
+
+// ─── WARNING-1: happy-path ok result must write nothing ───────────────────────
+
+test("getDrift: ok-status result writes nothing to finding, snapshot, or feedback_event", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  seedSnapshot(s, [
+    { commit_sha: "commit-a", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+    { commit_sha: "commit-a", fingerprint: "fpB", rule_id: "react/rc", evidence_digest: "d2" },
+    { commit_sha: "commit-b", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+    { commit_sha: "commit-b", fingerprint: "fpC", rule_id: "react/rc", evidence_digest: "d3" },
+  ]);
+  const beforeSnapshot = countRows(s, "snapshot");
+  const beforeFinding = countRows(s, "finding");
+  const beforeFeedback = countRows(s, "feedback_event");
+
+  const r = s.getDrift({ baseCommit: "commit-a", headCommit: "commit-b" });
+
+  expect(r.status).toBe("ok");
+  expect(countRows(s, "snapshot")).toBe(beforeSnapshot);
+  expect(countRows(s, "finding")).toBe(beforeFinding);
+  expect(countRows(s, "feedback_event")).toBe(beforeFeedback);
+});
