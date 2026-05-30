@@ -17,3 +17,5 @@ export { mayExecuteCodemod } from "./codemod/capability-gate.js";
 export type { CodemodGateContext, CodemodGateRefusalReason, CodemodGateResult } from "./codemod/capability-gate.js";
 export { previewSharedExtractionPatch } from "./codemod/dry-run.js";
 export type { DryRunPatchInput, DryRunPatchPreview, DryRunRefusalReason } from "./codemod/dry-run.js";
+export { runApplyRefactorPipeline } from "./codemod/apply-pipeline.js";
+export type { ApplyPipelineInput, ApplyPipelineResult, ApplyWorkspace, VerificationCommand, VerificationResult, VerificationStage } from "./codemod/apply-pipeline.js";

@@ -1,6 +1,6 @@
 # P5 — Codemod Apply — Implementation Plan
 
-**Status:** In progress — Slices 1, 2, 3, and 4 complete
+**Status:** In progress — Slices 1, 2, 3, 4, and 5a complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §1, §4.6, §5.2, §7
@@ -175,13 +175,43 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 5 — `apply_refactor` verification pipeline
+### Slice 5a — verification pipeline orchestrator ✅ DONE
+
+**Goal:** prove the apply pipeline order and rollback semantics behind an injected workspace adapter. This slice does not register `apply_refactor` and does not write the real workspace.
+
+**Tasks:**
+
+- [x] Add dirty-worktree guard before mutation.
+- [x] Apply patch through an injected workspace adapter.
+- [x] Run injected typecheck command.
+- [x] Run injected test command.
+- [x] Check git-clean state for touched files through the adapter.
+- [x] Create commit through the adapter after verification.
+- [x] Return rollback patch in the success result.
+- [x] Roll back on typecheck/test/git-clean failure.
+
+**Strict TDD anchors:**
+
+- dirty tree refuses before mutation
+- typecheck failure restores workspace exactly through rollback adapter call
+- test failure restores workspace exactly through rollback adapter call
+- unexpected changes roll back before commit
+- successful pipeline verifies, commits, and returns rollback proof
+
+**Exit criteria:**
+
+- [x] Pipeline order is proven with tests.
+- [x] Failed verification calls rollback and does not commit.
+- [x] No `--force` behavior exists.
+
+---
+
+### Slice 5b — `apply_refactor` real workspace adapter and MCP tool
 
 **Goal:** apply the patch only after all safety gates pass.
 
 **Tasks:**
 
-- [ ] Add dirty-worktree guard before mutation.
 - [ ] Apply patch to workspace.
 - [ ] Run configured typecheck command.
 - [ ] Run configured test command.
@@ -193,9 +223,9 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 **Strict TDD anchors:**
 
-- dirty tree refuses before mutation
-- typecheck failure restores workspace exactly
-- test failure restores workspace exactly
+- dirty tree refuses before mutation using real git status
+- typecheck failure restores real workspace exactly
+- test failure restores real workspace exactly
 - successful apply creates commit and reversal patch
 - timeout aborts and rolls back
 
