@@ -1,13 +1,7 @@
 # Delta for MCP Tools
 
-> **DEFERRED TO SLICE 1b — NOT IN SCOPE FOR THE CURRENT IMPLEMENTATION.**
-> This `get_drift` delta is the contract for a follow-up slice. Slice 1 implements
-> snapshot population (writer) ONLY — see `specs/analysis-pipeline/spec.md`.
-> `sdd-apply` and `sdd-verify` for Slice 1 MUST ignore this file. The requirements
-> below are correct and pre-approved; they are staged here for Slice 1b.
-
-**Change**: `p4-snapshot-get-drift` (Slice 1b — deferred)
-**Status**: Staged (RFC 2119) — not active until Slice 1b
+**Change**: `p4-snapshot-get-drift` (Slice 1b)
+**Status**: Active (RFC 2119)
 **Base spec**: `openspec/specs/mcp-tools.md`
 
 ---
