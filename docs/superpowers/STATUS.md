@@ -141,6 +141,7 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - ✅ Formal P6 plan exists: [`docs/superpowers/plans/p6-adapter-next.md`](plans/p6-adapter-next.md).
 - ✅ Variant guard design resolved: `app-router`, `pages-router`, `mixed-router`, and structured `variant-mismatch` diagnostics.
 - ✅ Slice 1 complete: `@rai/adapter-next` package scaffold + deterministic Next variant detection + core framework-free lint guard.
+- ✅ Slice 2 complete: `guardNextVariant` emits structured `variant-mismatch` diagnostics without running unsupported analyzers.
 - `@rai/adapter-next`: detect + enrich (RSC/client/route tags, frozen-input append-only) + 2–3 Next analyzers + variant-guard diagnostics + nominal/positional-only fp extension
 - CI lint: `grep framework-name packages/core == 0`
 - **Adapter storage rule**: adapters may NOT introduce independent persistence — all truth stays core-owned

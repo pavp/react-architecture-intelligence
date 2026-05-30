@@ -113,23 +113,23 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 2 — Variant guard diagnostics
+### Slice 2 — Variant guard diagnostics ✅ DONE
 
 **Goal:** prevent analyzers from silently running on unsupported Next variants.
 
 **Tasks:**
 
-- [ ] Extend analyzer registration or adapter execution with `supportedVariants` metadata outside core analyzer branching.
-- [ ] Emit `variant-mismatch` diagnostics when detected variant is unsupported.
-- [ ] Ensure mismatch creates no finding, feedback, weight, snapshot, or proof rows.
-- [ ] Add tests for app-only analyzer on pages-router and mixed-router.
+- [x] Extend adapter execution with `supportedVariants` metadata outside core analyzer branching.
+- [x] Emit `variant-mismatch` diagnostics when detected variant is unsupported.
+- [x] Ensure mismatch creates no finding, feedback, weight, snapshot, or proof rows.
+- [x] Add tests for app-only analyzer on pages-router and mixed-router.
 
 **Exit criteria:**
 
-- [ ] Unsupported variant produces exact diagnostic shape.
-- [ ] Silent fallback is impossible.
-- [ ] Diagnostics remain separate from findings and memory.
-- [ ] build/test/typecheck clean.
+- [x] Unsupported variant produces exact diagnostic shape.
+- [x] Silent fallback is impossible.
+- [x] Diagnostics remain separate from findings and memory.
+- [x] build/test/typecheck clean.
 
 ---
 
