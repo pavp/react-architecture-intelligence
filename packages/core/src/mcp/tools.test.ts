@@ -51,3 +51,20 @@ test("record_feedback refuses a phantom fingerprint", () => {
   const r = s.recordFeedback({ fingerprint: "phantom", ruleId: "r", verdict: "reject", source: "human", asOf: 0 });
   expect(r.accepted).toBe(false);
 });
+
+test("explainFinding includes lastReason from most recent non-null feedback reason", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0 });
+  const fp = a.topFingerprints[0]!;
+  s.recordFeedback({ fingerprint: fp, ruleId: "react/shared-extraction", verdict: "reject", source: "human", reason: "arch-reason", asOf: 1 });
+  const e = s.explainFinding({ fingerprint: fp });
+  expect(e.memory.lastReason).toBe("arch-reason");
+});
+
+test("explainFinding lastReason is null when no feedback with non-null reason exists", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  const a = s.analyzeRepo({ files, asOf: 0 });
+  const fp = a.topFingerprints[0]!;
+  const e = s.explainFinding({ fingerprint: fp });
+  expect(e.memory.lastReason).toBeNull();
+});

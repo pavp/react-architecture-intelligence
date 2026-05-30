@@ -77,6 +77,7 @@ export class Session {
         eventCount: events.length,
         net: (f.weight && f.weight.value < 0 ? "suppress" : f.weight && f.weight.value > 0 ? "amplify" : "neutral") as
           "suppress" | "amplify" | "neutral",
+        lastReason: [...events].reverse().find((e) => e.reason !== null)?.reason ?? null,
       },
     };
   }
