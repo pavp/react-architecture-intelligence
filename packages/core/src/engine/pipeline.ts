@@ -19,7 +19,7 @@ export interface AnalyzeRepoInput {
   runId: string;
   commitSha: string;
   asOf: number; // explicit time anchor (§3.3 determinism)
-  analysisVersion?: number;
+  analysisVersion?: number | undefined;
 }
 
 export interface AnalyzeRepoResult {

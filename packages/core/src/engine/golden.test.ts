@@ -26,9 +26,11 @@ function setup() {
   return { db, registry, findings, feedback };
 }
 
-test("GOLDEN: shared-buttons corpus yields exactly one opportunity", () => {
+test("GOLDEN: duplicated-buttons corpus yields exactly one opportunity", () => {
+  // NOTE: fixtures live under fixtures/duplication/ (NOT shared/) on purpose — the default
+  // excludeGlobs skip **/shared/**, so a 'shared/' path would correctly be excluded.
   const files = ["LoginButton", "SignupBtn", "CtaButton"].map((n) => ({
-    file: `shared/buttons/${n}.tsx`, source: read(`shared/buttons/${n}.tsx`),
+    file: `features/buttons/${n}.tsx`, source: read(`duplication/buttons/${n}.tsx`),
   }));
   const { registry, findings, feedback } = setup();
   const res = analyzeRepo({ files, registry, findings, feedback, config: DEFAULT_CONFIG, runId: "r", commitSha: "c", asOf: 0 });
@@ -44,7 +46,7 @@ test("GOLDEN identity: reformatting a component preserves its structural fingerp
 
 test("DETERMINISM REPLAY: identical inputs -> byte-identical presented findings (sans ids)", () => {
   const files = ["LoginButton", "SignupBtn", "CtaButton"].map((n) => ({
-    file: `shared/buttons/${n}.tsx`, source: read(`shared/buttons/${n}.tsx`),
+    file: `features/buttons/${n}.tsx`, source: read(`duplication/buttons/${n}.tsx`),
   }));
   const run = () => {
     const { registry, findings, feedback } = setup();

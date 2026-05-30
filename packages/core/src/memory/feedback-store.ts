@@ -8,11 +8,11 @@ export interface RecordFeedbackInput {
   ruleId: string;
   verdict: Verdict;
   source: FeedbackSource;
-  originRunId?: string;
-  weightHint?: number;
-  reason?: string;
-  commitSha?: string;
-  asOf?: number; // for testability; defaults to Date.now() at the I/O boundary
+  originRunId?: string | undefined;
+  weightHint?: number | undefined;
+  reason?: string | undefined;
+  commitSha?: string | undefined;
+  asOf?: number | undefined; // for testability; defaults to Date.now() at the I/O boundary
 }
 
 export interface RecordFeedbackResult { accepted: boolean; refusedReason?: string; }

@@ -26,7 +26,7 @@ export class Session {
   }
 
   // ── analyze_repo (§5.2) — counts + handles, never a finding dump ──────
-  analyzeRepo(input: { files: SourceFile[]; asOf: number; analysisVersion?: number; runId?: string; commitSha?: string }) {
+  analyzeRepo(input: { files: SourceFile[]; asOf: number; analysisVersion?: number | undefined; runId?: string | undefined; commitSha?: string | undefined }) {
     const res = analyzeRepo({
       files: input.files, registry: this.registry, findings: this.findings, feedback: this.feedback,
       config: this.opts.config, runId: input.runId ?? "run-" + input.asOf, commitSha: input.commitSha ?? "head",
@@ -54,7 +54,7 @@ export class Session {
   }
 
   // ── find_shared_opportunities (§5.2) — opportunities & conflicts SEPARATED ──
-  findSharedOpportunities(input: { includeSuppressed?: boolean }) {
+  findSharedOpportunities(input: { includeSuppressed?: boolean | undefined }) {
     const pool = input.includeSuppressed ? this.lastPresented : this.lastPresented.filter((p) => p.status !== "suppressed");
     return {
       opportunities: pool.filter((p) => p.type === "opportunity"),
@@ -82,7 +82,7 @@ export class Session {
   }
 
   // ── record_feedback (§5.3) — the SOLE memory write door ──────────────
-  recordFeedback(input: { fingerprint: string; ruleId: string; verdict: Verdict; source: FeedbackSource; originRunId?: string; reason?: string; asOf?: number }) {
+  recordFeedback(input: { fingerprint: string; ruleId: string; verdict: Verdict; source: FeedbackSource; originRunId?: string | undefined; reason?: string | undefined; asOf?: number | undefined }) {
     return this.feedback.record(input);
   }
 }
