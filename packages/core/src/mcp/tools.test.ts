@@ -226,3 +226,157 @@ test("closeSession ignores ambiguous summary text without decisions", () => {
   expect(r.results).toEqual([]);
   expect(s.explainFinding({ fingerprint: fp }).memory.eventCount).toBe(0);
 });
+
+// ─── getDrift tests ────────────────────────────────────────────────────────
+
+function seedSnapshot(session: ReturnType<typeof createSession>, rows: Array<{
+  commit_sha: string; fingerprint: string; rule_id: string;
+  severity_raw?: string; evidence_digest: string; created_at?: number;
+}>) {
+  const db = (session as any).db;
+  const stmt = db.prepare(
+    "INSERT OR REPLACE INTO snapshot (commit_sha, fingerprint, rule_id, severity_raw, evidence_digest, created_at) VALUES (?,?,?,?,?,?)"
+  );
+  for (const r of rows) {
+    stmt.run(r.commit_sha, r.fingerprint, r.rule_id, r.severity_raw ?? "warn", r.evidence_digest, r.created_at ?? Date.now());
+  }
+}
+
+function countRows(session: ReturnType<typeof createSession>, table: string): number {
+  const db = (session as any).db;
+  return (db.prepare(`SELECT COUNT(*) AS cnt FROM ${table}`).get() as { cnt: number }).cnt;
+}
+
+test("getDrift does not trigger analysis (zero writes)", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  // no seeded rows — both commits absent
+  s.getDrift({ baseCommit: "abc", headCommit: "def" });
+  expect(countRows(s, "snapshot")).toBe(0);
+  expect(countRows(s, "finding")).toBe(0);
+  expect(countRows(s, "feedback_event")).toBe(0);
+});
+
+test("getDrift: added finding detected", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  seedSnapshot(s, [
+    { commit_sha: "base1", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+    { commit_sha: "base1", fingerprint: "fpB", rule_id: "react/rc", evidence_digest: "d2" },
+    { commit_sha: "head1", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+    { commit_sha: "head1", fingerprint: "fpB", rule_id: "react/rc", evidence_digest: "d2" },
+    { commit_sha: "head1", fingerprint: "fpC", rule_id: "react/rc", evidence_digest: "d3" },
+  ]);
+  const r = s.getDrift({ baseCommit: "base1", headCommit: "head1" });
+  expect(r.status).toBe("ok");
+  const added = (r as any).added as Array<{ fingerprint: string }>;
+  expect(added.map((x) => x.fingerprint)).toContain("fpC");
+  expect((r as any).removed).toHaveLength(0);
+});
+
+test("getDrift: removed finding detected", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  seedSnapshot(s, [
+    { commit_sha: "base2", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+    { commit_sha: "base2", fingerprint: "fpB", rule_id: "react/rc", evidence_digest: "d2" },
+    { commit_sha: "head2", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+  ]);
+  const r = s.getDrift({ baseCommit: "base2", headCommit: "head2" });
+  expect(r.status).toBe("ok");
+  const removed = (r as any).removed as Array<{ fingerprint: string }>;
+  expect(removed.map((x) => x.fingerprint)).toContain("fpB");
+  expect((r as any).added).toHaveLength(0);
+});
+
+test("getDrift: differing evidence_digest → persisted 'changed'", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  seedSnapshot(s, [
+    { commit_sha: "base3", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "digest-v1" },
+    { commit_sha: "head3", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "digest-v2" },
+  ]);
+  const r = s.getDrift({ baseCommit: "base3", headCommit: "head3" });
+  expect(r.status).toBe("ok");
+  const persisted = (r as any).persisted as Array<{ fingerprint: string; stability: string }>;
+  const entry = persisted.find((p) => p.fingerprint === "fpA");
+  expect(entry?.stability).toBe("changed");
+});
+
+test("getDrift: identical evidence_digest → persisted 'stable'", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  seedSnapshot(s, [
+    { commit_sha: "base4", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "same-digest" },
+    { commit_sha: "head4", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "same-digest" },
+  ]);
+  const r = s.getDrift({ baseCommit: "base4", headCommit: "head4" });
+  expect(r.status).toBe("ok");
+  const persisted = (r as any).persisted as Array<{ fingerprint: string; stability: string }>;
+  const entry = persisted.find((p) => p.fingerprint === "fpA");
+  expect(entry?.stability).toBe("stable");
+});
+
+test("getDrift: ruleId filter narrows results", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  seedSnapshot(s, [
+    { commit_sha: "base5", fingerprint: "fpA", rule_id: "react/render-coupling", evidence_digest: "d1" },
+    { commit_sha: "base5", fingerprint: "fpB", rule_id: "react/over-abstraction", evidence_digest: "d2" },
+    { commit_sha: "head5", fingerprint: "fpA", rule_id: "react/render-coupling", evidence_digest: "d1" },
+    { commit_sha: "head5", fingerprint: "fpB", rule_id: "react/over-abstraction", evidence_digest: "d2" },
+    { commit_sha: "head5", fingerprint: "fpC", rule_id: "react/render-coupling", evidence_digest: "d3" },
+  ]);
+  const r = s.getDrift({ baseCommit: "base5", headCommit: "head5", ruleId: "react/render-coupling" });
+  expect(r.status).toBe("ok");
+  const added = (r as any).added as Array<{ fingerprint: string; rule_id: string }>;
+  const persisted = (r as any).persisted as Array<{ fingerprint: string; rule_id: string }>;
+  const removed = (r as any).removed as Array<{ fingerprint: string; rule_id: string }>;
+  const allEntries = [...added, ...persisted, ...removed];
+  expect(allEntries.every((e) => e.rule_id === "react/render-coupling")).toBe(true);
+  expect(allEntries.some((e) => e.rule_id === "react/over-abstraction")).toBe(false);
+});
+
+test("getDrift: unknown base commit → status unknown_commit with base SHA", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  seedSnapshot(s, [
+    { commit_sha: "known-head", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+    { commit_sha: "known-base", fingerprint: "fpX", rule_id: "react/rc", evidence_digest: "dx" },
+  ]);
+  const r = s.getDrift({ baseCommit: "unknown-sha", headCommit: "known-head" });
+  expect(r.status).toBe("unknown_commit");
+  expect((r as any).commit).toBe("unknown-sha");
+  // no writes
+  expect(countRows(s, "finding")).toBe(0);
+});
+
+test("getDrift: unknown head commit → status unknown_commit with head SHA", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  seedSnapshot(s, [
+    { commit_sha: "known-base2", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+    { commit_sha: "also-known", fingerprint: "fpB", rule_id: "react/rc", evidence_digest: "d2" },
+  ]);
+  const r = s.getDrift({ baseCommit: "known-base2", headCommit: "unknown-head" });
+  expect(r.status).toBe("unknown_commit");
+  expect((r as any).commit).toBe("unknown-head");
+});
+
+test("getDrift: only one distinct commit analyzed → insufficient_history", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  seedSnapshot(s, [
+    { commit_sha: "only-sha", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+  ]);
+  const r = s.getDrift({ baseCommit: "only-sha", headCommit: "only-sha" });
+  expect(r.status).toBe("insufficient_history");
+  expect((r as any).snapshotCount).toBe(1);
+  expect((r as any).requiredSnapshots).toBe(2);
+  expect((r as any).added).toEqual([]);
+  expect((r as any).removed).toEqual([]);
+});
+
+test("getDrift: unknown state is never silent-clean (no ok with empty arrays)", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  // fewer than 2 distinct commits
+  seedSnapshot(s, [
+    { commit_sha: "single-commit", fingerprint: "fpA", rule_id: "react/rc", evidence_digest: "d1" },
+  ]);
+  const r = s.getDrift({ baseCommit: "single-commit", headCommit: "single-commit" });
+  // must NOT be status "ok"
+  expect(r.status).not.toBe("ok");
+  // must be one of the named error statuses
+  expect(["unknown_commit", "insufficient_history"]).toContain(r.status);
+});

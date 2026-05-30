@@ -45,6 +45,29 @@ export interface CloseSessionResult {
   summary?: string | undefined;
 }
 
+export interface GetDriftInput {
+  baseCommit: string;
+  headCommit?: string | undefined;
+  ruleId?: string | undefined;
+  fingerprint?: string | undefined;
+}
+
+export interface DriftEntry {
+  fingerprint: string;
+  rule_id: string;
+  severity_raw: string;
+  evidence_digest: string;
+}
+
+export interface PersistedEntry extends DriftEntry {
+  stability: "changed" | "stable";
+}
+
+export type DriftResult =
+  | { status: "ok"; added: DriftEntry[]; removed: DriftEntry[]; persisted: PersistedEntry[] }
+  | { status: "unknown_commit"; commit: string; message: string }
+  | { status: "insufficient_history"; snapshotCount: number; requiredSnapshots: 2; added: []; removed: []; message: string };
+
 /** Engine session backing the MCP tools. One per repo. */
 export class Session {
   private db: Db;
@@ -139,6 +162,106 @@ export class Session {
       results,
       ...(input.summary !== undefined ? { summary: input.summary } : {}),
     };
+  }
+
+  // ── getDrift (§5.4) — read-only set-algebra over snapshot table ────────
+  getDrift(input: GetDriftInput): DriftResult {
+    // Resolve headCommit: when omitted, use most recent analyzed commit by created_at DESC
+    let headCommit = input.headCommit;
+    if (!headCommit) {
+      const row = this.db.prepare(
+        "SELECT commit_sha FROM snapshot ORDER BY created_at DESC, rowid DESC LIMIT 1"
+      ).get() as { commit_sha: string } | undefined;
+      if (!row) {
+        return { status: "unknown_commit", commit: "", message: "run analyze_repo({commit}) to backfill" };
+      }
+      headCommit = row.commit_sha;
+    }
+
+    // Count distinct commits
+    const { cnt } = this.db.prepare(
+      "SELECT COUNT(DISTINCT commit_sha) AS cnt FROM snapshot"
+    ).get() as { cnt: number };
+
+    if (cnt < 2) {
+      return {
+        status: "insufficient_history",
+        snapshotCount: cnt,
+        requiredSnapshots: 2,
+        added: [],
+        removed: [],
+        message: "No historical snapshots available yet. Run analysis on at least two commits.",
+      };
+    }
+
+    // Verify baseCommit present
+    const baseExists = this.db.prepare(
+      "SELECT 1 AS found FROM snapshot WHERE commit_sha=? LIMIT 1"
+    ).get(input.baseCommit) as { found: number } | undefined;
+    if (!baseExists) {
+      return { status: "unknown_commit", commit: input.baseCommit, message: "run analyze_repo({commit}) to backfill" };
+    }
+
+    // Verify headCommit present
+    const headExists = this.db.prepare(
+      "SELECT 1 AS found FROM snapshot WHERE commit_sha=? LIMIT 1"
+    ).get(headCommit) as { found: number } | undefined;
+    if (!headExists) {
+      return { status: "unknown_commit", commit: headCommit, message: "run analyze_repo({commit}) to backfill" };
+    }
+
+    // Build optional filter fragment
+    const filterParts: string[] = [];
+    const filterArgs: unknown[] = [];
+    if (input.ruleId) {
+      filterParts.push("rule_id=?");
+      filterArgs.push(input.ruleId);
+    }
+    if (input.fingerprint) {
+      filterParts.push("fingerprint=?");
+      filterArgs.push(input.fingerprint);
+    }
+    const filterSql = filterParts.length > 0 ? " AND " + filterParts.join(" AND ") : "";
+
+    // Load base and head sets
+    const baseRows = this.db.prepare(
+      `SELECT fingerprint, rule_id, severity_raw, evidence_digest FROM snapshot WHERE commit_sha=?${filterSql}`
+    ).all(input.baseCommit, ...filterArgs) as DriftEntry[];
+
+    const headRows = this.db.prepare(
+      `SELECT fingerprint, rule_id, severity_raw, evidence_digest FROM snapshot WHERE commit_sha=?${filterSql}`
+    ).all(headCommit, ...filterArgs) as DriftEntry[];
+
+    // Set-algebra keyed by (fingerprint, rule_id)
+    const baseMap = new Map<string, DriftEntry>();
+    for (const r of baseRows) baseMap.set(`${r.fingerprint}::${r.rule_id}`, r);
+
+    const headMap = new Map<string, DriftEntry>();
+    for (const r of headRows) headMap.set(`${r.fingerprint}::${r.rule_id}`, r);
+
+    const added: DriftEntry[] = [];
+    const removed: DriftEntry[] = [];
+    const persisted: PersistedEntry[] = [];
+
+    for (const [key, headEntry] of headMap) {
+      const baseEntry = baseMap.get(key);
+      if (!baseEntry) {
+        added.push(headEntry);
+      } else {
+        persisted.push({
+          ...headEntry,
+          stability: headEntry.evidence_digest === baseEntry.evidence_digest ? "stable" : "changed",
+        });
+      }
+    }
+
+    for (const [key, baseEntry] of baseMap) {
+      if (!headMap.has(key)) {
+        removed.push(baseEntry);
+      }
+    }
+
+    return { status: "ok", added, removed, persisted };
   }
 
   private currentCloseSessionFindings(discussed: string[] | undefined): PresentedFinding[] {
