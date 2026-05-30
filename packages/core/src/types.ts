@@ -92,13 +92,10 @@ export interface PresentedFinding extends Finding {
 }
 
 // ── Analysis Diagnostics ────────────────────────────────────────────────
-export type AnalysisDiagnosticKind = "analyzer-error";
-export interface AnalysisDiagnostic {
-  ruleId: string;
-  kind: AnalysisDiagnosticKind;
-  errorName: string;
-  message: string;
-}
+export type AnalysisDiagnosticKind = "analyzer-error" | "snapshot-skipped";
+export type AnalysisDiagnostic =
+  | { kind: "analyzer-error"; ruleId: string; errorName: string; message: string }
+  | { kind: "snapshot-skipped"; message: string };
 
 // ── Memory (§3) ─────────────────────────────────────────────────────────
 export type Verdict = "accept" | "reject" | "wontfix" | "confirm" | "dismiss";

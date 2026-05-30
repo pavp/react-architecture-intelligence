@@ -8,7 +8,10 @@ import { FindingsStore } from "../memory/findings-store.js";
 import { FeedbackStore } from "../memory/feedback-store.js";
 import { DEFAULT_CONFIG } from "../config/resolve.js";
 import type { Analyzer } from "../analyzers/analyzer.js";
-import type { Finding } from "../types.js";
+import type { Finding, AnalysisDiagnostic } from "../types.js";
+
+// A1 — compile-time assertion: snapshot-skipped diagnostic is assignable to AnalysisDiagnostic
+const _snapshotSkippedDiagnostic: AnalysisDiagnostic = { kind: "snapshot-skipped", message: "no git SHA available" };
 
 const A = `function LoginButton({ label, onClick, variant }) { const t = useTheme(); return <button onClick={onClick}>{label}</button>; }
 export default LoginButton;`;
