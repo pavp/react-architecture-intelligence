@@ -8,19 +8,19 @@
 
 These are deferred features inside the already-completed P0–P3 scope. They are documented as inline comments in the source but have no corresponding plan file or executable task list.
 
-### 1.1 `boundary_rule` → `architectural-conflict` never fires
+### 1.1 `boundary_rule` → `architectural-conflict` ✅ FIXED in wire-deferred-mvp-gaps
 
-**Location:** [packages/core/src/analyzers/shared-extraction.ts](../packages/core/src/analyzers/shared-extraction.ts) line 44
-```ts
-// boundary check is a P4 feature (boundary_rule table empty in MVP) → always opportunity
-```
-**Impact:** The `boundary_rule` table exists in the schema and T5 has rows for it, but `shared-extraction` always emits `opportunity` regardless of boundary violations. The `architectural-conflict` finding type is never produced.
+**Location:** [packages/core/src/analyzers/shared-extraction.ts](../packages/core/src/analyzers/shared-extraction.ts)
 
-**Fix:** Wire `ctx.boundaryRules` in `shared-extraction.ts` and populate `boundary_rule` rows from config. Defined in spec §4.4.
+**Fix applied:** Wired `ctx.boundaryRules` (loaded from `config.boundaries[]`) into `shared-extraction`. Clusters crossing a declared `from`/`to` glob boundary now emit `type: "architectural-conflict"` with `evidence.conflict = { rule, why }`. Clusters that don't cross any boundary continue to emit `"opportunity"`. The DB `boundary_rule` table remains read-only — rules are version-controlled in config.
+
+**Change:** `wire-deferred-mvp-gaps` — branch `feat/rai-mvp-p0-p3`.
 
 ---
 
-### 1.2 `typeOf()` always returns null (Pass-2 not wired)
+### 1.2 `typeOf()` always returns null (Pass-2 not wired) — split into `wire-ts-morph-pass2`
+
+> Note: §1.2 was split out of `wire-deferred-mvp-gaps` into a separate future change `wire-ts-morph-pass2` — adds ~130–190 LOC and a ~5 MB ts-morph dependency for zero observable behavior change in current scope. The stub remains until that change lands.
 
 **Location:** [packages/core/src/engine/pipeline.ts](../packages/core/src/engine/pipeline.ts) line 45
 ```ts
@@ -28,19 +28,17 @@ types: { typeOf: () => null }, // lazy Pass-2 wired in P4
 ```
 **Impact:** All type-level analysis is unavailable. Analyzers that call `ctx.typeOf(span)` always get `null`. This also blocks the learned-embedding work (§future-ideas §5) since richer type information is a prerequisite.
 
-**Fix:** Wire ts-morph lazy Pass-2 in `pipeline.ts`. Contract defined in spec §2.1.
+**Fix:** Wire ts-morph lazy Pass-2 in `pipeline.ts`. Contract defined in spec §2.1. Tracked in `wire-ts-morph-pass2`.
 
 ---
 
-### 1.3 Config severity-clamp is identity in overlay
+### 1.3 Config severity-clamp is identity in overlay ✅ FIXED in wire-deferred-mvp-gaps
 
-**Location:** [packages/core/src/memory/overlay.ts](../packages/core/src/memory/overlay.ts) line 7
-```ts
-const severity: Severity = f.severityRaw; // config severity-clamp is a P4 knob; identity here
-```
-**Impact:** The `clampSeverity(f.severity_raw, cfg)` function described in spec §3.4 does nothing — severity is always passed through unchanged. Teams cannot remap severity levels via config.
+**Location:** [packages/core/src/memory/overlay.ts](../packages/core/src/memory/overlay.ts)
 
-**Fix:** Implement `clampSeverity` using the config severity-map knobs. Spec §3.4 defines the contract.
+**Fix applied:** Added optional `severityMap: Partial<Record<Severity, Severity>>` to `OverlayConfig` and `config.memory` schema. The overlay now applies `cfg.severityMap?.[f.severityRaw] ?? f.severityRaw` — a pure read-time clamp that never mutates the stored finding. Config validation rejects any upward mapping (e.g. `info→error`) via a Zod `superRefine` down-only rank guard.
+
+**Change:** `wire-deferred-mvp-gaps` — branch `feat/rai-mvp-p0-p3`.
 
 ---
 
@@ -151,13 +149,13 @@ These are issues identified in the spec or through architectural review that hav
 
 **Fix:** Resolve before writing the P6 plan. Decisions here affect the adapter contract and the `detect()` return type.
 
-### 3.5 `reason` field in T4 is inert
+### 3.5 `reason` field in T4 is inert ✅ FIXED in wire-deferred-mvp-gaps
 
-**Problem:** `record_feedback` accepts a `reason` string that is stored in T4 but never surfaced back. `explain_finding` does not include it, there is no search over it, and no inspection tool shows it.
+**Location:** [packages/core/src/mcp/tools.ts](../packages/core/src/mcp/tools.ts)
 
-**Impact:** Narrative context about why a finding was rejected is lost from the user-facing layer. This is the main advantage Engram has over RAI's memory system (see future-ideas §9).
+**Fix applied:** Added `lastReason` to the `memory` object returned by `explainFinding`. It is the `reason` string from the most recent `FeedbackEvent` where `reason !== null` (ordered by `createdAt ASC`, last non-null wins). Returns `null` when no feedback with a reason exists. No MCP server change needed — `server.ts` serializes via `JSON.stringify`.
 
-**Fix:** Surface `reason` in `explain_finding` response under `memory.lastReason`. Make it part of any future `rai memory` inspection surface. No schema change needed — the data is already being collected.
+**Change:** `wire-deferred-mvp-gaps` — branch `feat/rai-mvp-p0-p3`.
 
 ### 3.6 Hook coupling conventions — edges planned but no config mechanism
 
