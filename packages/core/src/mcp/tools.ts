@@ -1,6 +1,6 @@
 import { openDb, type Db } from "../db/db.js";
 import type { RaiConfig } from "../config/schema.js";
-import type { PresentedFinding, Verdict, FeedbackSource, FindingType, PresentedStatus, Severity } from "../types.js";
+import type { PresentedFinding, Verdict, FeedbackSource, FindingType, PresentedStatus, Severity, Evidence, HookNode, Span } from "../types.js";
 import { createDefaultAnalyzerRegistry } from "../analyzers/registry.js";
 import { FindingsStore } from "../memory/findings-store.js";
 import { FeedbackStore } from "../memory/feedback-store.js";
@@ -14,6 +14,8 @@ import { mayExecuteCodemod, type CodemodGateResult } from "../codemod/capability
 import { previewSharedExtractionPatch, type DryRunPatchPreview } from "../codemod/dry-run.js";
 import { runApplyRefactorPipeline, type ApplyPipelineResult, type ApplyWorkspace } from "../codemod/apply-pipeline.js";
 import { CodemodProofStore } from "../memory/codemod-proof-store.js";
+import { createTypeResolver } from "../parse/type-resolver.js";
+import type { TypeInfo, TypeResolver } from "../analyzers/analyzer.js";
 
 export interface SessionOpts { config: RaiConfig; dbPath?: string; }
 
@@ -79,6 +81,9 @@ export type DriftResult =
 const QUERY_ARCHITECTURE_QUESTIONS = ["renders", "rendered-by", "fan-in", "fan-out", "reachability"] as const;
 type QueryArchitectureQuestion = typeof QUERY_ARCHITECTURE_QUESTIONS[number];
 const MAX_QUERY_ARCHITECTURE_DEPTH = 5;
+const RAW_GRAPH_QUERY_KINDS = ["nodes", "edges"] as const;
+type RawGraphQueryKind = typeof RAW_GRAPH_QUERY_KINDS[number];
+const MAX_RAW_GRAPH_QUERY_LIMIT = 100;
 
 export interface QueryArchitectureInput {
   question: string;
@@ -104,6 +109,32 @@ export type QueryArchitectureResult =
   | { status: "unknown_question"; question: string; validQuestions: QueryArchitectureQuestion[] }
   | { status: "unknown_target"; target: string };
 
+export interface GetNodeInput {
+  fingerprint?: string | undefined;
+  file?: string | undefined;
+  byteRange?: [number, number] | undefined;
+}
+
+export type GraphNodeDetail =
+  | { kind: "component"; id: string; name: string; file: string; span: Span; exportKind: ComponentNode["exportKind"]; componentKind: ComponentNode["kind"]; propNames: string[]; hookCalls: string[]; childComponents: string[]; compositionMarkers: string[]; conditionalBranches: number }
+  | { kind: "hook"; id: string; name: string; file: string; span: Span; exportKind: HookNode["exportKind"]; hookCalls: string[] }
+  | { kind: "module"; id: string; file: string; contentHash: string };
+
+export type GetNodeResult =
+  | { status: "ok"; node: Exclude<GraphNodeDetail, { kind: "module" }>; span: Span; astPath: string; typeInfo?: TypeInfo | undefined }
+  | { status: "no_analysis"; message: string }
+  | { status: "not_found"; input: GetNodeInput };
+
+export interface RawGraphQueryInput {
+  cypherLike: string;
+  limit: number;
+}
+
+export type RawGraphQueryResult =
+  | { status: "ok"; rows: unknown[]; truncated: boolean }
+  | { status: "no_analysis"; message: string }
+  | { status: "unsupported_query"; supportedQueries: RawGraphQueryKind[] };
+
 export type ProposeRefactorResult =
   | SharedExtractionProposal
   | { status: "refused"; reason: "unknown-current-finding" | "suppressed-finding" };
@@ -122,6 +153,7 @@ export class Session {
   private proofs: CodemodProofStore;
   private lastPresented: PresentedFinding[] = [];
   private lastGraph: Readonly<RepoGraph> | null = null;
+  private lastTypeResolver: TypeResolver | null = null;
   private lastAnalysisVersion = 0;
 
   constructor(private opts: SessionOpts) {
@@ -140,6 +172,7 @@ export class Session {
     });
     this.lastPresented = res.presented;
     this.lastGraph = res.graph;
+    this.lastTypeResolver = createTypeResolver({ files: input.files, graph: res.graph });
     this.lastAnalysisVersion = res.analysisVersion;
     const active = res.presented.filter((p) => p.status !== "suppressed");
     return {
@@ -237,6 +270,38 @@ export class Session {
     return this.renderReachability(target, edges, input.depth);
   }
 
+  // ── get_node (§5.4 Band C) — detail lookup from latest analyzed graph ──
+  getNode(input: GetNodeInput): GetNodeResult {
+    if (!this.lastGraph) {
+      return { status: "no_analysis", message: "run analyze_repo before get_node" };
+    }
+    const node = this.findGraphNode(input);
+    if (!node) return { status: "not_found", input };
+
+    const detail = toGraphNodeDetail(node);
+    const typeInfo = this.lastTypeResolver?.typeOf(node.span) ?? undefined;
+    return {
+      status: "ok",
+      node: detail,
+      span: node.span,
+      astPath: node.span.astPath,
+      ...(typeInfo ? { typeInfo } : {}),
+    };
+  }
+
+  // ── raw_graph_query (§5.4 Band C) — bounded allowlisted graph escape hatch ──
+  rawGraphQuery(input: RawGraphQueryInput): RawGraphQueryResult {
+    if (!this.lastGraph) {
+      return { status: "no_analysis", message: "run analyze_repo before raw_graph_query" };
+    }
+    const query = rawGraphQueryKind(input.cypherLike);
+    if (!query) return { status: "unsupported_query", supportedQueries: [...RAW_GRAPH_QUERY_KINDS] };
+
+    const limit = normalizeRawGraphLimit(input.limit);
+    const rows = query === "nodes" ? this.rawNodeRows() : this.rawEdgeRows();
+    return { status: "ok", rows: rows.slice(0, limit), truncated: rows.length > limit };
+  }
+
   // ── explain_finding (§5.2) — evidence + groundingFields, NO prose (§5-Fix-1) ──
   explainFinding(input: { fingerprint: string }) {
     const f = this.lastPresented.find((p) => p.fingerprint.structural === input.fingerprint);
@@ -296,6 +361,37 @@ export class Session {
 
   private edgeRef(edge: GraphEdge): EdgeRef {
     return { srcId: edge.srcId, dstId: edge.dstId, kind: edge.kind };
+  }
+
+  private findGraphNode(input: GetNodeInput): ComponentNode | HookNode | null {
+    const graph = this.lastGraph;
+    if (!graph) return null;
+    const nodes = [...graph.components, ...graph.hooks];
+    if (input.fingerprint) {
+      const finding = this.lastPresented.find((presented) => presented.fingerprint.structural === input.fingerprint);
+      const span = spanFromEvidence(finding?.evidence);
+      if (span) return nodes.find((node) => sameSpan(node.span, span)) ?? null;
+    }
+    if (input.file && input.byteRange) {
+      const [start, end] = input.byteRange;
+      return nodes.find((node) => node.file === input.file && spansOverlap(node.span, start, end)) ?? null;
+    }
+    if (input.file) return nodes.find((node) => node.file === input.file) ?? null;
+    return null;
+  }
+
+  private rawNodeRows(): unknown[] {
+    const graph = this.lastGraph;
+    if (!graph) return [];
+    return [
+      ...graph.components.map((node) => toGraphNodeDetail(node)),
+      ...graph.hooks.map((node) => toGraphNodeDetail(node)),
+      ...graph.modules.map((node) => ({ kind: "module" as const, ...node })),
+    ].sort(compareRawRows);
+  }
+
+  private rawEdgeRows(): unknown[] {
+    return this.lastGraph?.edges.slice().sort(compareEdge).map((edge) => this.edgeRef(edge)) ?? [];
   }
 
   private componentsForEdges(edges: GraphEdge[], includeTarget: ComponentNode): NodeRef[] {
@@ -544,6 +640,75 @@ function uniqueGraphEdges(edges: GraphEdge[]): GraphEdge[] {
   const byKey = new Map<string, GraphEdge>();
   for (const edge of edges) byKey.set(`${edge.kind}:${edge.srcId}:${edge.dstId}`, edge);
   return [...byKey.values()];
+}
+
+function toGraphNodeDetail(node: ComponentNode): Exclude<GraphNodeDetail, { kind: "module" }>;
+function toGraphNodeDetail(node: HookNode): Exclude<GraphNodeDetail, { kind: "module" }>;
+function toGraphNodeDetail(node: ComponentNode | HookNode): Exclude<GraphNodeDetail, { kind: "module" }> {
+  if ("propNames" in node) {
+    return {
+      kind: "component",
+      id: node.id,
+      name: node.name,
+      file: node.file,
+      span: node.span,
+      exportKind: node.exportKind,
+      componentKind: node.kind,
+      propNames: node.propNames,
+      hookCalls: node.hookCalls,
+      childComponents: node.childComponents,
+      compositionMarkers: node.compositionMarkers,
+      conditionalBranches: node.conditionalBranches,
+    };
+  }
+  return {
+    kind: "hook",
+    id: node.id,
+    name: node.name,
+    file: node.file,
+    span: node.span,
+    exportKind: node.exportKind,
+    hookCalls: node.hookCalls,
+  };
+}
+
+function spanFromEvidence(evidence: Evidence | undefined): Span | null {
+  if (!evidence) return null;
+  if (evidence.kind === "shared-extraction") return evidence.instances[0]?.span ?? null;
+  if (evidence.kind === "render-coupling") return evidence.component.span;
+  if (evidence.kind === "over-abstraction") return evidence.component.span;
+  if (evidence.kind === "hook-topology") return evidence.hook.span;
+  return evidence.edge.from.span;
+}
+
+function sameSpan(a: Span, b: Span): boolean {
+  return a.file === b.file && a.start === b.start && a.end === b.end && a.kind === b.kind && a.astPath === b.astPath;
+}
+
+function spansOverlap(span: Span, start: number, end: number): boolean {
+  return Number.isFinite(start) && Number.isFinite(end) && span.start < end && start < span.end;
+}
+
+function rawGraphQueryKind(query: string): RawGraphQueryKind | null {
+  const normalized = query.trim().toLowerCase();
+  if (/\bnodes?\b/.test(normalized)) return "nodes";
+  if (/\bedges?\b/.test(normalized)) return "edges";
+  return null;
+}
+
+function normalizeRawGraphLimit(limit: number): number {
+  if (!Number.isFinite(limit) || limit < 1) return 1;
+  return Math.min(Math.floor(limit), MAX_RAW_GRAPH_QUERY_LIMIT);
+}
+
+function compareRawRows(a: unknown, b: unknown): number {
+  return rawRowKey(a).localeCompare(rawRowKey(b));
+}
+
+function rawRowKey(row: unknown): string {
+  if (!row || typeof row !== "object") return "";
+  const r = row as { kind?: string; file?: string; name?: string; id?: string };
+  return `${r.kind ?? ""}:${r.file ?? ""}:${r.name ?? ""}:${r.id ?? ""}`;
 }
 
 export function createSession(opts: SessionOpts): Session {

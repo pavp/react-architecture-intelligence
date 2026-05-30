@@ -1,8 +1,8 @@
 # Capability Spec: MCP Tools
 
 **Status**: Active (RFC 2119)  
-**Origin**: changes `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`, `p5-propose-refactor`, `p5-apply-refactor` (2026-05-30)
-**Scope**: MCP tool contracts for analyze diagnostics, feedback closure, temporal drift, bounded graph questions, proposal-only refactor suggestions, and gated refactor apply.
+**Origin**: changes `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`, `p4-band-c-tools`, `p5-propose-refactor`, `p5-apply-refactor` (2026-05-30)
+**Scope**: MCP tool contracts for analyze diagnostics, feedback closure, temporal drift, bounded graph questions, Band C graph escape hatches, proposal-only refactor suggestions, and gated refactor apply.
 
 ## Purpose
 
@@ -337,6 +337,75 @@ All `query_architecture` traversal MUST be bounded. `renders`, `rendered-by`, `f
 - WHEN `query_architecture({ question: "reachability", target, depth: 1 })` runs
 - THEN results MUST include only nodes reachable within one render hop
 
+## Requirement: get_node Tool Registration
+
+The MCP server MUST expose `get_node` as a registered Band C tool. The tool MUST accept `{ fingerprint?: string; file?: string; byteRange?: [number, number] }` and return one bounded graph node detail from the latest analyzed graph.
+
+### Scenario: Tool is listed
+
+- GIVEN an MCP server starts normally
+- WHEN the client requests the available tools
+- THEN `get_node` MUST be present in the tool list
+
+## Requirement: get_node Current Graph Lookup
+
+`get_node` MUST read only the most recent in-memory graph produced by `analyze_repo`. If no analysis has run, it MUST return `{ status: "no_analysis", message }` and MUST NOT trigger analysis.
+
+When a node is found, the response MUST include `{ status: "ok", node, span, astPath }`. It MAY include `typeInfo` when lazy Pass-2 can resolve the node's span.
+
+Supported lookup modes are:
+
+- `fingerprint`: resolves a currently presented finding fingerprint to the first evidence span, then finds the graph node with that span.
+- `file` + `byteRange`: returns the first component or hook node whose span overlaps the range.
+- `file`: returns the first component or hook node in that file.
+
+If no node matches, `get_node` MUST return `{ status: "not_found", input }`.
+
+### Scenario: No prior analysis is explicit
+
+- GIVEN no `analyze_repo` call has populated the current session graph
+- WHEN `get_node` is called
+- THEN the response MUST have `status: "no_analysis"`
+- AND no analysis MUST be triggered
+
+### Scenario: File/range lookup returns node detail
+
+- GIVEN the latest graph has a component whose span overlaps a requested file/range
+- WHEN `get_node({ file, byteRange })` runs
+- THEN the response MUST include the node detail, span, and astPath
+
+## Requirement: raw_graph_query Tool Registration
+
+The MCP server MUST expose `raw_graph_query` as a registered Band C tool. The tool MUST accept `{ cypherLike: string; limit: number }` and return `{ rows: unknown[]; truncated: boolean }` when successful.
+
+### Scenario: Tool is listed
+
+- GIVEN an MCP server starts normally
+- WHEN the client requests the available tools
+- THEN `raw_graph_query` MUST be present in the tool list
+
+## Requirement: raw_graph_query Bounded Allowlist
+
+`raw_graph_query` MUST read only the latest in-memory graph produced by `analyze_repo`. If no analysis has run, it MUST return `{ status: "no_analysis", message }` and MUST NOT trigger analysis.
+
+`raw_graph_query` MUST support only allowlisted graph row requests for `nodes` and `edges`. Unsupported patterns MUST return `{ status: "unsupported_query", supportedQueries: ["nodes", "edges"] }` and MUST NOT evaluate arbitrary Cypher, SQL, JavaScript, or user-supplied predicates.
+
+The tool MUST bound output by `limit`, cap implementation maximums, and set `truncated: true` when more rows exist than returned.
+
+### Scenario: Unsupported pattern is refused
+
+- GIVEN a latest analyzed graph exists
+- WHEN `raw_graph_query` receives an unsupported pattern
+- THEN the response MUST have `status: "unsupported_query"`
+- AND no arbitrary query language MUST be evaluated
+
+### Scenario: Limit truncates rows
+
+- GIVEN the latest graph has more rows than the requested limit
+- WHEN `raw_graph_query` runs
+- THEN returned `rows.length` MUST be no greater than the normalized limit
+- AND `truncated` MUST be `true`
+
 ## Requirement: propose_refactor Tool Registration
 
 The MCP server MUST expose `propose_refactor` as a registered tool. The tool MUST accept `{ fingerprint: string }` and return a deterministic proposal or structured refusal.
@@ -430,4 +499,4 @@ When the gate binds and dry-run preview succeeds, `apply_refactor` MUST execute 
 
 - Implementation: `packages/core/src/mcp/tools.ts`, `packages/core/src/mcp/server.ts`
 - Tests: `packages/core/src/mcp/tools.test.ts`, `packages/core/src/mcp/server.test.ts`
-- Source changes: `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`, `p5-propose-refactor`, `p5-apply-refactor`
+- Source changes: `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`, `p4-snapshot-get-drift`, `p4-query-architecture`, `p4-band-c-tools`, `p5-propose-refactor`, `p5-apply-refactor`

@@ -2,13 +2,13 @@
 
 **Last updated:** 2026-05-30
 **Branch:** `feat/rai-mvp-p0-p3` (not yet merged to `main`)
-**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Pass-2, hook topology, conventions, and P5 codemod apply complete; CI/PR workflow active.**
+**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Band C graph tools, Pass-2, hook topology, conventions, and P5 codemod apply complete; CI/PR workflow active.**
 
 ---
 
 ## TL;DR
 
-The MVP vertical slice is done, temporal drift is active, `query_architecture` is available, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, `apply_refactor` is gated through the verification pipeline, codemod proof artifacts are append-only, and GitHub PRs run CI.
+The MVP vertical slice is done, temporal drift is active, `query_architecture` is available, Band C `get_node` / `raw_graph_query` are bounded read-only escape hatches, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, `apply_refactor` is gated through the verification pipeline, codemod proof artifacts are append-only, and GitHub PRs run CI.
 
 ```
 typecheck:  0 errors (strict: noUncheckedIndexedAccess + exactOptionalPropertyTypes)
@@ -42,7 +42,7 @@ append-only, and **a human rejection survives re-analysis and suppresses the fin
 | Analyzers | `core/src/analyzers/` | contract + registry + `shared-extraction`, `render-coupling`, `over-abstraction`, `hook-topology`, `boundary-violation` |
 | Engine | `core/src/engine/pipeline.ts` | `analyzeRepo`: graph→analyze→persist→overlay, with per-analyzer crash diagnostics |
 | Golden | `fixtures/`, `engine/golden.test.ts` | corpus + rebuild/determinism-replay |
-| MCP | `core/src/mcp/` | Band-A/B tools session + stdio server, including `get_drift` and `query_architecture` |
+| MCP | `core/src/mcp/` | Band-A/B/C tools session + stdio server, including `get_drift`, `query_architecture`, `get_node`, and `raw_graph_query` |
 | CLI | `cli/src/{index,cli}.ts` | `rai analyze [dir]` (prints §5.2 counts) / `rai mcp [dir]` (serves stdio); reuses core `readSources` |
 
 ## Verified invariants (P3 exit criteria)
@@ -115,10 +115,11 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - ~~Formal P4 plan~~ — ✅ Done in `docs/superpowers/plans/p4-breadth-temporal.md`.
 - ~~`snapshot` population + `get_drift`~~ — ✅ Done in `p4-snapshot-get-drift`.
 - ~~`query_architecture` MCP tool~~ — ✅ Done; bounded questions over latest analyzed `RepoGraph`.
+- ~~Band C MCP tools~~ — ✅ Done; `get_node` and allowlisted `raw_graph_query` over latest analyzed `RepoGraph`.
 - ~~Lazy ts-morph Pass-2~~ — ✅ Done; `ctx.types.typeOf(span)` returns stable `TypeInfo` lazily.
 - ~~`react/hook-topology` analyzer + `uses-hook` edges~~ — ✅ Done; metric-only hook fan-in/fan-out/depth.
 - ~~`react/boundary-violation` / conventions~~ — ✅ Done; config forbids `renders` / `uses-hook` edges.
-- **Still next:** deferred edge work (`passes`, import/call analyzers) only when needed, or P5 planning.
+- **Still next:** deferred edge work (`passes`, import/call analyzers) only when needed, or P6 variant-guard planning.
 
 ### P5 — Codemod apply (dangerous — sequenced last, gated)
 - ✅ Formal P5 plan exists: [`docs/superpowers/plans/p5-codemod-apply.md`](plans/p5-codemod-apply.md).

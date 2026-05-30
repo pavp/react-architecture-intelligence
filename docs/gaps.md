@@ -74,9 +74,9 @@ Tasks that need to be formalized:
 - Populate `snapshot` table on each analysis run — ✅ done
 - Implement `get_drift` MCP tool (pure SQL set-algebra over snapshots — spec §3.5/§5.2) — ✅ done
 - Implement `query_architecture` MCP tool (enumerated graph questions, bounded traversal — spec §5.2) — ✅ done for current `renders` graph facts
+- Implement Band C MCP tools `get_node` and `raw_graph_query` (bounded read-only escape hatches — spec §5.4) — ✅ done over the latest analyzed graph
 - Add more analyzers: `coupling`, `hook-topology`, `over-abstraction`, `boundary-violation` — ✅ `react/render-coupling`, `react/over-abstraction`, `react/hook-topology`, and `react/boundary-violation` done
 - Analyzer fault containment: crash isolation ✅ done; hard sync-CPU timeout still deferred until worker isolation exists
-- Band C MCP tools: `get_node`, `raw_graph_query` (spec §5.4)
 
 Exit criteria (to be defined in the plan): same format as P0–P3 plan checkboxes.
 
@@ -228,7 +228,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 | Phase | Plan file | Status |
 |---|---|---|
 | P0–P3 | [docs/superpowers/plans/2026-05-29-rai-mvp-p0-p3.md](superpowers/plans/2026-05-29-rai-mvp-p0-p3.md) | ✅ Exists, all 24 tasks complete |
-| P4 | [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md) | ✅ Exists; temporal + `query_architecture` slices complete |
+| P4 | [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md) | ✅ Exists; temporal + `query_architecture` + Band C slices complete |
 | P5 | [docs/superpowers/plans/p5-codemod-apply.md](superpowers/plans/p5-codemod-apply.md) | ✅ Exists; complete |
 | P6 | `docs/superpowers/plans/p6-adapter-next.md` | ❌ Missing |
 
@@ -240,19 +240,20 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 2. ~~**Resolve §3.1 (drift cold-start)**~~ — ✅ complete via explicit `unknown_commit` / `insufficient_history` statuses.
 3. ~~**Implement snapshot population + `get_drift`**~~ — ✅ complete.
 4. ~~**Implement `query_architecture`**~~ — ✅ complete for current render graph facts.
-5. ~~**Wire lazy ts-morph Pass-2** (§1.2)~~ — ✅ complete.
-6. ~~**Implement `boundary-violation` / conventions**~~ — ✅ complete for `renders` / `uses-hook`.
-7. ~~**Write the P5 codemod-apply plan**~~ — ✅ complete.
-8. ~~**Implement P5 Slice 1**~~ — ✅ complete: proposal contract + shared-extraction evidence readiness.
-9. ~~**Implement P5 Slice 2**~~ — ✅ complete: `propose_refactor` MCP tool over the pure proposal builder.
-10. ~~**Implement P5 Slice 3**~~ — ✅ complete: capability-token gate for apply, without applying code yet.
-11. ~~**Implement P5 Slice 4**~~ — ✅ complete: dry-run transform and patch preview; workspace remains unchanged.
-12. ~~**Implement P5 Slice 5a**~~ — ✅ complete: verification pipeline orchestrator.
-13. ~~**Implement P5 Slice 5b1**~~ — ✅ complete: real git workspace adapter.
-14. ~~**Implement P5 Slice 5b1.5**~~ — ✅ complete: dry-run patch output is valid `git apply` input.
-15. ~~**Implement P5 Slice 5b2**~~ — ✅ complete: `apply_refactor` MCP tool over the existing pipeline.
-16. ~~**Implement P5 Slice 6**~~ — ✅ complete: append-only codemod proof artifacts.
-17. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
+5. ~~**Implement Band C MCP tools**~~ — ✅ complete: bounded `get_node` and allowlisted `raw_graph_query` over latest analyzed graph.
+6. ~~**Wire lazy ts-morph Pass-2** (§1.2)~~ — ✅ complete.
+7. ~~**Implement `boundary-violation` / conventions**~~ — ✅ complete for `renders` / `uses-hook`.
+8. ~~**Write the P5 codemod-apply plan**~~ — ✅ complete.
+9. ~~**Implement P5 Slice 1**~~ — ✅ complete: proposal contract + shared-extraction evidence readiness.
+10. ~~**Implement P5 Slice 2**~~ — ✅ complete: `propose_refactor` MCP tool over the pure proposal builder.
+11. ~~**Implement P5 Slice 3**~~ — ✅ complete: capability-token gate for apply, without applying code yet.
+12. ~~**Implement P5 Slice 4**~~ — ✅ complete: dry-run transform and patch preview; workspace remains unchanged.
+13. ~~**Implement P5 Slice 5a**~~ — ✅ complete: verification pipeline orchestrator.
+14. ~~**Implement P5 Slice 5b1**~~ — ✅ complete: real git workspace adapter.
+15. ~~**Implement P5 Slice 5b1.5**~~ — ✅ complete: dry-run patch output is valid `git apply` input.
+16. ~~**Implement P5 Slice 5b2**~~ — ✅ complete: `apply_refactor` MCP tool over the existing pipeline.
+17. ~~**Implement P5 Slice 6**~~ — ✅ complete: append-only codemod proof artifacts.
+18. **Resolve §3.4 (Next.js variant guard design)** before P6 adapter planning.
 
 ---
 

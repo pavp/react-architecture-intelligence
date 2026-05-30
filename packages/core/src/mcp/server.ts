@@ -151,6 +151,29 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("query_architecture");
 
+  server.tool("get_node", "Return bounded details for a node in the latest analyzed repo graph.",
+    {
+      fingerprint: z.string().optional(),
+      file: z.string().optional(),
+      byteRange: z.tuple([z.number(), z.number()]).optional(),
+    },
+    async (args) => {
+      const r = session.getNode(args);
+      return { content: [{ type: "text", text: JSON.stringify(r, null, 2) }] };
+    });
+  toolNames.push("get_node");
+
+  server.tool("raw_graph_query", "Return bounded allowlisted graph rows from the latest analyzed repo graph.",
+    {
+      cypherLike: z.string(),
+      limit: z.number(),
+    },
+    async (args) => {
+      const r = session.rawGraphQuery(args);
+      return { content: [{ type: "text", text: JSON.stringify(r, null, 2) }] };
+    });
+  toolNames.push("raw_graph_query");
+
   return { server, session, toolNames };
 }
 

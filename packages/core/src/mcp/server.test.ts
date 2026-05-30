@@ -29,6 +29,12 @@ test("apply_refactor is listed in toolNames", () => {
   expect(toolNames).toContain("apply_refactor");
 });
 
+test("Band C tools are listed in toolNames", () => {
+  const { toolNames } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
+  expect(toolNames).toContain("get_node");
+  expect(toolNames).toContain("raw_graph_query");
+});
+
 test("analyze_repo handler passes resolved SHA (not literal 'head') to session.analyzeRepo", async () => {
   const { session, server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
   const spy = vi.spyOn(session, "analyzeRepo");

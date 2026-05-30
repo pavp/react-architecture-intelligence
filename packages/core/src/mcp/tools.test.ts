@@ -129,6 +129,42 @@ test("queryArchitecture refuses unknown targets", () => {
   expect(r).toEqual({ status: "unknown_target", target: "Missing" });
 });
 
+test("getNode requires a prior analysis", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+
+  expect(s.getNode({ file: "Page.tsx" })).toEqual({ status: "no_analysis", message: "run analyze_repo before get_node" });
+});
+
+test("getNode returns a component by file and byte range", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  s.analyzeRepo({ files: graphFiles, asOf: 0 });
+
+  const r = s.getNode({ file: "Page.tsx", byteRange: [0, 80] });
+
+  expect(r.status).toBe("ok");
+  expect((r as any).node).toMatchObject({ kind: "component", name: "Page", file: "Page.tsx" });
+  expect((r as any).span.file).toBe("Page.tsx");
+  expect((r as any).astPath).toBeTruthy();
+});
+
+test("rawGraphQuery refuses before analysis and unknown patterns", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  expect(s.rawGraphQuery({ cypherLike: "MATCH edges", limit: 10 })).toEqual({ status: "no_analysis", message: "run analyze_repo before raw_graph_query" });
+  s.analyzeRepo({ files: graphFiles, asOf: 0 });
+  expect(s.rawGraphQuery({ cypherLike: "MATCH freeform", limit: 10 })).toEqual({ status: "unsupported_query", supportedQueries: ["nodes", "edges"] });
+});
+
+test("rawGraphQuery returns bounded graph rows with truncation", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  s.analyzeRepo({ files: graphFiles, asOf: 0 });
+
+  const r = s.rawGraphQuery({ cypherLike: "MATCH edges", limit: 1 });
+
+  expect(r.status).toBe("ok");
+  expect(r.rows).toHaveLength(1);
+  expect(r.truncated).toBe(true);
+});
+
 test("analyze_repo returns diagnostic count and details for partial analyzer failure", () => {
   const s = createSession({ config: DEFAULT_CONFIG });
   registerAnalyzer(s, analyzer("test/failing", () => { throw new TypeError("boom"); }));

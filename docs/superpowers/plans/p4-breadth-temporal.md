@@ -1,6 +1,6 @@
 # P4 — Breadth + Temporal — Implementation Plan
 
-**Status:** In progress — Slices 1/1b/2/3/4/4b complete; Slice 5 backfill deferred
+**Status:** In progress — Slices 1/1b/2/2b/3/4/4b complete; Slice 5 backfill deferred
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-30
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §3.5, §5.2, §7.2
@@ -20,7 +20,7 @@ P4 delivers two capabilities the MVP cannot:
    over the persisted index (set-algebra + evidence-delta). This is the highest-value
    P4 feature because the schema and fingerprint groundwork already exist.
 2. **Breadth** — `query_architecture` for bounded graph questions, the lazy ts-morph
-   Pass-2 for `typeOf()`, and the remaining analyzer slices (`hook-topology`,
+   Pass-2 for `typeOf()`, Band C graph escape hatches, and the remaining analyzer slices (`hook-topology`,
    `boundary-violation` / conventions).
 
 Already complete (do **not** re-plan here): KI-1 component-detector fix,
@@ -253,6 +253,29 @@ Design §5.2 signature:
 
 ---
 
+### Slice 2b — Band C graph escape hatches ✅ DONE
+
+**Goal:** expose non-primary, bounded graph debugging tools from design §5.4 without turning
+`query_architecture` into free-form traversal.
+
+**Implemented scope:** `get_node` and allowlisted `raw_graph_query` over the latest in-memory
+`RepoGraph`. Both tools require a prior analysis and never trigger analysis as a side effect.
+
+**Tasks:**
+- [x] **2b.1 `get_node` session method** — lookup by current finding fingerprint, file+byteRange,
+      or file. Returns node detail, span, astPath, and optional lazy Pass-2 `typeInfo`.
+- [x] **2b.2 `raw_graph_query` session method** — supports only allowlisted `nodes` / `edges`
+      row requests, normalizes/caps `limit`, and returns `truncated` when bounded.
+- [x] **2b.3 MCP registration** — expose `get_node` and `raw_graph_query`.
+- [x] **2b.4 Spec/status/gaps update**.
+
+**Exit criteria:**
+- [x] `get_node` refuses before analysis and resolves a known file/range node.
+- [x] `raw_graph_query` refuses before analysis, rejects unsupported patterns, and truncates rows.
+- [x] build/test/typecheck clean; spec updated.
+
+---
+
 ### Slice 3 — Lazy ts-morph Pass-2 for `typeOf()` (gaps §1.2) ✅ DONE
 
 **Goal:** wire the deferred Pass-2 so `ctx.typeOf(span)` returns real type info instead of
@@ -396,6 +419,7 @@ orchestration, categorically riskier than the read-only slices above.
 Slice 1 (snapshot + get_drift)   ← FIRST, groundwork exists, highest value
         │
         ├── Slice 2 (query_architecture)   independent of 1, can run parallel
+        ├── Slice 2b (Band C graph tools)  escape hatches over latest graph
         ├── Slice 3 (ts-morph Pass-2)      independent, unlocks type-aware work
         └── Slice 4 (edge audit + hook-topology)
                     └── Slice 4b (boundary-violation / conventions)
@@ -408,6 +432,7 @@ Slice 5 (backfill CLI)   deferred, after Slice 1 contract is stable
 - [ ] `get_drift` shows a fan-in delta (e.g. 3→9) across commits
 - [ ] `snapshot` populated deterministically per analysis run
 - [x] `query_architecture` answers bounded graph questions
+- [x] Band C `get_node` / `raw_graph_query` are bounded and read-only
 - [ ] cold-start returns explicit `insufficient_history`, never silent-clean
 - [ ] All slices: build/test/typecheck clean, specs synced, each PR ≤400 lines or chained
 
