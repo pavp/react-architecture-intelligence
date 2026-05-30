@@ -38,19 +38,19 @@ export class SnapshotStore {
     this.insertStmt = db.prepare(
       `INSERT OR REPLACE INTO snapshot
          (commit_sha, fingerprint, rule_id, severity_raw, evidence_digest, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES (@sha, @fp, @rule, @sev, @digest, @ts)`,
     );
   }
 
   insert(row: SnapshotRow): void {
     const digest = digestEvidence(row.evidence);
-    this.insertStmt.run(
-      row.commitSha,
-      row.fingerprint,
-      row.ruleId,
-      row.severityRaw,
+    this.insertStmt.run({
+      sha: row.commitSha,
+      fp: row.fingerprint,
+      rule: row.ruleId,
+      sev: row.severityRaw,
       digest,
-      row.createdAt,
-    );
+      ts: row.createdAt,
+    });
   }
 }
