@@ -1,5 +1,12 @@
-import { expect, test } from "vitest";
+import { expect, test, describe } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { pass1 } from "./pass1.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+// packages/core/src/parse -> repo root is four levels up
+const FIX = join(__dirname, "../../../../fixtures");
 
 const SRC = `
 import { memo } from "react";
@@ -68,4 +75,33 @@ test("collects all nested composition markers", () => {
 export default W;`);
   const w = r.components.find((x) => x.name === "W")!;
   expect(w.compositionMarkers.sort()).toEqual(["forwardRef", "memo"]);
+});
+
+describe("KI-1 fix", () => {
+  test("SC-1: route handler GET is NOT admitted as a component", () => {
+    const source = readFileSync(join(FIX, "duplication/route-handlers/GET.ts"), "utf8");
+    const result = pass1("GET.ts", source);
+    expect(result.components.length).toBe(0);
+  });
+
+  test("SC-2: forwardRef component IS detected (regression guard)", () => {
+    const source = readFileSync(join(FIX, "truepositives/forwardref-components/Button.tsx"), "utf8");
+    const result = pass1("Button.tsx", source);
+    expect(result.components.length).toBe(1);
+    expect(result.components[0]!.name).toBe("Button");
+    expect(result.components[0]!.kind).toBe("forwardRef");
+  });
+
+  test("SC-3: memo component IS detected", () => {
+    const result = pass1("Badge.tsx", `const Badge = memo(() => <span className="badge">•</span>);`);
+    expect(result.components.length).toBe(1);
+    expect(result.components[0]!.kind).toBe("memo");
+  });
+
+  test("SC-4: plain JSX-returning function component IS detected", () => {
+    const result = pass1("Header.tsx", `export function Header({ title }: { title: string }) { return <header><h1>{title}</h1></header>; }`);
+    expect(result.components.length).toBe(1);
+    expect(result.components[0]!.name).toBe("Header");
+    expect(result.components[0]!.kind).toBe("fn");
+  });
 });

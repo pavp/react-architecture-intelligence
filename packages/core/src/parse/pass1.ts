@@ -29,6 +29,7 @@ export function pass1(file: string, source: string): Pass1Result {
     exportKind: ComponentNode["exportKind"],
   ) => {
     const facts = collectRenderFacts(node);
+    if (!facts.returnsJsx) return; // KI-1: capitalized non-component (no JSX) is not a component
     components.push({
       id: `${file}#${cid++}`,
       name,
@@ -155,13 +156,14 @@ function unwrapFn(node: any): any {
   return null;
 }
 
-interface RenderFacts { hooks: string[]; children: string[]; markers: string[]; conditionals: number; }
+interface RenderFacts { hooks: string[]; children: string[]; markers: string[]; conditionals: number; returnsJsx: boolean; }
 
 function collectRenderFacts(fnNode: any): RenderFacts {
   const hooks = new Set<string>();
   const children = new Set<string>();
   const markers = new Set<string>();
   let conditionals = 0;
+  let returnsJsx = false;
 
   const visit = (n: any) => {
     if (!n || typeof n !== "object") return;
@@ -175,6 +177,7 @@ function collectRenderFacts(fnNode: any): RenderFacts {
         }
         break;
       case "JSXOpeningElement": {
+        returnsJsx = true;
         const nm = jsxName(n.name);
         if (nm && COMPONENT_NAME.test(nm)) children.add(nm);
         break;
@@ -194,6 +197,7 @@ function collectRenderFacts(fnNode: any): RenderFacts {
     children: [...children].sort(),
     markers: [...markers].sort(),
     conditionals,
+    returnsJsx,
   };
 }
 

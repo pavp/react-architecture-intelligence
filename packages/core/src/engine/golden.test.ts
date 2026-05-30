@@ -44,6 +44,15 @@ test("GOLDEN identity: reformatting a component preserves its structural fingerp
   expect(layeredFingerprint(before).structural).toBe(layeredFingerprint(after).structural);
 });
 
+test("GOLDEN KI-1: route-handler corpus produces zero shared-extraction findings", () => {
+  const files = ["GET", "POST", "DELETE"].map((n) => ({
+    file: `app/api/${n}.ts`, source: read(`duplication/route-handlers/${n}.ts`),
+  }));
+  const { registry, findings, feedback } = setup();
+  const res = analyzeRepo({ files, registry, findings, feedback, config: DEFAULT_CONFIG, runId: "r", commitSha: "c", asOf: 0 });
+  expect(res.presented.length).toBe(0);
+});
+
 test("DETERMINISM REPLAY: identical inputs -> byte-identical presented findings (sans ids)", () => {
   const files = ["LoginButton", "SignupBtn", "CtaButton"].map((n) => ({
     file: `features/buttons/${n}.tsx`, source: read(`duplication/buttons/${n}.tsx`),
