@@ -2,7 +2,7 @@
 
 **Status**: Active (RFC 2119)  
 **Origin**: change `wire-deferred-mvp-gaps` (2026-05-30)  
-**Scope**: feedback reason surface in `explainFinding` and explicit `close_session` feedback closure.
+**Scope**: feedback reason surface in `explainFinding`, explicit `close_session` feedback closure, and analyzer diagnostic metadata in `analyze_repo`.
 
 ## Purpose
 
@@ -31,6 +31,37 @@ If no feedback events exist, or all feedback events have `reason === null`, `las
 - `lastReason` is a presentation field, not a finding field.
 - `lastReason` MUST NOT alter feedback verdicts or finding data.
 - JSON serialization may include the field through the existing response object.
+
+## `analyze_repo` Diagnostic Metadata Contract
+
+### Requirement: analyze_repo Diagnostic Summary
+
+`analyze_repo` MUST expose analyzer diagnostics from repository analysis as non-finding metadata. The response MUST include diagnostic counts and details sufficient to identify failed analyzer rules without leaking finding bodies.
+
+#### Scenario: Partial failure is reported without findings leakage
+
+- GIVEN repository analysis contains one analyzer diagnostic
+- WHEN `analyze_repo` returns
+- THEN the response MUST include diagnostic count and detail entries
+- AND diagnostic details MUST NOT include finding bodies or evidence payloads
+
+#### Scenario: Diagnostics are not feedback targets
+
+- GIVEN `analyze_repo` returns diagnostics
+- WHEN a client reviews returned items
+- THEN diagnostics MUST NOT be represented as findings
+- AND diagnostics MUST NOT become valid feedback targets for `close_session` or other feedback tools
+
+### Requirement: analyze_repo Diagnostic Integrity Boundary
+
+`analyze_repo` MUST preserve the existing integrity model: diagnostics are runtime metadata, not CODE-derived findings. Diagnostics MUST NOT create T3 findings, memory reducer inputs, overlay entries, or feedback records.
+
+#### Scenario: Diagnostics do not affect persistence or memory semantics
+
+- GIVEN one analyzer fails and another analyzer returns findings
+- WHEN `analyze_repo` completes
+- THEN successful findings MUST remain available through existing result semantics
+- AND diagnostics MUST remain separate from findings, memory, overlay, and feedback semantics
 
 ## Scenarios Covered
 
@@ -118,4 +149,4 @@ When `close_session` includes `decisions[]`, the system MUST record feedback onl
 
 - Implementation: `packages/core/src/mcp/tools.ts`
 - Tests: `packages/core/src/mcp/tools.test.ts`
-- Source changes: `wire-deferred-mvp-gaps`, `close-session-feedback`
+- Source changes: `wire-deferred-mvp-gaps`, `close-session-feedback`, `analyzer-fault-containment`
