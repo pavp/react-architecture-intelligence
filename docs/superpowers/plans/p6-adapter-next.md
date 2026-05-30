@@ -1,6 +1,6 @@
 # P6 — Next.js Adapter — Implementation Plan
 
-**Status:** Planned
+**Status:** In progress — Slice 1 complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-31
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §6, §7.2
@@ -92,24 +92,24 @@ Ship two analyzers first:
 
 Each slice is a reviewable work unit. If a slice approaches 400 changed lines, split it into a chained PR.
 
-### Slice 1 — Adapter package scaffold + detection
+### Slice 1 — Adapter package scaffold + detection ✅ DONE
 
 **Goal:** add `@rai/adapter-next` with pure detection and no core imports from adapter.
 
 **Tasks:**
 
-- [ ] Add `packages/adapter-next` package, TS config, tests, and package export.
-- [ ] Implement `detectNext(rootDir)` over `package.json`, `next.config.*`, `app/`, and `pages/` signals.
-- [ ] Return `{ adapterId: "next", rootDir, variant, signals }` or `null`.
-- [ ] Add tests for app-router, pages-router, mixed-router, and non-Next repo.
-- [ ] Add CI/test guard that `packages/core` contains no Next framework imports or path conventions.
+- [x] Add `packages/adapter-next` package, TS config, tests, and package export.
+- [x] Implement `detectNext(rootDir)` over `package.json`, `next.config.*`, `app/`, and `pages/` signals.
+- [x] Return `{ adapterId: "next", rootDir, variant, signals }` or `null`.
+- [x] Add tests for app-router, pages-router, mixed-router, and non-Next repo.
+- [x] Add CI/test guard that `packages/core` contains no Next framework imports or path conventions.
 
 **Exit criteria:**
 
-- [ ] Next variants are detected deterministically.
-- [ ] Non-Next repos return `null`.
-- [ ] Core remains free of Next-specific code.
-- [ ] build/test/typecheck clean.
+- [x] Next variants are detected deterministically.
+- [x] Non-Next repos return `null`.
+- [x] Core remains free of Next-specific code.
+- [x] build/test/typecheck clean.
 
 ---
 
