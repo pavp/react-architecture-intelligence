@@ -33,13 +33,13 @@ Chain strategy: stacked-to-main
 
 ## Phase 2: Safe Writers + Instructions
 
-- [ ] 2.1 RED: add `packages/cli/src/install/writers.test.ts` and `templates.test.ts` for JSON merge, TOML section replace, marker block update, broken JSON denial, no real home writes.
-- [ ] 2.2 GREEN: create `writers.ts` atomic temp/rename helpers and `templates.ts` bounded RAI routing block with use/not-use guidance.
+- [x] 2.1 RED: add `packages/cli/src/install/writers.test.ts` and `templates.test.ts` for JSON merge, TOML section replace, marker block update, broken JSON denial, no real home writes.
+- [x] 2.2 GREEN: create `writers.ts` atomic temp/rename helpers and `templates.ts` bounded RAI routing block with use/not-use guidance.
 
 ## Phase 3: `rai install` CLI Wiring
 
-- [ ] 3.1 RED: extend `packages/cli/src/cli.test.ts` for `install --dry-run`, `--yes`, `--no-instructions`, confirmation-required path, explicit platforms, temp `$HOME`/cwd.
-- [ ] 3.2 GREEN: modify `packages/cli/src/cli.ts` parser/routing/usage; review `packages/cli/package.json` bin metadata only if MCP command generation needs it.
+- [x] 3.1 RED: extend `packages/cli/src/cli.test.ts` for `install --dry-run`, `--yes`, `--no-instructions`, confirmation-required path, explicit platforms, temp `$HOME`/cwd.
+- [x] 3.2 GREEN: modify `packages/cli/src/cli.ts` parser/routing/usage; review `packages/cli/package.json` bin metadata only if MCP command generation needs it.
 
 ## Phase 4: `rai doctor`
 

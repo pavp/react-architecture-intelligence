@@ -3,16 +3,16 @@
 **Change**: p7-distribution-install  
 **Version**: N/A  
 **Mode**: Strict TDD  
-**Scope**: Chain part 1 only — install planner + platform detection + dry-run operation modeling
+**Scope**: Chain part 2 only — safe writers + instruction templates + `rai install` CLI wiring
 
 ### Completeness
 
 | Metric | Value |
 |--------|-------|
-| Scoped tasks total | 2 |
-| Scoped tasks complete | 2 |
+| Scoped tasks total | 4 |
+| Scoped tasks complete | 4 |
 | Scoped tasks incomplete | 0 |
-| Later-slice tasks | Out of scope for this verification |
+| Later-slice tasks | `rai doctor`, docs/status, archive remain out of scope |
 
 ### Build & Tests Execution
 
@@ -25,15 +25,16 @@ packages/adapter-next build: Done
 packages/cli build: Done
 ```
 
-**Tests**: ✅ 297 passed / ❌ 0 failed / ⚠️ 0 skipped
+**Tests**: ✅ 309 passed / ❌ 0 failed / ⚠️ 0 skipped
 
 ```text
 pnpm test
-Test Files 47 passed (47)
-Tests 297 passed (297)
-New focused coverage observed:
-- packages/cli/src/install/plan.test.ts (7 tests)
-- packages/cli/src/install/detect.test.ts (3 tests)
+Test Files 49 passed (49)
+Tests 309 passed (309)
+New part-2 coverage observed:
+- packages/cli/src/install/writers.test.ts (4 tests)
+- packages/cli/src/install/templates.test.ts (4 tests)
+- packages/cli/src/cli.test.ts (16 total tests, including 3 install CLI integration tests)
 ```
 
 **Typecheck**: ✅ Passed
@@ -65,11 +66,11 @@ git diff --check
 | Check | Result | Details |
 |-------|--------|---------|
 | TDD Evidence reported | ✅ | Found in `apply-progress.md` TDD Cycle Evidence table. |
-| All scoped tasks have tests | ✅ | 2/2 scoped tasks list `detect.test.ts` and `plan.test.ts`. |
-| RED confirmed (tests exist) | ✅ | 2/2 reported test files exist. Historical RED is documented in apply-progress. |
-| GREEN confirmed (tests pass) | ✅ | 10/10 new install tests passed in fresh `pnpm test`; full suite passed 297/297. |
-| Triangulation adequate | ✅ | 10 cases cover detection, empty fixtures, override parsing, no selection, unknown platform, dry-run operations, and project-root-not-`src`. |
-| Safety Net for modified files | ✅ | New install files only; `N/A (new)` is consistent for scoped files. |
+| All scoped tasks have tests | ✅ | 4/4 scoped part-2 tasks list test files. |
+| RED confirmed (tests exist) | ✅ | `writers.test.ts`, `templates.test.ts`, and `cli.test.ts` exist. Historical RED is documented in apply-progress. |
+| GREEN confirmed (tests pass) | ✅ | Fresh `pnpm test` passed 49 files / 309 tests. |
+| Triangulation adequate | ✅ | Writer/template/CLI tests cover JSON merge, marker block replace, TOML section replace, broken JSON, bounded platform templates, dry-run, confirmation-required, `--yes`, and `--no-instructions`. |
+| Safety Net for modified files | ✅ | Apply-progress reports focused safety net before CLI edits and focused green after wiring; fresh full suite passed. |
 
 **TDD Compliance**: 6/6 checks passed.
 
@@ -79,10 +80,10 @@ git diff --check
 
 | Layer | Tests | Files | Tools |
 |-------|-------|-------|-------|
-| Unit | 10 | 2 | Vitest |
-| Integration | 0 | 0 | Not used in this slice |
+| Unit | 8 part-2 writer/template tests | 2 | Vitest |
+| Integration | 3 install CLI tests | 1 | Vitest |
 | E2E | 0 | 0 | Not used in this slice |
-| **Total** | **10** | **2** | |
+| **Total** | **11 part-2 focused tests** | **3** | |
 
 ---
 
@@ -94,7 +95,7 @@ Coverage analysis skipped — no coverage tool detected.
 
 ### Assertion Quality
 
-**Assertion quality**: ✅ All assertions verify real behavior. No tautologies, type-only assertions, ghost loops, smoke-only assertions, or mock-heavy tests found in scoped install tests.
+**Assertion quality**: ✅ All assertions verify real behavior. No tautologies, type-only-only assertions, ghost loops, smoke-only assertions, or mock-heavy tests found in scoped part-2 tests.
 
 ---
 
@@ -108,51 +109,54 @@ Coverage analysis skipped — no coverage tool detected.
 | Requirement | Scenario | Test | Result |
 |-------------|----------|------|--------|
 | Install Platform Selection | Auto-detect supported platforms | `packages/cli/src/install/detect.test.ts > detects supported platform config targets from injected fixture directories`; `plan.test.ts > selects every detected supported platform when no override is provided` | ✅ COMPLIANT |
-| Install Platform Selection | Explicit platform override | `packages/cli/src/install/plan.test.ts > normalizes repeated and comma-separated platform override values`; `targets explicit platforms even when no platform is auto-detected` | ✅ COMPLIANT |
+| Install Platform Selection | Explicit platform override | `packages/cli/src/install/plan.test.ts > normalizes repeated and comma-separated platform override values`; `targets explicit platforms even when no platform is auto-detected`; `cli.test.ts > parseArgs routes install with platform and safety flags` | ✅ COMPLIANT |
 | Install Platform Selection | Selection failure | `packages/cli/src/install/plan.test.ts > fails with supported ids when nothing is detected or selected`; `fails before operations when an unknown platform is requested` | ✅ COMPLIANT |
-| Install Execution Modes | Dry run is read-only | `packages/cli/src/install/plan.test.ts > models dry-run MCP config and instruction operations without writing files` | ✅ COMPLIANT for scoped planner; writer execution out of scope |
-| Install Execution Modes | Confirmed write | N/A for chain part 1 | ➖ OUT OF SCOPE |
-| Install Execution Modes | Instructions skipped | N/A for chain part 1 | ➖ OUT OF SCOPE |
-| Safe Platform Writes | JSON merge preserves user config | N/A for chain part 1 | ➖ OUT OF SCOPE |
-| Safe Platform Writes | Marker-owned instruction update | N/A for chain part 1 | ➖ OUT OF SCOPE |
-| Safe Platform Writes | Unsafe write failure | N/A for chain part 1 | ➖ OUT OF SCOPE |
-| Generated MCP Command Contract | Project root target | `packages/cli/src/install/plan.test.ts > models dry-run MCP config and instruction operations without writing files` | ✅ COMPLIANT |
-| Bounded Agent Routing Instructions | Routing guidance is bounded | Operation plan includes instruction write operation; template content out of scope for chain part 1 | ⚠️ PARTIAL by slice boundary |
-| Doctor Health Checks | Healthy environment | N/A for chain part 1 | ➖ OUT OF SCOPE |
-| Doctor Health Checks | Degraded environment | N/A for chain part 1 | ➖ OUT OF SCOPE |
+| Install Execution Modes | Dry run is read-only | `packages/cli/src/cli.test.ts > run install --dry-run prints a read-only plan and writes nothing` | ✅ COMPLIANT |
+| Install Execution Modes | Confirmed write | `packages/cli/src/cli.test.ts > run install --yes applies MCP config and skips instructions when requested` | ✅ COMPLIANT |
+| Install Execution Modes | Instructions skipped | `packages/cli/src/cli.test.ts > run install --yes applies MCP config and skips instructions when requested` | ✅ COMPLIANT |
+| Safe Platform Writes | JSON merge preserves user config | `packages/cli/src/install/writers.test.ts > merges a RAI MCP JSON entry while preserving user config` | ✅ COMPLIANT |
+| Safe Platform Writes | Marker-owned instruction update | `packages/cli/src/install/writers.test.ts > replaces only the RAI marker-owned instruction block` | ✅ COMPLIANT |
+| Safe Platform Writes | Unsafe write failure | `packages/cli/src/install/writers.test.ts > fails on broken JSON before applying later operations` | ✅ COMPLIANT |
+| Generated MCP Command Contract | Project root target | `packages/cli/src/install/plan.test.ts > models dry-run MCP config and instruction operations without writing files`; `cli.test.ts > run install --yes applies MCP config and skips instructions when requested` | ✅ COMPLIANT |
+| Bounded Agent Routing Instructions | Routing guidance is bounded | `packages/cli/src/install/templates.test.ts > builds bounded routing guidance for opencode/claude-code/codex/copilot` | ✅ COMPLIANT |
+| Doctor Health Checks | Healthy environment | N/A for chain part 2 | ➖ OUT OF SCOPE |
+| Doctor Health Checks | Degraded environment | N/A for chain part 2 | ➖ OUT OF SCOPE |
 | Distribution Strategy Record | Strategy is visible to implementers | `proposal.md`, `design.md`, and `tasks.md` preserve TypeScript CLI near-term, prebuilt native bindings next, Go wrapper later, WASM deferred | ✅ COMPLIANT |
 
-**Compliance summary**: 6/6 scoped scenarios compliant. Later-slice scenarios intentionally not judged as failures.
+**Compliance summary**: 12/12 scoped scenarios compliant. `rai doctor` scenarios intentionally not judged for part 2.
 
 ### Correctness (Static Evidence)
 
 | Requirement | Status | Notes |
 |------------|--------|-------|
-| Pure planner only; no real writes | ✅ Implemented | Production install modules use `existsSync` detection and plan objects only; no production `writeFile`, `mkdir`, `rename`, or CLI wiring in scoped files. |
-| Supported platforms modeled | ✅ Implemented | `SUPPORTED_PLATFORM_IDS` contains `opencode`, `claude-code`, `codex`, `copilot`; platform adapters define MCP and instruction targets. |
-| Injected directories | ✅ Implemented | `BuildInstallPlanInput` / `InstallPlanningContext` require `projectRoot`, `homeDir`, and `configDir`; tests use temp fixtures. |
-| Explicit override | ✅ Implemented | `parsePlatformOverrides` handles repeated and comma-separated values; planner selects explicit targets even when detection is empty. |
-| Operation modeling | ✅ Implemented | Planner emits MCP config operations plus instruction operations, with operation modes and `dryRun` state. |
-| No install CLI / doctor | ✅ Preserved | No matches for `rai install` or `doctor` wiring in `packages/cli/src`; later tasks remain unchecked. |
+| JSON writer preserves existing config | ✅ Implemented | `mergeJsonMcpConfig` parses existing JSON, preserves unknown root keys and existing `mcp` entries, and replaces/adds only `mcp.rai`. |
+| Instruction writer uses markers | ✅ Implemented | `replaceMarkerBlock` replaces only content from `<!-- RAI:BEGIN -->` through `<!-- RAI:END -->`; outside content remains unchanged. |
+| TOML writer preserves unrelated sections | ✅ Implemented | `removeTomlSection` removes only `[mcp_servers.rai]`; rendered config appends updated RAI section. |
+| Safe write mechanics | ✅ Implemented | `atomicWrite` creates parent dir, writes temp file, then renames. Broken JSON stops before later operations in covered test. |
+| CLI flags | ✅ Implemented | `parseArgs` supports `--platform`, `--dry-run`, `--yes`, and `--no-instructions`. |
+| Confirmation gate | ✅ Implemented | `runInstallCommand` returns `confirmation-required` and exits non-zero before writes unless `--yes`; `--dry-run` exits zero without writes. |
+| No real home writes in tests | ✅ Observed | Confirmed write test uses explicit `--platform opencode` and temp cwd; default no-`--yes` path does not apply writes. |
+| `rai doctor` excluded | ✅ Preserved | No production `doctor` implementation found under `packages/cli/src`; tasks 4.1–4.2 remain incomplete by scope. |
 
 ### Coherence (Design)
 
 | Decision | Followed? | Notes |
 |----------|-----------|-------|
-| Plan-first installer | ✅ Yes | `buildInstallPlan` returns deterministic plan data without applying writes. |
-| Platform adapters | ✅ Yes | `platforms.ts` centralizes best-known targets and schema confidence. |
-| Safe writes later | ✅ Yes | Writer implementation omitted for PR1 boundary. |
-| Marker-owned instructions later | ✅ Yes | Planner models `replace-marker-block`; template/writer implementation deferred. |
-| TypeScript CLI near-term | ✅ Yes | New work stays under `packages/cli/src/install`. |
+| Plan-first installer | ✅ Yes | CLI builds plan first; `--dry-run` and confirmation-required paths do not apply operations. |
+| Safe writers | ✅ Yes | JSON/TOML/marker writers preserve unrelated content and use temp/rename write path. |
+| Marker-owned instructions | ✅ Yes | Template markers match design: `<!-- RAI:BEGIN -->` / `<!-- RAI:END -->`. |
+| Bounded routing | ✅ Yes | Template states when to use RAI and when not to use it. |
+| TypeScript CLI near-term | ✅ Yes | Work remains in `packages/cli`. |
+| `rai doctor` later slice | ✅ Yes | Not implemented in part 2. |
 
 ### Issues Found
 
 **CRITICAL**: None.  
-**WARNING**: None for chain part 1.  
-**SUGGESTION**: Add coverage tooling or a changed-file coverage command before larger writer/doctor slices, so strict TDD coverage can be quantified.
+**WARNING**: None.  
+**SUGGESTION**: Consider adding injected `homeDir` / `configDir` seams for `runInstallCommand` tests later. Current part-2 tests avoid real home writes, but default install detection still reads process home, which can make future test fixtures environment-sensitive.
 
 ### Verdict
 
 PASS
 
-Chain part 1 satisfies scoped spec/design/tasks with fresh runtime evidence and no code-modifying verification actions.
+Chain part 2 satisfies scoped spec/design/tasks with fresh runtime evidence. No blocking issues found; `rai doctor` remains correctly out of scope.
