@@ -20,7 +20,8 @@ them as active work.
 | P16 | Safe code proposals | Lets RAI propose patch previews for high-evidence mechanical refactors, with explicit apply, preflight hashes, verification, and rollback. |
 | P17 | Always-fresh analysis | Keeps findings current without manual `rai analyze`: watch mode, hooks, and incremental local analysis. |
 | P18 | Architecture reporting | Adds leadership/reporting views: sprint digest, architecture changelog, and onboarding reports. |
-| P19 | Advanced intelligence | Explores longer-term ideas: learned embeddings, consequence-aware prioritization, and cross-repo architectural memory. |
+| P19 | Go Runtime / Engine Parity | Evaluates migrating runtime/storage/intelligence pieces to Go only behind golden parity, so results stay identical before any engine replacement. |
+| P20 | Advanced intelligence | Explores longer-term ideas: learned embeddings, consequence-aware prioritization, and cross-repo architectural memory. |
 
 ## P7 scope notes — complete
 
@@ -81,3 +82,4 @@ Planned capabilities:
 - RAI should not auto-apply patches; apply must be explicit and verified.
 - RAI should derive team patterns from code/config/feedback, not generic best-practice vibes.
 - CI should report net-new findings, not punish old debt.
+- Go CLI changes distribution; Go engine changes truth. Do not migrate intelligence/storage modules to Go without golden parity for RepoGraph, spans, fingerprints, findings, DB rows, and MCP JSON.
