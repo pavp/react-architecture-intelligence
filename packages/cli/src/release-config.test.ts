@@ -32,7 +32,65 @@ test("release config defines dry-run archive and channel shape without publish",
     "lib/rai/runtime/",
     "lib/rai/native/<os>-<arch>/",
   ]);
-  expect(report.channels).toEqual(["github-release-disabled", "homebrew-dry-run", "scoop-dry-run", "install-script-dry-run"]);
+  expect(report.channels).toEqual([
+    "github-release-disabled",
+    "homebrew:pavp/homebrew-tap",
+    "scoop:pavp/scoop-bucket",
+    "install-script-dry-run",
+  ]);
+});
+
+test("release validation requires real channel repositories while keeping GitHub releases disabled", () => {
+  const root = tempRoot();
+  writeFileSync(join(root, ".goreleaser.yaml"), dryRunConfig());
+  writeFileSync(join(root, "docs", "release-maintainer-checklist.md"), completeChecklistDoc());
+  writeFileSync(join(root, "docs", "repository-workflow.md"), completeRepositoryWorkflowDoc());
+  writeFileSync(join(root, "scripts", "install-rai.sh"), installScript());
+
+  const report = validateReleaseDryRunConfig(root);
+
+  expect(report.status).toBe("fail");
+  expect(report.failures).toContain(".goreleaser.yaml missing Homebrew channel pavp/homebrew-tap");
+  expect(report.failures).toContain(".goreleaser.yaml missing Scoop channel pavp/scoop-bucket");
+  expect(report.failures).not.toContain(".goreleaser.yaml missing release:\n  disable: true");
+});
+
+test("release validation requires documented publish gates and exact secret names", () => {
+  const root = tempRoot();
+  writeFileSync(join(root, ".goreleaser.yaml"), realChannelConfig());
+  writeFileSync(join(root, "docs", "release-maintainer-checklist.md"), checklistDoc());
+  writeFileSync(join(root, "docs", "repository-workflow.md"), repositoryWorkflowDoc());
+  writeFileSync(join(root, "scripts", "install-rai.sh"), installScript());
+
+  const report = validateReleaseDryRunConfig(root);
+
+  expect(report.status).toBe("fail");
+  expect(report.failures).toContain("release maintainer checklist missing RAI_RELEASE_GITHUB_TOKEN");
+  expect(report.failures).toContain("release maintainer checklist missing RAI_HOMEBREW_TAP_TOKEN");
+  expect(report.failures).toContain("release maintainer checklist missing RAI_SCOOP_BUCKET_TOKEN");
+  expect(report.failures).toContain("release maintainer checklist missing Homebrew tap has default branch `main`");
+  expect(report.failures).toContain("release maintainer checklist missing Scoop bucket has default branch `main`");
+  expect(report.failures).toContain("release maintainer checklist missing support matrix darwin/linux/windows amd64/arm64");
+  expect(report.failures).toContain("repository workflow policy missing refs/tags/v* blocks deletion and non-fast-forward");
+  expect(report.failures).toContain("repository workflow policy missing publish workflow must fail closed without release secrets");
+});
+
+test("release validation allows only manually gated fail-closed release workflow", () => {
+  const root = tempRoot();
+  writeFileSync(join(root, ".goreleaser.yaml"), realChannelConfig());
+  writeFileSync(join(root, "docs", "release-maintainer-checklist.md"), completeChecklistDoc());
+  writeFileSync(join(root, "docs", "repository-workflow.md"), completeRepositoryWorkflowDoc());
+  writeFileSync(join(root, "scripts", "install-rai.sh"), installScript());
+  writeFileSync(join(root, ".github", "workflows", "release.yml"), unsafeReleaseWorkflow());
+
+  const report = validateReleaseDryRunConfig(root);
+
+  expect(report.status).toBe("fail");
+  expect(report.failures).toContain("release workflow must use workflow_dispatch only");
+  expect(report.failures).toContain("release workflow missing RELEASE_PUBLISH_CONFIRM gate");
+  expect(report.failures).toContain("release workflow missing required secret RAI_RELEASE_GITHUB_TOKEN");
+  expect(report.failures).toContain("release workflow missing required secret RAI_HOMEBREW_TAP_TOKEN");
+  expect(report.failures).toContain("release workflow missing required secret RAI_SCOOP_BUCKET_TOKEN");
 });
 
 test("release validation rejects real publish workflow shape", () => {
@@ -185,6 +243,12 @@ scoops:
 `;
 }
 
+function realChannelConfig(): string {
+  return dryRunConfig()
+    .replace('owner: "DRY_RUN_ONLY"\n      name: "homebrew-rai"', 'owner: "pavp"\n      name: "homebrew-tap"')
+    .replace('owner: "DRY_RUN_ONLY"\n      name: "scoop-rai"', 'owner: "pavp"\n      name: "scoop-bucket"');
+}
+
 function checklistDoc(): string {
   return "Homebrew tap\nScoop bucket\nGitHub token\nRelease tag\nDry-run only\n";
 }
@@ -205,6 +269,54 @@ explicit maintainer/user confirmation
 not executed in P8-S3a
 real publish remains disabled
 P8-S3b maintainer setup
+`;
+}
+
+function completeChecklistDoc(): string {
+  return `${checklistDoc()}
+Homebrew tap has default branch \`main\`
+Scoop bucket has default branch \`main\`
+P8-S3a repository workflow policy gates
+P8-S3b real publish activation gates
+main branch protection
+tag protection
+RAI_RELEASE_GITHUB_TOKEN
+RAI_HOMEBREW_TAP_TOKEN
+RAI_SCOOP_BUCKET_TOKEN
+support matrix darwin/linux/windows amd64/arm64
+rollback for GitHub Release assets, Homebrew formulae, and Scoop manifests
+`;
+}
+
+function completeRepositoryWorkflowDoc(): string {
+  return `${repositoryWorkflowDoc()}
+not executed in P8-S3c
+branch examples: feat/p8-release-policy, fix/release-check, docs/repository-workflow, chore/release-config, test/release-validator
+Conventional Commit commit messages
+Conventional Commit PR titles
+repository PR template
+Allowed/recommended scopes
+GoReleaser remains release artifact publisher
+manual vX.Y.Z tags are release authority
+semantic-release is not added in P8
+P8-S3c adds commitlint and PR-title workflow enforcement
+CI enforcement is preferred over local hooks
+no mandatory Husky or Lefthook setup is added
+refs/tags/v* blocks deletion and non-fast-forward
+publish workflow must fail closed without release secrets
+`;
+}
+
+function unsafeReleaseWorkflow(): string {
+  return `name: Release
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: goreleaser release --clean
 `;
 }
 

@@ -26,7 +26,12 @@ const archiveLayout = [
   "lib/rai/native/<os>-<arch>/",
 ];
 
-const channels = ["github-release-disabled", "homebrew-dry-run", "scoop-dry-run", "install-script-dry-run"];
+const channels = [
+  "github-release-disabled",
+  "homebrew:pavp/homebrew-tap",
+  "scoop:pavp/scoop-bucket",
+  "install-script-dry-run",
+];
 
 const requiredConfigSnippets = [
   "release:\n  disable: true",
@@ -39,10 +44,29 @@ const requiredConfigSnippets = [
   "lib/rai/native",
   "checksum:",
   "brews:",
+  'owner: "pavp"',
+  'name: "homebrew-tap"',
   "scoops:",
+  'name: "scoop-bucket"',
 ];
 
-const requiredChecklistSnippets = ["Homebrew tap", "Scoop bucket", "GitHub token", "Release tag", "Dry-run only"];
+const requiredChecklistSnippets = [
+  "Homebrew tap",
+  "Scoop bucket",
+  "GitHub token",
+  "Release tag",
+  "Dry-run only",
+];
+
+const requiredPublishChecklistSnippets = [
+  "Homebrew tap has default branch `main`",
+  "Scoop bucket has default branch `main`",
+  "RAI_RELEASE_GITHUB_TOKEN",
+  "RAI_HOMEBREW_TAP_TOKEN",
+  "RAI_SCOOP_BUCKET_TOKEN",
+  "support matrix darwin/linux/windows amd64/arm64",
+  "rollback for GitHub Release assets, Homebrew formulae, and Scoop manifests",
+];
 
 const requiredRepositoryWorkflowSnippets = [
   "main is the principal trunk/default branch target",
@@ -71,6 +95,8 @@ const requiredRepositoryWorkflowSnippets = [
   "P8-S3c adds commitlint and PR-title workflow enforcement",
   "CI enforcement is preferred over local hooks",
   "no mandatory Husky or Lefthook setup is added",
+  "refs/tags/v* blocks deletion and non-fast-forward",
+  "publish workflow must fail closed without release secrets",
 ];
 
 const requiredRepositoryChecklistSnippets = [
@@ -95,6 +121,13 @@ export function validateReleaseDryRunConfig(root: string): ReleaseDryRunReport {
     for (const snippet of requiredConfigSnippets) {
       if (!config.includes(snippet)) failures.push(`.goreleaser.yaml missing ${snippet}`);
     }
+    if (!config.includes('owner: "pavp"') || !config.includes('name: "homebrew-tap"')) {
+      failures.push(".goreleaser.yaml missing Homebrew channel pavp/homebrew-tap");
+    }
+    if (!config.includes('owner: "pavp"') || !config.includes('name: "scoop-bucket"')) {
+      failures.push(".goreleaser.yaml missing Scoop channel pavp/scoop-bucket");
+    }
+    if (config.includes("DRY_RUN_ONLY")) failures.push(".goreleaser.yaml still contains DRY_RUN_ONLY placeholders");
   }
 
   if (!existsSync(checklistPath)) {
@@ -105,6 +138,9 @@ export function validateReleaseDryRunConfig(root: string): ReleaseDryRunReport {
       if (!checklist.includes(snippet)) failures.push(`release maintainer checklist missing ${snippet}`);
     }
     for (const snippet of requiredRepositoryChecklistSnippets) {
+      if (!checklist.includes(snippet)) failures.push(`release maintainer checklist missing ${snippet}`);
+    }
+    for (const snippet of requiredPublishChecklistSnippets) {
       if (!checklist.includes(snippet)) failures.push(`release maintainer checklist missing ${snippet}`);
     }
   }
@@ -128,6 +164,12 @@ export function validateReleaseDryRunConfig(root: string): ReleaseDryRunReport {
   if (existsSync(workflowPath)) {
     const workflow = readFileSync(workflowPath, "utf8");
     if (/goreleaser\s+release(?!\s+--snapshot)/.test(workflow)) failures.push("release workflow must not run real goreleaser publish");
+    if (!workflow.includes("workflow_dispatch:")) failures.push("release workflow must use workflow_dispatch only");
+    if (/push:\s*\n\s*tags:/m.test(workflow)) failures.push("release workflow must not auto-run from pushed tags");
+    if (!workflow.includes("RELEASE_PUBLISH_CONFIRM")) failures.push("release workflow missing RELEASE_PUBLISH_CONFIRM gate");
+    for (const secret of ["RAI_RELEASE_GITHUB_TOKEN", "RAI_HOMEBREW_TAP_TOKEN", "RAI_SCOOP_BUCKET_TOKEN"]) {
+      if (!workflow.includes(`secrets.${secret}`)) failures.push(`release workflow missing required secret ${secret}`);
+    }
   }
 
   return {

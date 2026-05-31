@@ -1,0 +1,96 @@
+name: Release preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Manual vX.Y.Z or vX.Y.Z-rc.N tag to validate"
+        required: true
+        type: string
+      confirm:
+        description: "Type RELEASE_PUBLISH_CONFIRM to run gated preflight"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Gated release preflight
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirm }}
+      RAI_RELEASE_GITHUB_TOKEN: ${{ secrets.RAI_RELEASE_GITHUB_TOKEN }}
+      RAI_HOMEBREW_TAP_TOKEN: ${{ secrets.RAI_HOMEBREW_TAP_TOKEN }}
+      RAI_SCOOP_BUCKET_TOKEN: ${{ secrets.RAI_SCOOP_BUCKET_TOKEN }}
+
+    steps:
+      - name: Validate manual gate
+        run: |
+          set -euo pipefail
+          if [ "$RELEASE_CONFIRMATION" != "RELEASE_PUBLISH_CONFIRM" ]; then
+            echo "release preflight requires RELEASE_PUBLISH_CONFIRM" >&2
+            exit 1
+          fi
+          if ! printf '%s' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$'; then
+            echo "release tag must match vX.Y.Z or vX.Y.Z-rc.N" >&2
+            exit 1
+          fi
+          for name in RAI_RELEASE_GITHUB_TOKEN RAI_HOMEBREW_TAP_TOKEN RAI_SCOOP_BUCKET_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "missing required secret $name" >&2
+              exit 1
+            fi
+          done
+
+      - name: Checkout selected tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+
+      - name: Verify tag points to main history
+        run: |
+          set -euo pipefail
+          git fetch origin main --tags
+          git merge-base --is-ancestor HEAD origin/main
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate release gates
+        run: pnpm release:check
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Run tests
+        run: pnpm test && pnpm test:launcher
+
+      - name: Prepare portable assets
+        run: pnpm release:prepare
+
+      - name: Run GoReleaser snapshot without publishing
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --snapshot --clean --skip=publish

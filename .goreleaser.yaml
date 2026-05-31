@@ -1,8 +1,8 @@
 version: 2
 project_name: rai
 
-# P8-S2 is dry-run/local validation only. Real publishing stays disabled until
-# maintainer-owned GitHub release, Homebrew tap, Scoop bucket, and secrets exist.
+# P8-S3b uses real channel repository names for readiness validation, but GitHub
+# release publishing stays disabled until maintainer secrets and gates are ready.
 snapshot:
   version_template: "{{ .Tag }}-snapshot"
 
@@ -45,8 +45,8 @@ checksum:
 brews:
   - name: rai
     repository:
-      owner: "DRY_RUN_ONLY"
-      name: "homebrew-rai"
+      owner: "pavp"
+      name: "homebrew-tap"
     directory: Formula
     homepage: "https://github.com/pavp/react-architecture-intelligence"
     description: "React Architecture Intelligence launcher"
@@ -55,8 +55,8 @@ brews:
 scoops:
   - name: rai
     repository:
-      owner: "DRY_RUN_ONLY"
-      name: "scoop-rai"
+      owner: "pavp"
+      name: "scoop-bucket"
     homepage: "https://github.com/pavp/react-architecture-intelligence"
     description: "React Architecture Intelligence launcher"
     license: "MIT"

@@ -76,7 +76,18 @@ Commitlint dependencies are governance-only. semantic-release is not added in P8
 
 Branch renames, remote branch creation or deletion, default-branch changes, branch protection changes, tag creation, and publishing require explicit maintainer/user confirmation and are not executed in P8-S3c. This supersedes the P8-S3a statement that remote mutations were not executed in P8-S3a.
 
-real publish remains disabled until P8-S3b maintainer setup, protected `main`/tag rules, release channels, secrets, permissions, and support policy exist.
+real publish remains disabled until P8-S3b maintainer setup, protected `main`/tag rules, release channels, secrets, permissions, and support policy exist. Channel repos are initialized with README-only `main` branches; Formula/bucket manifests are pending first approved real release. The release tag ruleset for refs/tags/v* blocks deletion and non-fast-forward. The publish workflow must fail closed without release secrets, including `RAI_RELEASE_GITHUB_TOKEN`, `RAI_HOMEBREW_TAP_TOKEN`, and `RAI_SCOOP_BUCKET_TOKEN`.
+
+## Publish readiness policy
+
+P8-S3b validates real channel names but does not publish. Safe activation requires all of these gates:
+
+- `main` is the GitHub default branch and protected with required checks, one review, stale review dismissal, linear history, conversation resolution, and no force pushes/deletions.
+- `refs/tags/v*` is protected against deletion and non-fast-forward updates.
+- `pavp/homebrew-tap` has a README-only `main` default branch; first formula write waits for an approved real release.
+- `pavp/scoop-bucket` has a README-only `main` default branch; first manifest write waits for an approved real release.
+- Release secrets exist with exact names: `RAI_RELEASE_GITHUB_TOKEN`, `RAI_HOMEBREW_TAP_TOKEN`, and `RAI_SCOOP_BUCKET_TOKEN`.
+- Publish runs require manual maintainer confirmation and a manual `vX.Y.Z` or `vX.Y.Z-rc.N` tag. No auto-tagging, force-push, deletion, or `semantic-release` is allowed.
 
 ## Rollback
 
