@@ -1,6 +1,6 @@
 # RAI Roadmap
 
-This is the canonical roadmap after P10. Older roadmap notes in `docs/superpowers/`,
+This is the canonical roadmap after P11-S1. Older roadmap notes in `docs/superpowers/`,
 `docs/gaps.md`, and `docs/future-ideas.md` are historical inputs unless this file links
 them as active work.
 
@@ -12,7 +12,7 @@ them as active work.
 | P8 | Single-binary distribution | Complete: P8-S1 local Go launcher prototype, P8-S2 release shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, release activation, and first installable `v0.1.3` release. |
 | P9 | Explainability | Complete: deterministic human output, glossary for evidence terms, additive `explain_finding`, `rai explain <file>`, and README onboarding. |
 | P10 | React Pattern Intelligence Foundation | Complete: generic pattern fact extraction for imports, exports, calls, hooks, JSX structure, static members, file roles, and a React catalog scaffold outside core. |
-| P11 | React Pattern Analyzers + Pattern Drift | Detects concrete repo-derived patterns and divergences: compound components, container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
+| P11 | React Pattern Analyzers + Pattern Drift | In progress. P11-S1 complete: `react/compound-component-api-drift` analyzer in `@rai/adapter-react`. Remaining slices detect more repo-derived patterns and divergences: container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
 | P12 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
 | P13 | Calibration | Reduces noise per repo: `rai calibrate`, threshold suggestions from feedback, and no automatic config changes. |
 | P14 | Deeper graph | Expands structural intelligence: `passes` edges, prop drilling, import/call topology, and `exportKind` use in analyzers/codemods. |
@@ -84,6 +84,25 @@ Delivered capabilities:
 - Explainable syntax evidence that future analyzers can consume without emitting findings yet.
 
 Rule: P10 facts are syntax observations only. They must not infer React intent, pattern labels, root cause, or remediation.
+
+## P11 scope notes — in progress
+
+P11 turns P10 syntax facts into concrete React pattern detection and drift, one family per slice.
+
+Delivered in P11-S1:
+
+- `react/compound-component-api-drift` analyzer in `@rai/adapter-react`, detecting compound-component API divergence from grounded pattern-fact evidence.
+- Pure deterministic adapter-owned execution with stable fingerprints and no side effects.
+- CLI/MCP adapter composition through the same registry factory as the Next adapter, with no new MCP drift tool.
+- Distinct drift terminology: repo-local divergence for current source; historical wording only in existing `get_drift` snapshot results.
+- OpenSpec specs `react-pattern-analyzers`, `pattern-drift`, and `cli-adapter-loading`.
+
+Deferred to later P11 slices (specified/implemented by future approved changes, no findings yet):
+
+- provider/context, controlled/uncontrolled, forms, data fetching, design-system usage, overlays beyond compound primitives, container/presenter, and broad API conventions.
+- Optional non-blocking follow-ups: snapshot/`get_drift` parity coverage and `rai explain <file>` / file-ref parity coverage.
+
+Rule: P11 analyzers stay adapter-owned and grounded. They explain syntax-derived divergence; they must not assert intended API, semantic symbol resolution, root cause, or required remediation.
 
 ## Future-scope guardrails
 
