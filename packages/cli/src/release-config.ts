@@ -44,10 +44,47 @@ const requiredConfigSnippets = [
 
 const requiredChecklistSnippets = ["Homebrew tap", "Scoop bucket", "GitHub token", "Release tag", "Dry-run only"];
 
+const requiredRepositoryWorkflowSnippets = [
+  "main is the principal trunk/default branch target",
+  "feat/rai-mvp-p0-p3 is legacy integration to retire after P8",
+  "approved issue",
+  "exactly one type:* label",
+  "passing CI",
+  "reviewable diff",
+  "Conventional Commit squash merge",
+  "vX.Y.Z",
+  "vX.Y.Z-rc.N",
+  "published tags must not move",
+  "rollback uses a new patch or prerelease tag",
+  "explicit maintainer/user confirmation",
+  "not executed in P8-S3a",
+  "real publish remains disabled",
+  "P8-S3b maintainer setup",
+  "branch examples: feat/p8-release-policy, fix/release-check, docs/repository-workflow, chore/release-config, test/release-validator",
+  "Conventional Commit commit messages",
+  "Conventional Commit PR titles",
+  "repository PR template",
+  "Allowed/recommended scopes",
+  "GoReleaser remains release artifact publisher",
+  "manual vX.Y.Z tags are release authority",
+  "semantic-release is not added in P8",
+  "no new dependencies in P8-S3a",
+  "Future P8-S3c may add commitlint and PR-title workflow",
+  "CI enforcement is preferred over local hooks",
+];
+
+const requiredRepositoryChecklistSnippets = [
+  "P8-S3a repository workflow policy gates",
+  "P8-S3b real publish activation gates",
+  "main branch protection",
+  "tag protection",
+];
+
 export function validateReleaseDryRunConfig(root: string): ReleaseDryRunReport {
   const failures: string[] = [];
   const configPath = join(root, ".goreleaser.yaml");
   const checklistPath = join(root, "docs", "release-maintainer-checklist.md");
+  const repositoryWorkflowPath = join(root, "docs", "repository-workflow.md");
   const installScriptPath = join(root, "scripts", "install-rai.sh");
   const workflowPath = join(root, ".github", "workflows", "release.yml");
 
@@ -66,6 +103,18 @@ export function validateReleaseDryRunConfig(root: string): ReleaseDryRunReport {
     const checklist = readFileSync(checklistPath, "utf8");
     for (const snippet of requiredChecklistSnippets) {
       if (!checklist.includes(snippet)) failures.push(`release maintainer checklist missing ${snippet}`);
+    }
+    for (const snippet of requiredRepositoryChecklistSnippets) {
+      if (!checklist.includes(snippet)) failures.push(`release maintainer checklist missing ${snippet}`);
+    }
+  }
+
+  if (!existsSync(repositoryWorkflowPath)) {
+    failures.push("repository workflow policy missing");
+  } else {
+    const repositoryWorkflow = readFileSync(repositoryWorkflowPath, "utf8");
+    for (const snippet of requiredRepositoryWorkflowSnippets) {
+      if (!repositoryWorkflow.includes(snippet)) failures.push(`repository workflow policy missing ${snippet}`);
     }
   }
 

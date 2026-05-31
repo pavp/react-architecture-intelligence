@@ -7,10 +7,10 @@ This is the canonical project status after P7. Historical status in
 
 | Area | Status |
 |------|--------|
-| Branch | `feat/rai-mvp-p0-p3` |
+| Branch | `feat/rai-mvp-p0-p3` now legacy integration; `main` is target trunk/default branch after P8 policy migration. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P7 complete; P8-S1 local launcher prototype and P8-S2 release dry-run shape implemented |
-| Next phase | P8-S3 — publish gate after maintainer setup |
+| Product state | P0–P7 complete; P8-S1 local launcher prototype, P8-S2 release dry-run shape, and P8-S3a repository workflow/tag/naming policy implemented |
+| Next phase | P8-S3b — real publish activation after maintainer setup |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -80,7 +80,7 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: continue P8 with publish gates only after maintainer tap/bucket/secrets setup exists.
+Immediate next work: continue P8-S3b with real publish activation only after maintainer tap/bucket/secrets/protection setup exists.
 
 ## P8 single-binary distribution
 
@@ -92,8 +92,11 @@ P8-S1 adds a local Go launcher prototype without changing analyzer truth:
 - Archive mode validates `lib/rai/metadata.json` asset schema and platform before starting the TypeScript engine.
 - Local scripts: `pnpm build:launcher`, `pnpm test:launcher`, and `scripts/smoke-launcher.sh`.
 - P8-S2 adds dry-run release shape only: `.goreleaser.yaml`, `pnpm release:check`, `pnpm release:prepare`, `scripts/install-rai.sh`, and `docs/release-maintainer-checklist.md`.
+- P8-S3a adds `docs/repository-workflow.md` plus read-only release checks for `main` trunk/default branch target, retirement of legacy `feat/rai-mvp-p0-p3` after P8, branch naming, Conventional Commit commit/PR titles, PR template use, stable `vX.Y.Z` tags, optional `vX.Y.Z-rc.N` tags, immutable published tags, rollback through new patch/prerelease tags, and manual maintainer gates.
+- GoReleaser/manual `vX.Y.Z` tags remain release authority; `semantic-release`, new dependencies, commitlint, PR-title workflow, and local hooks remain deferred out of P8-S3a.
+- Future P8-S3c may add CI-preferred commitlint/PR-title enforcement after policy stabilizes.
 - GoReleaser publishing stays disabled with `release.disable: true`; Homebrew/Scoop use `DRY_RUN_ONLY` placeholders until maintainer setup exists.
-- Real publish gates remain deferred to P8-S3.
+- Real publish activation remains deferred to P8-S3b.
 
 ## Active guardrails
 

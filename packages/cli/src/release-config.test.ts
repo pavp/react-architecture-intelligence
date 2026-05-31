@@ -62,6 +62,79 @@ test("release validation requires maintainer setup docs", () => {
   expect(report.failures).toContain("release maintainer checklist missing Release tag");
 });
 
+test("release validation requires repository workflow policy doc", () => {
+  const root = tempRoot();
+  writeFileSync(join(root, ".goreleaser.yaml"), dryRunConfig());
+  writeFileSync(join(root, "docs", "release-maintainer-checklist.md"), checklistDoc());
+  writeFileSync(join(root, "scripts", "install-rai.sh"), installScript());
+
+  const report = validateReleaseDryRunConfig(root);
+
+  expect(report.status).toBe("fail");
+  expect(report.failures).toContain("repository workflow policy missing");
+});
+
+test("release validation requires main trunk and tag policy snippets", () => {
+  const root = tempRoot();
+  writeFileSync(join(root, ".goreleaser.yaml"), dryRunConfig());
+  writeFileSync(join(root, "docs", "release-maintainer-checklist.md"), checklistDoc());
+  writeFileSync(join(root, "docs", "repository-workflow.md"), "main\nRelease tags\n");
+  writeFileSync(join(root, "scripts", "install-rai.sh"), installScript());
+
+  const report = validateReleaseDryRunConfig(root);
+
+  expect(report.status).toBe("fail");
+  expect(report.failures).toContain("repository workflow policy missing main is the principal trunk/default branch target");
+  expect(report.failures).toContain("repository workflow policy missing feat/rai-mvp-p0-p3 is legacy integration to retire after P8");
+  expect(report.failures).toContain("repository workflow policy missing vX.Y.Z");
+  expect(report.failures).toContain("repository workflow policy missing vX.Y.Z-rc.N");
+  expect(report.failures).toContain("repository workflow policy missing published tags must not move");
+  expect(report.failures).toContain("repository workflow policy missing rollback uses a new patch or prerelease tag");
+});
+
+test("release validation requires checklist branch tag and publish gates", () => {
+  const root = tempRoot();
+  writeFileSync(join(root, ".goreleaser.yaml"), dryRunConfig());
+  writeFileSync(join(root, "docs", "release-maintainer-checklist.md"), checklistDoc());
+  writeFileSync(join(root, "docs", "repository-workflow.md"), repositoryWorkflowDoc());
+  writeFileSync(join(root, "scripts", "install-rai.sh"), installScript());
+
+  const report = validateReleaseDryRunConfig(root);
+
+  expect(report.status).toBe("fail");
+  expect(report.failures).toContain("release maintainer checklist missing P8-S3a repository workflow policy gates");
+  expect(report.failures).toContain("release maintainer checklist missing P8-S3b real publish activation gates");
+  expect(report.failures).toContain("release maintainer checklist missing main branch protection");
+  expect(report.failures).toContain("release maintainer checklist missing tag protection");
+});
+
+test("release validation requires naming policy and automation deferral snippets", () => {
+  const root = tempRoot();
+  writeFileSync(join(root, ".goreleaser.yaml"), dryRunConfig());
+  writeFileSync(join(root, "docs", "release-maintainer-checklist.md"), checklistDoc());
+  writeFileSync(join(root, "docs", "repository-workflow.md"), repositoryWorkflowDoc());
+  writeFileSync(join(root, "scripts", "install-rai.sh"), installScript());
+
+  const report = validateReleaseDryRunConfig(root);
+
+  expect(report.status).toBe("fail");
+  expect(report.failures).toContain(
+    "repository workflow policy missing branch examples: feat/p8-release-policy, fix/release-check, docs/repository-workflow, chore/release-config, test/release-validator",
+  );
+  expect(report.failures).toContain("repository workflow policy missing Conventional Commit commit messages");
+  expect(report.failures).toContain("repository workflow policy missing Conventional Commit PR titles");
+  expect(report.failures).toContain("repository workflow policy missing repository PR template");
+  expect(report.failures).toContain("repository workflow policy missing Allowed/recommended scopes");
+  expect(report.failures).toContain("repository workflow policy missing GoReleaser remains release artifact publisher");
+  expect(report.failures).toContain("repository workflow policy missing manual vX.Y.Z tags are release authority");
+  expect(report.failures).toContain("repository workflow policy missing semantic-release is not added in P8");
+  expect(report.failures).toContain("repository workflow policy missing no new dependencies in P8-S3a");
+  expect(report.failures).toContain(
+    "repository workflow policy missing Future P8-S3c may add commitlint and PR-title workflow",
+  );
+  expect(report.failures).toContain("repository workflow policy missing CI enforcement is preferred over local hooks");
+});
+
 function tempRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "rai-release-config-"));
   dirs.push(root);
@@ -116,6 +189,25 @@ function checklistDoc(): string {
   return "Homebrew tap\nScoop bucket\nGitHub token\nRelease tag\nDry-run only\n";
 }
 
+function repositoryWorkflowDoc(): string {
+  return `main is the principal trunk/default branch target
+feat/rai-mvp-p0-p3 is legacy integration to retire after P8
+approved issue
+exactly one type:* label
+passing CI
+reviewable diff
+Conventional Commit squash merge
+vX.Y.Z
+vX.Y.Z-rc.N
+published tags must not move
+rollback uses a new patch or prerelease tag
+explicit maintainer/user confirmation
+not executed in P8-S3a
+real publish remains disabled
+P8-S3b maintainer setup
+`;
+}
+
 function installScript(): string {
-  return "#!/usr/bin/env bash\nset -euo pipefail\necho 'dry-run only'\n";
+  return "#!/usr/bin/env bash\nset -euo pipefail\necho 'DRY_RUN_ONLY'\n";
 }

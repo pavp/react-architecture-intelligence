@@ -50,7 +50,9 @@ Chain strategy: stacked-to-main
 - [x] 4.1 RED first: add checks/docs tests for `.goreleaser.yaml` dry-run archive/checksum/Homebrew/Scoop/install-script shape; no real publish.
 - [x] 4.2 Add GoReleaser/Homebrew/Scoop/install-script dry-run config/docs only; document required repos, tokens, secrets, and unsupported real-publish state.
 
-## Phase 5: P8-S3 — Publish Gate
+## Phase 5: P8-S3 — Repository Workflow and Publish Gates
 
-- [ ] 5.1 RED first: add guard tests/checks that publish fails unless maintainer-created GitHub release, tap, bucket, permissions, and secrets exist.
-- [ ] 5.2 Enable real publish workflow only after maintainer setup exists; update docs/status/roadmap/OpenSpec with release support matrix and rollback notes.
+- [x] 5.1 P8-S3a extend guard tests/checks for `main` trunk/default policy, legacy branch retirement, branch naming, commit naming, PR title, PR template policy, GoReleaser/manual tag authority, no `semantic-release`, rollback policy, and maintainer-confirmed manual gates.
+- [x] 5.2 P8-S3a document policy: revise workflow docs, release maintainer checklist, status/roadmap/OpenSpec for naming policy and automation deferral without dependencies, branch/tag/remote mutation, secrets, or publish channels.
+- [ ] 5.3 P8-S3b RED first: add guard tests/checks that real publish fails unless maintainer-created GitHub release, tap, bucket, permissions, branch/tag protection, and secrets exist.
+- [ ] 5.4 P8-S3b enable real publish workflow only after maintainer setup exists; update docs/status/roadmap/OpenSpec with release support matrix and rollback notes.
