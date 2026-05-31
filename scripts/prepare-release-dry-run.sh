@@ -2,9 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DIST="$ROOT/dist/rai/lib/rai"
+DIST="$ROOT/build/release-assets/rai/lib/rai"
 PLATFORM="$(go env GOOS)/$(go env GOARCH)"
 
+rm -rf "$ROOT/build/release-assets/rai"
 mkdir -p \
   "$DIST/engine/packages/cli/dist" \
   "$DIST/runtime" \

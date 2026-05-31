@@ -30,13 +30,13 @@ archives:
       - goos: windows
         formats: [zip]
     files:
-      - src: dist/rai/lib/rai/metadata.json
+      - src: build/release-assets/rai/lib/rai/metadata.json
         dst: lib/rai/metadata.json
-      - src: dist/rai/lib/rai/engine/packages/cli/dist/index.js
+      - src: build/release-assets/rai/lib/rai/engine/packages/cli/dist/index.js
         dst: lib/rai/engine/packages/cli/dist/index.js
-      - src: dist/rai/lib/rai/runtime/README.md
+      - src: build/release-assets/rai/lib/rai/runtime/README.md
         dst: lib/rai/runtime/README.md
-      - src: dist/rai/lib/rai/native/README.md
+      - src: build/release-assets/rai/lib/rai/native/README.md
         dst: lib/rai/native/{{ .Os }}-{{ .Arch }}/README.md
 
 checksum:

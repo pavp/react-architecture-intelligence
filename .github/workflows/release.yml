@@ -113,9 +113,6 @@ jobs:
       - name: Run tests
         run: pnpm test && pnpm test:launcher
 
-      - name: Prepare portable assets
-        run: pnpm release:prepare
-
       - name: Run GoReleaser snapshot without publishing
         if: steps.release.outputs.publish != 'true'
         uses: goreleaser/goreleaser-action@v6

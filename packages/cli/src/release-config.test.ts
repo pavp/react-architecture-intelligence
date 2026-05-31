@@ -68,8 +68,7 @@ test("release validation rejects unsafe workflow gates before publish", () => {
   expect(report.failures).toContain("release workflow missing pnpm test && pnpm test:launcher gate");
   expect(report.failures).toContain("release workflow missing pnpm typecheck gate");
   expect(report.failures).toContain("release workflow missing pnpm build gate");
-  expect(report.failures).toContain("release workflow missing pnpm release:prepare gate");
-  expect(report.failures).toContain("release workflow missing GoReleaser publish step");
+    expect(report.failures).toContain("release workflow missing GoReleaser publish step");
   expect(report.failures).toContain("release workflow missing snapshot preflight skip publish step");
 });
 
@@ -164,13 +163,13 @@ builds:
 archives:
   - id: portable
     files:
-      - src: dist/rai/lib/rai/metadata.json
+      - src: build/release-assets/rai/lib/rai/metadata.json
         dst: lib/rai/metadata.json
-      - src: dist/rai/lib/rai/engine/packages/cli/dist/index.js
+      - src: build/release-assets/rai/lib/rai/engine/packages/cli/dist/index.js
         dst: lib/rai/engine/packages/cli/dist/index.js
-      - src: dist/rai/lib/rai/runtime/README.md
+      - src: build/release-assets/rai/lib/rai/runtime/README.md
         dst: lib/rai/runtime/README.md
-      - src: dist/rai/lib/rai/native/README.md
+      - src: build/release-assets/rai/lib/rai/native/README.md
         dst: lib/rai/native/{{ .Os }}-{{ .Arch }}/README.md
 checksum:
   name_template: "checksums.txt"
@@ -207,7 +206,6 @@ steps:
   - run: pnpm test && pnpm test:launcher
   - run: pnpm typecheck
   - run: pnpm build
-  - run: pnpm release:prepare
   - uses: goreleaser/goreleaser-action@v6
     with:
       args: release --snapshot --clean --skip=publish

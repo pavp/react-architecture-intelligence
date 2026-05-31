@@ -35,6 +35,7 @@ const channels = [
 
 const requiredConfigSnippets = [
   "pnpm release:prepare",
+  "build/release-assets/rai/lib/rai",
   "goos: [darwin, linux, windows]",
   "goarch: [amd64, arm64]",
   "lib/rai/metadata.json",
@@ -119,7 +120,9 @@ function validateWorkflow(root: string, failures: string[]): void {
   if (!workflow.includes("pnpm test && pnpm test:launcher")) failures.push("release workflow missing pnpm test && pnpm test:launcher gate");
   if (!workflow.includes("pnpm typecheck")) failures.push("release workflow missing pnpm typecheck gate");
   if (!workflow.includes("pnpm build")) failures.push("release workflow missing pnpm build gate");
-  if (!workflow.includes("pnpm release:prepare")) failures.push("release workflow missing pnpm release:prepare gate");
+  if (/name:\s*Prepare portable assets[\s\S]*?run:\s*pnpm release:prepare/.test(workflow)) {
+    failures.push("release workflow must not run pnpm release:prepare before GoReleaser clean");
+  }
   if (!workflow.includes("args: release --clean")) failures.push("release workflow missing GoReleaser publish step");
   if (!workflow.includes("args: release --snapshot --clean --skip=publish")) failures.push("release workflow missing snapshot preflight skip publish step");
   if (!/^\s*GITHUB_TOKEN:\s*\$\{\{ secrets\.RAI_RELEASE_GITHUB_TOKEN \}\}/m.test(workflow)) {
