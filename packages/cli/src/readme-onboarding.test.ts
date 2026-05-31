@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 
-test("README quick path covers install, first commands, finding limits, and glossary terms", () => {
+test("README quick path covers install, first commands, finding guardrails, and glossary terms", () => {
   const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
   const quickPath = section(readme, "## Quick path");
-  const limitations = section(readme, "## Current limitations");
+  const principles = section(readme, "## Core principles");
   const glossary = section(readme, "## Glossary");
 
   expectInOrder(quickPath, [
@@ -16,8 +16,8 @@ test("README quick path covers install, first commands, finding limits, and glos
   ]);
   expect(readme).toContain("## How to read findings");
   expect(readme).toContain("rai explain src/components/Button.tsx --json");
-  expect(limitations).toContain("does not infer owner intent, root cause, or safe remediation");
-  expect(limitations).toContain("human text is presentation-only");
+  expect(principles).toContain("RAI does not infer owner intent, root cause, or safest fix.");
+  expect(principles).toContain("Explanations stay honest");
   for (const term of ["cosine", "propOverlap", "hookOverlap", "groundingFields", "span", "diagnostic"]) {
     expect(glossary).toContain(`\`${term}\``);
   }
