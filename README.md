@@ -55,13 +55,13 @@ rai doctor .
 
 ### Agent setup
 
-Use install dry-run first so you can review MCP config writes:
+Use install dry-run first so you can review MCP config writes. OpenCode example:
 
 ```bash
 rai install . --platform opencode --dry-run
 ```
 
-Supported installer targets: `opencode`, `claude-code`, `codex`, and `copilot`.
+RAI is not OpenCode-only. Supported installer targets: `opencode`, `claude-code`, `codex`, and `copilot`.
 
 ## Example explain output
 
@@ -139,11 +139,3 @@ rai mcp [dir]                         # Serve MCP stdio tools
 - `rai explain <file>` matches primary spans and known nested evidence references; human text is presentation-only.
 - Release publishing is manual and maintainer-approved.
 - P10+ will expand React pattern intelligence beyond current analyzer signals.
-
-## Project status
-
-- Current release: `v0.1.3`
-- Current phase: P10 next — React Pattern Intelligence Foundation
-- Canonical status: [`docs/STATUS.md`](docs/STATUS.md)
-- Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md)
-- Release checklist: [`docs/release-maintainer-checklist.md`](docs/release-maintainer-checklist.md)
