@@ -1,6 +1,6 @@
 # RAI Roadmap
 
-This is the canonical roadmap after P6. Older roadmap notes in `docs/superpowers/`,
+This is the canonical roadmap after P7. Older roadmap notes in `docs/superpowers/`,
 `docs/gaps.md`, and `docs/future-ideas.md` are historical inputs unless this file links
 them as active work.
 
@@ -8,8 +8,8 @@ them as active work.
 
 | Phase | Name | What it adds |
 |-------|------|--------------|
-| P7 | Distribution + install | Makes RAI easy to adopt: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
-| P8 | Explainability | Makes RAI understandable: human output, glossary for evidence terms, improved `explain_finding`, and `rai explain <file>`. |
+| P7 | Distribution + install | Complete: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
+| P8 | Explainability | Next: human output, glossary for evidence terms, improved `explain_finding`, and `rai explain <file>`. |
 | P9 | React Pattern Intelligence Foundation | Builds the fact layer for broad React pattern detection: imports, exports, calls, hooks, JSX structure, static members, file roles, and a pattern catalog. |
 | P10 | React Pattern Analyzers + Pattern Drift | Detects concrete repo-derived patterns and divergences: compound components, container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
 | P11 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
@@ -21,11 +21,11 @@ them as active work.
 | P17 | Architecture reporting | Adds leadership/reporting views: sprint digest, architecture changelog, and onboarding reports. |
 | P18 | Advanced intelligence | Explores longer-term ideas: learned embeddings, consequence-aware prioritization, and cross-repo architectural memory. |
 
-## P7 scope notes
+## P7 scope notes — complete
 
 P7 is first because adoption friction blocks all later value.
 
-Planned capabilities:
+Delivered capabilities:
 
 - `rai install` defaults to auto-detecting supported platforms.
 - Initial supported platforms: `opencode`, `claude-code`, `codex`, `copilot`.
@@ -34,7 +34,7 @@ Planned capabilities:
 - Installer writes MCP config plus bounded RAI routing instructions.
 - Existing files are preserved; generated blocks use markers.
 - `rai doctor` checks native dependencies, SQLite/vector support, MCP config, paths, and build/runtime health.
-- Distribution decision compares prebuilt native bindings, Go CLI wrapper, and WASM SQLite.
+- Distribution decision keeps near-term TypeScript CLI, plans prebuilt native bindings next, defers Go wrapper, and defers WASM SQLite/vector until vector support is viable.
 
 ## P8 scope notes
 

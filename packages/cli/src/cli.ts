@@ -2,10 +2,11 @@ import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, 
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { loadInstalledAdapters } from "./adapters.js";
+import { formatDoctorReport, runDoctor } from "./doctor.js";
 import { buildInstallPlan } from "./install/plan.js";
 import { applyInstallPlan } from "./install/writers.js";
 
-export type Command = "analyze" | "mcp" | "backfill" | "install" | "help";
+export type Command = "analyze" | "mcp" | "backfill" | "install" | "doctor" | "help";
 export interface ParsedArgs {
   cmd: Command;
   dir: string;
@@ -16,6 +17,7 @@ export interface ParsedArgs {
   dryRun?: boolean | undefined;
   yes?: boolean | undefined;
   includeInstructions?: boolean | undefined;
+  json?: boolean | undefined;
 }
 
 /** Parse argv (already sliced past node + script). Pure. */
@@ -33,6 +35,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
       yes: argv.includes("--yes"),
       includeInstructions: !argv.includes("--no-instructions"),
     };
+  }
+  if (cmd === "doctor") {
+    const doctorDir = dir && !dir.startsWith("--") ? dir : ".";
+    return { cmd: "doctor", dir: doctorDir, json: argv.includes("--json") };
   }
   if (cmd === "backfill") {
     const backfillDir = dir && !dir.startsWith("--") ? dir : ".";
@@ -118,12 +124,13 @@ Usage:
   rai analyze [dir]   Analyze a repo; prints finding counts (default dir: .)
   rai backfill [dir] --from <sha> --to <sha> --db <path>
   rai install [dir] [--platform <id[,id]>] [--dry-run] [--yes] [--no-instructions]
+  rai doctor [dir] [--json]
   rai mcp [dir]       Serve the MCP stdio server over the repo (default dir: .)
 `;
 
 /** Run the CLI. Returns the process exit code; serves indefinitely for mcp. */
 export async function run(argv: string[]): Promise<number> {
-  const { cmd, dir, from, to, dbPath, platforms, dryRun, yes, includeInstructions } = parseArgs(argv);
+  const { cmd, dir, from, to, dbPath, platforms, dryRun, yes, includeInstructions, json } = parseArgs(argv);
   switch (cmd) {
     case "analyze": {
       const r = await runAnalyze(dir);
@@ -144,6 +151,12 @@ export async function run(argv: string[]): Promise<number> {
       const r = await runInstallCommand({ dir, ...(platforms ? { platforms } : {}), ...(dryRun !== undefined ? { dryRun } : {}), ...(yes !== undefined ? { yes } : {}), ...(includeInstructions !== undefined ? { includeInstructions } : {}) });
       process.stdout.write(JSON.stringify(r.payload, null, 2) + "\n");
       return r.code;
+    }
+    case "doctor": {
+      const projectRoot = isAbsolute(dir) ? dir : join(process.cwd(), dir);
+      const report = await runDoctor({ projectRoot, homeDir: homedir(), configDir: process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config") });
+      process.stdout.write(json ? `${JSON.stringify(report, null, 2)}\n` : formatDoctorReport(report));
+      return report.status === "fail" ? 1 : 0;
     }
     default:
       process.stderr.write(USAGE);

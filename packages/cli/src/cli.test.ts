@@ -48,6 +48,10 @@ test("parseArgs routes install with platform and safety flags", () => {
   });
 });
 
+test("parseArgs routes doctor with JSON output", () => {
+  expect(parseArgs(["doctor", "/repo", "--json"])).toEqual({ cmd: "doctor", dir: "/repo", json: true });
+});
+
 test("parseArgs returns help for no args", () => {
   expect(parseArgs([]).cmd).toBe("help");
 });
@@ -130,6 +134,36 @@ test("run install --yes applies MCP config and skips instructions when requested
   expect(existsSync(join(dir, "AGENTS.md"))).toBe(false);
 });
 
+test("run doctor --json exits zero for a healthy temp project", async () => {
+  const dir = doctorRepo();
+  const output = await captureStdout(() => run(["doctor", ".", "--json"]));
+
+  expect(output.code).toBe(0);
+  const report = JSON.parse(output.stdout) as { status: string; checks: Array<{ name: string; status: string }> };
+  expect(report.status).toBe("pass");
+  expect(report.checks).toEqual(expect.arrayContaining([expect.objectContaining({ name: "MCP config", status: "pass" })]));
+});
+
+test("run doctor prints stable text output", async () => {
+  doctorRepo();
+  const output = await captureStdout(() => run(["doctor"]));
+
+  expect(output.code).toBe(0);
+  expect(output.stdout).toContain("RAI doctor: pass");
+  expect(output.stdout).toContain("[pass] runtime / Node >=22");
+});
+
+test("run doctor exits non-zero for blocking config failures", async () => {
+  const dir = doctorRepo();
+  writeFileSync(join(dir, "opencode.json"), "{ broken");
+  const output = await captureStdout(() => run(["doctor", ".", "--json"]));
+
+  expect(output.code).toBe(1);
+  const report = JSON.parse(output.stdout) as { status: string; checks: Array<{ name: string; status: string }> };
+  expect(report.status).toBe("fail");
+  expect(report.checks).toEqual(expect.arrayContaining([expect.objectContaining({ name: "MCP config", status: "fail" })]));
+});
+
 test("runBackfillCommand analyzes historical commits into a persistent db", async () => {
   const dir = repo();
   const dbPath = ".git/rai.db";
@@ -186,6 +220,16 @@ function installRepo(): string {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "rai-cli-install-")));
   dirs.push(dir);
   writeFileSync(join(dir, "opencode.json"), "{}\n");
+  return dir;
+}
+
+function doctorRepo(): string {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "rai-cli-doctor-")));
+  dirs.push(dir);
+  mkdirSync(join(dir, "packages", "cli", "dist"), { recursive: true });
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "fixture" }));
+  writeFileSync(join(dir, "packages", "cli", "dist", "index.js"), "#!/usr/bin/env node\n");
+  writeFileSync(join(dir, "opencode.json"), JSON.stringify({ mcp: { rai: { command: "rai", args: ["mcp", dir] } } }));
   return dir;
 }
 

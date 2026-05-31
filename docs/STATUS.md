@@ -1,6 +1,6 @@
 # RAI Status
 
-This is the canonical project status after P6. Historical status in
+This is the canonical project status after P7. Historical status in
 `docs/superpowers/STATUS.md` remains useful for archaeology, but new sessions should start here.
 
 ## Current state
@@ -9,18 +9,18 @@ This is the canonical project status after P6. Historical status in
 |------|--------|
 | Branch | `feat/rai-mvp-p0-p3` |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P6 complete |
-| Next phase | P7 — Distribution + install |
+| Product state | P0–P7 complete |
+| Next phase | P8 — Explainability |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, `explain_finding`, `get_node`, drift/query/refactor tools active |
 
 ## Latest verified baseline
 
-Latest full verification after P6:
+Latest full verification after P7:
 
 ```bash
-pnpm test       # 45 files / 286 tests
+pnpm test       # 50 files / 316 tests
 pnpm typecheck
 pnpm build
 pnpm lint
@@ -41,6 +41,18 @@ Latest MCP compatibility fix:
 | P4 | Complete | Breadth + temporal: snapshots, drift, graph tools, backfill, lazy type resolver, more analyzers. |
 | P5 | Complete | Codemod proposal/apply safety pipeline, proof persistence, real git workspace adapter. |
 | P6 | Complete | Next adapter: detection, variant guard, enrichment, client-boundary-bloat, route-coupling, CLI adapter loading. |
+| P7 | Complete | Distribution + install: `rai install`, platform auto-detect, safe config/instruction writes, `rai doctor`, and near-term TypeScript CLI distribution decision. |
+
+## P7 distribution + install
+
+P7 adds adoption tooling without changing the `@rai/core` boundary:
+
+- `rai install` supports `opencode`, `claude-code`, `codex`, and `copilot` with auto-detect or `--platform` overrides.
+- Installer supports `--dry-run`, `--yes`, and `--no-instructions`; writes require explicit consent unless dry-run is used.
+- JSON MCP configs merge `mcp.rai` while preserving unknown keys; TOML replaces only `[mcp_servers.rai]`.
+- Instruction files use `<!-- RAI:BEGIN -->` / `<!-- RAI:END -->` marker ownership and preserve user content outside markers.
+- `rai doctor` reports runtime, project root, CLI build, native SQLite/vector readiness, MCP config validity, MCP server construction, and config write suitability.
+- Distribution decision: keep near-term CLI in TypeScript, plan prebuilt native bindings next, defer Go wrapper and WASM SQLite/vector to later distribution work.
 
 ## P6 real-project smoke
 
@@ -68,10 +80,7 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work:
-
-1. P7-S0 docs normalization is complete once this file and `docs/ROADMAP.md` are committed.
-2. P7-S1 should design distribution/install: native dependency strategy, `rai install`, and `rai doctor`.
+Immediate next work: start P8 explainability.
 
 ## Active guardrails
 

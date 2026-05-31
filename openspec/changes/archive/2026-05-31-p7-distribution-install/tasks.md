@@ -43,11 +43,11 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: `rai doctor`
 
-- [ ] 4.1 RED: add CLI doctor tests for pass/warn/fail JSON/text output, degraded native/config checks, non-zero blocking failures, temp runtime probes.
-- [ ] 4.2 GREEN: create `packages/cli/src/doctor.ts`; wire `rai doctor` checks for Node, CLI smoke, `better-sqlite3`, `sqlite-vec`, MCP construction, config parse, permissions.
+- [x] 4.1 RED: add CLI doctor tests for pass/warn/fail JSON/text output, degraded native/config checks, non-zero blocking failures, temp runtime probes.
+- [x] 4.2 GREEN: create `packages/cli/src/doctor.ts`; wire `rai doctor` checks for Node, CLI smoke, `better-sqlite3`, `sqlite-vec`, MCP construction, config parse, permissions.
 
 ## Phase 5: Docs, Archive, Verification
 
-- [ ] 5.1 Update `docs/STATUS.md` and `docs/ROADMAP.md` with P7 install/doctor progress and distribution decision.
-- [ ] 5.2 After verify, archive specs via SDD archive: merge `openspec/changes/p7-distribution-install/specs/distribution-install/spec.md` into canonical specs.
-- [ ] 5.3 Run `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm lint`, and `git diff --check`; fix failures before completion.
+- [x] 5.1 Update `docs/STATUS.md` and `docs/ROADMAP.md` with P7 install/doctor progress and distribution decision.
+- [x] 5.2 After verify, archive specs via SDD archive: merge `openspec/changes/p7-distribution-install/specs/distribution-install/spec.md` into canonical specs.
+- [x] 5.3 Run `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm lint`, and `git diff --check`; fix failures before completion.
