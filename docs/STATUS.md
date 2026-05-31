@@ -1,6 +1,6 @@
 # RAI Status
 
-This is the canonical project status after P10. Historical status in
+This is the canonical project status after P11-S1. Historical status in
 `docs/superpowers/STATUS.md` remains useful for archaeology, but new sessions should start here.
 
 ## Current state
@@ -9,8 +9,8 @@ This is the canonical project status after P10. Historical status in
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P10 complete; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P11 React Pattern Analyzers + Pattern Drift |
+| Product state | P0–P10 complete plus P11-S1; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P11-S2 React pattern analyzers (deferred pattern families) |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -57,6 +57,7 @@ Latest MCP compatibility fix:
 | P8 | Complete | Single-binary distribution: Go launcher prototype, release shape/governance, safe publish gates, and first installable `v0.1.3` release. |
 | P9 | Complete | Explainability: deterministic explanation envelope, glossary, additive MCP `explain_finding`, `rai explain <file>`, and README onboarding. |
 | P10 | Complete | React Pattern Intelligence Foundation: generic syntax facts, React catalog scaffold outside core, compound primitive fixtures, and OpenSpec specs. |
+| P11-S1 | Complete | First React pattern analyzer slice: `react/compound-component-api-drift` in `@rai/adapter-react`, CLI/MCP adapter composition, drift terminology, and OpenSpec specs `react-pattern-analyzers`, `pattern-drift`, `cli-adapter-loading`. Remaining P11 pattern families deferred. |
 
 ## P7 distribution + install
 
@@ -95,7 +96,30 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: start P11 React Pattern Analyzers + Pattern Drift. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+Immediate next work: start P11-S2, the next React pattern analyzer family (for example provider/context or container/presenter). Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+
+## P11-S1 React Pattern Analyzers + Pattern Drift
+
+P11-S1 delivers the first concrete React pattern analyzer on top of P10 pattern facts, without changing the `@rai/core` boundary:
+
+- `@rai/adapter-react` now ships `react/compound-component-api-drift`, which detects compound-component API divergence from grounded `RepoGraph.patternFacts` syntax evidence.
+- The analyzer is pure and deterministic: it reads pattern facts, sorts/freezes evidence, uses stable SHA fingerprints, and performs no fs/network/memory/config/clock/random/LLM writes.
+- CLI/MCP composition loads the React adapter through the same registry factory as the Next adapter, so `analyze_repo`, findings, and diagnostics see the React finding without core framework coupling and without a new MCP drift tool.
+- Drift terminology stays distinct: current-source findings use repo-local divergence wording; historical change wording stays in existing `get_drift` snapshot results.
+- OpenSpec specs added/updated: `react-pattern-analyzers`, `pattern-drift`, and `cli-adapter-loading`.
+- Deferred to later P11 slices (no findings emitted yet): provider/context, controlled/uncontrolled, forms, data fetching, design-system usage, overlays beyond compound primitives, container/presenter, and broad API conventions.
+- Deferred PR3 follow-ups (optional, non-blocking): backfill/snapshot/`get_drift` parity test coverage and `rai explain <file>` / file-ref parity test coverage.
+
+Latest P11-S1 verification:
+
+```bash
+pnpm test       # 59 files / 365 tests
+pnpm test:launcher
+pnpm typecheck
+pnpm build
+pnpm lint
+git diff --check
+```
 
 ## P10 React Pattern Intelligence Foundation
 
