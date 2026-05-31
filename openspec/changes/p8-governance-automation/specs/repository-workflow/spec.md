@@ -1,31 +1,11 @@
-# Repository Workflow Specification
+# Delta for repository-workflow
 
-## Purpose
-
-Define policy for `main` trunk, naming, PR template, CI governance checks, release tags, rollback, and publish gates before real publishing.
-
-## Requirements
-
-### Requirement: Main Trunk Workflow
-
-The repository MUST use trunk-based workflow with `main` as trunk/default target. Future work SHOULD use short-lived work-unit branches merged/squash-merged to `main`. Legacy `feat/rai-mvp-p0-p3` SHALL retire after P8. GitFlow and long-lived `develop`, `release/*`, or `hotfix/*` branches MUST NOT be required.
-
-#### Scenario: Main is principal trunk
-
-- GIVEN guidance names repository trunk
-- WHEN contribution guidance names the merge target
-- THEN it SHALL identify `main` as trunk/default target
-- AND SHALL describe `feat/rai-mvp-p0-p3` as legacy integration to retire after P8
-
-#### Scenario: GitFlow branch proposal rejected
-
-- GIVEN proposed workflow requires long-lived support branches
-- WHEN policy compliance is reviewed
-- THEN the proposal MUST be rejected or deferred outside this change
+## MODIFIED Requirements
 
 ### Requirement: Naming Policy
 
 P8-S3c MUST document branch naming, commit naming, PR title, and PR template policy. Branches SHOULD use short-lived `feat/`, `fix/`, `docs/`, `chore/`, or `test/` prefixes plus kebab-case scope. Commit messages and PR titles MUST use Conventional Commit form and MUST be enforceable by CI checks. PR descriptions MUST preserve the repository template and fill issue, type, verification, and scope fields. Conventional Commit scopes SHOULD remain flexible and MUST NOT require a fixed package-scope list.
+(Previously: P8-S3a documented naming policy without CI-enforceable commit or PR-title checks.)
 
 #### Scenario: Naming policy is explicit
 
@@ -44,6 +24,7 @@ P8-S3c MUST document branch naming, commit naming, PR title, and PR template pol
 ### Requirement: PR and Chained Review Policy
 
 Changes MUST enter trunk through PRs that link approved issue, have exactly one `type:*` label, complete the repository PR template, pass CI, and use Conventional Commit squash merge. Oversized work MUST split into chained/stacked units unless maintainers approve `size:exception`. PR-title CI MUST run on `pull_request` events and validate the squash-title candidate before merge.
+(Previously: PR policy required Conventional Commit squash titles but not PR-title CI validation.)
 
 #### Scenario: PR meets gates
 
@@ -58,35 +39,12 @@ Changes MUST enter trunk through PRs that link approved issue, have exactly one 
 - THEN CI MUST fail the PR-title governance check
 - AND the PR MUST NOT be merge-ready
 
-### Requirement: Release Tag Policy
-
-Releases SHALL originate only from `main` commits. Stable tags MUST use `vX.Y.Z`; prerelease tags MAY use `vX.Y.Z-rc.N`. Published tags MUST NOT move. Rollback MUST use new patch/prerelease tag. GoReleaser/manual tag authority SHALL remain. P8-S3a MUST NOT add `semantic-release`, create real tags, or publish artifacts.
-
-#### Scenario: Valid tag source
-
-- GIVEN a tag follows `vX.Y.Z` or `vX.Y.Z-rc.N` and points at `main`
-- WHEN release readiness is reviewed
-- THEN the tag MAY proceed to maintainer release gates
-
-#### Scenario: Invalid tag source
-
-- GIVEN a tag is unprotected, invalid, moved after publication, or not from `main`
-- WHEN release readiness is reviewed
-- THEN publishing MUST remain blocked
-
-### Requirement: Real Publish Gate
-
-Real publishing MUST remain disabled until P8-S3b maintainer setup provides channels, secrets, permissions, `main`/tag protection, explicit remote/default-branch confirmation, and checks. Dry-run validation MAY continue, but MUST NOT create public artifacts or package publications.
-
-#### Scenario: Real publish blocked without gates
-
-- GIVEN any required maintainer gate is missing
-- WHEN real publish is requested
-- THEN the system MUST reject request with documented missing prerequisites
-
 ### Requirement: Automation Deferral
 
 P8-S3c MUST replace automation deferral with CI-enforceable Conventional Commit validation for commit messages and PR titles. Local hooks MAY remain optional and MUST NOT be required for compliance. `semantic-release` MUST NOT be added in P8. Automated versioning, real publishing, and release artifact publication MUST remain out of scope.
+(Previously: P8-S3a deferred commitlint and PR-title workflow to future P8-S3c.)
+
+Implementation uses root `commitlint.config.cjs`, `@commitlint/cli`, `@commitlint/config-conventional`, package script `lint:pr-title`, and `.github/workflows/pr-title.yml`. The workflow writes the PR title to a temporary file and runs `pnpm commitlint --edit <file>`.
 
 #### Scenario: Commit messages are CI-enforced
 
@@ -112,6 +70,7 @@ P8-S3c MUST replace automation deferral with CI-enforceable Conventional Commit 
 ### Requirement: Remote Mutation and Rollback Scope
 
 P8-S3c MUST document remote/default-branch migration and retirement steps, but MUST NOT execute branch renames, remote changes, default-branch changes, protections, tags, or publishing without explicit confirmation. Rollback guidance MUST revert only docs, governance checks, dependency/config changes, and release checks.
+(Previously: P8-S3a rollback covered docs and release checks because governance automation was deferred.)
 
 #### Scenario: Remote mutation needs confirmation
 

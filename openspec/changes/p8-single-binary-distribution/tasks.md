@@ -54,5 +54,6 @@ Chain strategy: stacked-to-main
 
 - [x] 5.1 P8-S3a extend guard tests/checks for `main` trunk/default policy, legacy branch retirement, branch naming, commit naming, PR title, PR template policy, GoReleaser/manual tag authority, no `semantic-release`, rollback policy, and maintainer-confirmed manual gates.
 - [x] 5.2 P8-S3a document policy: revise workflow docs, release maintainer checklist, status/roadmap/OpenSpec for naming policy and automation deferral without dependencies, branch/tag/remote mutation, secrets, or publish channels.
+- [x] 5.2a P8-S3c add commitlint conventional defaults, PR-title CI, optional local title check, flexible scopes, docs/OpenSpec updates, and no semantic-release/real-publish/branch/tag/default mutation/mandatory hooks.
 - [ ] 5.3 P8-S3b RED first: add guard tests/checks that real publish fails unless maintainer-created GitHub release, tap, bucket, permissions, branch/tag protection, and secrets exist.
 - [ ] 5.4 P8-S3b enable real publish workflow only after maintainer setup exists; update docs/status/roadmap/OpenSpec with release support matrix and rollback notes.
