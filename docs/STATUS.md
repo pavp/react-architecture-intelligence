@@ -9,8 +9,8 @@ This is the canonical project status after P7. Historical status in
 |------|--------|
 | Branch | `feat/rai-mvp-p0-p3` |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P7 complete |
-| Next phase | P8 — Single-binary distribution |
+| Product state | P0–P7 complete; P8-S1 local launcher prototype implemented |
+| Next phase | P8-S2 — release dry-run shape |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -80,7 +80,18 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: start P8 single-binary distribution / Go CLI wrapper evaluation.
+Immediate next work: continue P8 with release dry-run shape; do not enable real publishing until maintainer tap/bucket/secrets setup exists.
+
+## P8 single-binary distribution
+
+P8-S1 adds a local Go launcher prototype without changing analyzer truth:
+
+- `cmd/rai` is the Go entrypoint; `internal/launcher` resolves dev/archive engine assets and delegates to `node packages/cli/dist/index.js`.
+- Delegated commands preserve argv, stdout/stderr passthrough, MCP stdout cleanliness, and child exit codes.
+- `rai version` is Go-owned and reports launcher/engine/runtime/platform metadata.
+- Archive mode validates `lib/rai/metadata.json` asset schema and platform before starting the TypeScript engine.
+- Local scripts: `pnpm build:launcher`, `pnpm test:launcher`, and `scripts/smoke-launcher.sh`.
+- GoReleaser/Homebrew/Scoop/install-script publishing remains deferred to later P8 slices.
 
 ## Active guardrails
 

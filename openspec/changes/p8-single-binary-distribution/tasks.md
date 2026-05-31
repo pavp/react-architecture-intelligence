@@ -10,11 +10,11 @@
 | Chained PRs recommended | Yes |
 | Suggested split | PR 1 P8-S1 local launcher → PR 2 P8-S2 dry-run release config/docs → PR 3 P8-S3 publish enablement only after maintainer setup |
 | Delivery strategy | auto-forecast |
-| Chain strategy | pending |
+| Chain strategy | stacked-to-main |
 
 Decision needed before apply: Yes
 Chained PRs recommended: Yes
-Chain strategy: pending
+Chain strategy: stacked-to-main
 400-line budget risk: High
 800-line budget risk: High for full P8; Low/Medium for S1 only
 
@@ -28,22 +28,22 @@ Chain strategy: pending
 
 ## Phase 1: P8-S1 RED — Launcher Contract Tests
 
-- [ ] 1.1 Create `go.mod`, `cmd/rai/main.go`, and `internal/launcher/*_test.go` with failing tests for `install`, `doctor`, `analyze`, `mcp` argv pass-through.
-- [ ] 1.2 Add failing tests proving child stdout/stderr passthrough, `mcp` stdout cleanliness, non-zero exit propagation, and launcher diagnostics only on stderr.
-- [ ] 1.3 Add failing tests for dev/archive engine path resolution and `dist/rai/metadata.json` missing/mismatch failures before child execution.
+- [x] 1.1 Create `go.mod`, `cmd/rai/main.go`, and `internal/launcher/*_test.go` with failing tests for `install`, `doctor`, `analyze`, `mcp` argv pass-through.
+- [x] 1.2 Add failing tests proving child stdout/stderr passthrough, `mcp` stdout cleanliness, non-zero exit propagation, and launcher diagnostics only on stderr.
+- [x] 1.3 Add failing tests for dev/archive engine path resolution and `dist/rai/metadata.json` missing/mismatch failures before child execution.
 
 ## Phase 2: P8-S1 GREEN — Local Prototype
 
-- [ ] 2.1 Implement `cmd/rai/main.go` and `internal/launcher` routing/path/metadata/process logic; do not parse or rewrite TS CLI output.
-- [ ] 2.2 Wire stdin/stdout/stderr, child exit codes, and `SIGINT`/`SIGTERM` forwarding for delegated commands.
-- [ ] 2.3 Add local metadata fixture/schema support under `dist/rai/metadata.json` or test fixture path without committing generated release assets.
+- [x] 2.1 Implement `cmd/rai/main.go` and `internal/launcher` routing/path/metadata/process logic; do not parse or rewrite TS CLI output.
+- [x] 2.2 Wire stdin/stdout/stderr, child exit codes, and `SIGINT`/`SIGTERM` forwarding for delegated commands.
+- [x] 2.3 Add local metadata fixture/schema support under `dist/rai/metadata.json` or test fixture path without committing generated release assets.
 
 ## Phase 3: P8-S1 Build, Smoke, Docs
 
-- [ ] 3.1 Add `package.json` scripts `build:launcher` and `test:launcher`; keep `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint` behavior intact.
-- [ ] 3.2 Create `scripts/smoke-launcher.sh` to build TS CLI + Go launcher and verify delegated startup, failure propagation, and `rai mcp` stdout cleanliness.
-- [ ] 3.3 Verify: `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm lint`, `go test ./...`, `go build ./cmd/rai`, `./scripts/smoke-launcher.sh`.
-- [ ] 3.4 Update `docs/STATUS.md`, `docs/ROADMAP.md`, and this OpenSpec change with S1 complete state and deferred release publishing.
+- [x] 3.1 Add `package.json` scripts `build:launcher` and `test:launcher`; keep `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint` behavior intact.
+- [x] 3.2 Create `scripts/smoke-launcher.sh` to build TS CLI + Go launcher and verify delegated startup, failure propagation, and `rai mcp` stdout cleanliness.
+- [x] 3.3 Verify: `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm lint`, `go test ./...`, `go build ./cmd/rai`, `./scripts/smoke-launcher.sh`.
+- [x] 3.4 Update `docs/STATUS.md`, `docs/ROADMAP.md`, and this OpenSpec change with S1 complete state and deferred release publishing.
 
 ## Phase 4: P8-S2 — Future Dry-Run Release Shape
 
