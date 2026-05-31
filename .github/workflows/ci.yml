@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - feat/rai-mvp-p0-p3
+      - main
 
 jobs:
   test:
