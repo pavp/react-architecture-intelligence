@@ -1,0 +1,68 @@
+# RAI Roadmap
+
+This is the canonical roadmap after P6. Older roadmap notes in `docs/superpowers/`,
+`docs/gaps.md`, and `docs/future-ideas.md` are historical inputs unless this file links
+them as active work.
+
+## Current priority order
+
+| Phase | Name | What it adds |
+|-------|------|--------------|
+| P7 | Distribution + install | Makes RAI easy to adopt: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
+| P8 | Explainability | Makes RAI understandable: human output, glossary for evidence terms, improved `explain_finding`, and `rai explain <file>`. |
+| P9 | React Pattern Intelligence Foundation | Builds the fact layer for broad React pattern detection: imports, exports, calls, hooks, JSX structure, static members, file roles, and a pattern catalog. |
+| P10 | React Pattern Analyzers + Pattern Drift | Detects concrete repo-derived patterns and divergences: compound components, container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
+| P11 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
+| P12 | Calibration | Reduces noise per repo: `rai calibrate`, threshold suggestions from feedback, and no automatic config changes. |
+| P13 | Deeper graph | Expands structural intelligence: `passes` edges, prop drilling, import/call topology, and `exportKind` use in analyzers/codemods. |
+| P14 | Team memory | Shares decisions across developers: committable/importable T4/T5 feedback and “already decided” UX. |
+| P15 | Safe code proposals | Lets RAI propose patch previews for high-evidence mechanical refactors, with explicit apply, preflight hashes, verification, and rollback. |
+| P16 | Always-fresh analysis | Keeps findings current without manual `rai analyze`: watch mode, hooks, and incremental local analysis. |
+| P17 | Architecture reporting | Adds leadership/reporting views: sprint digest, architecture changelog, and onboarding reports. |
+| P18 | Advanced intelligence | Explores longer-term ideas: learned embeddings, consequence-aware prioritization, and cross-repo architectural memory. |
+
+## P7 scope notes
+
+P7 is first because adoption friction blocks all later value.
+
+Planned capabilities:
+
+- `rai install` defaults to auto-detecting supported platforms.
+- Initial supported platforms: `opencode`, `claude-code`, `codex`, `copilot`.
+- `--platform` overrides auto-detect.
+- `--dry-run`, `--yes`, and `--no-instructions` control safety and output.
+- Installer writes MCP config plus bounded RAI routing instructions.
+- Existing files are preserved; generated blocks use markers.
+- `rai doctor` checks native dependencies, SQLite/vector support, MCP config, paths, and build/runtime health.
+- Distribution decision compares prebuilt native bindings, Go CLI wrapper, and WASM SQLite.
+
+## P8 scope notes
+
+P8 makes RAI outputs usable by developers who are not familiar with internal terms.
+
+Planned capabilities:
+
+- Human output mode alongside JSON.
+- Glossary for `cosine`, `propOverlap`, `hookOverlap`, `sharedSurface`, `groundingFields`, `span`, and `diagnostic`.
+- Grounded summaries that explain what RAI found, why it matters, what to inspect first, and what not to assume.
+- `rai explain <file>` for memory/finding inspection without an agent session.
+
+Rule: core facts stay structured; UX explains facts without inventing intent.
+
+## P9 scope notes
+
+P9 is foundation only. It does not try to detect every pattern in one slice.
+
+Planned capabilities:
+
+- Pattern fact extraction for imports, exports, calls, JSX children, hook usage, static members, and file roles.
+- Pattern catalog design for known React patterns and repo-derived patterns.
+- Fixtures for examples such as Modal/Popover compound UI primitives.
+- Explainable evidence that future analyzers can consume.
+
+## Future-scope guardrails
+
+- RAI can propose patches only when evidence is structural and transformation is mechanical.
+- RAI should not auto-apply patches; apply must be explicit and verified.
+- RAI should derive team patterns from code/config/feedback, not generic best-practice vibes.
+- CI should report net-new findings, not punish old debt.

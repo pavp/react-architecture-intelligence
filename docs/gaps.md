@@ -1,5 +1,10 @@
 # RAI — Known Gaps & Missing Documentation
 
+> Legacy audit note: this file records gaps found during earlier iterations. The
+> canonical post-P6 roadmap now lives in [`docs/ROADMAP.md`](./ROADMAP.md), and
+> current project status lives in [`docs/STATUS.md`](./STATUS.md). Update this
+> file only when preserving or closing legacy audit items.
+
 > Compiled from architectural review on 2026-05-30. Gaps are organized by layer: code-level stubs, missing plans, and unresolved conceptual issues.
 
 ---

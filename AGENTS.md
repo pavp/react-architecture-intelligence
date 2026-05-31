@@ -5,8 +5,9 @@ OpenCode should use `CLAUDE.md` as the canonical repo handoff. This file exists 
 ## Read First
 
 1. Read `CLAUDE.md`.
-2. Read `docs/superpowers/STATUS.md` for current state.
-3. Read `docs/gaps.md` before choosing next roadmap work.
+2. Read `docs/STATUS.md` for current state.
+3. Read `docs/ROADMAP.md` before choosing next roadmap work.
+4. Treat `docs/superpowers/`, `docs/gaps.md`, and `docs/future-ideas.md` as legacy/historical inputs unless the canonical docs link to them.
 
 ## Local Rules
 
@@ -26,10 +27,4 @@ Known unrelated local files may exist:
 
 ## Next Recommended Work
 
-Create the formal P4 plan:
-
-```text
-docs/superpowers/plans/p4-breadth-temporal.md
-```
-
-After that, implement `snapshot` population + `get_drift` as the first P4 delivery slice.
+Start P7 — Distribution + install. First slice should design native dependency strategy, `rai install`, platform auto-detect, and `rai doctor`.

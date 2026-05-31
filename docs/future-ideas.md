@@ -1,5 +1,11 @@
 # RAI — Future Ideas & Implementation Directions
 
+> Legacy ideas note: this file is an idea bank from earlier iterations, not the
+> active roadmap. The canonical post-P6 roadmap now lives in
+> [`docs/ROADMAP.md`](./ROADMAP.md), and current project status lives in
+> [`docs/STATUS.md`](./STATUS.md). Promote ideas into `docs/ROADMAP.md` before
+> planning implementation.
+
 > Observations and directions that emerged from architectural review. Not commitments — ideas worth evaluating before planning each phase.
 
 ---

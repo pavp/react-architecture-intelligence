@@ -10,15 +10,18 @@ Use this file as the starting context for Claude Code sessions in this repo.
 | GitHub repo | `https://github.com/pavp/react-architecture-intelligence` |
 | CI | `.github/workflows/ci.yml` runs `pnpm build`, `pnpm test`, `pnpm typecheck` |
 | PR template | `.github/PULL_REQUEST_TEMPLATE.md` |
-| MVP | P0-P3 complete |
-| Latest completed slice | C4a / first P4 analyzer slice: render coupling + over-abstraction |
+| Product state | P0-P6 complete |
+| Current roadmap | `docs/ROADMAP.md` |
+| Current status | `docs/STATUS.md` |
+| Next phase | P7 — Distribution + install |
 
-Recent baseline on `feat/rai-mvp-p0-p3`:
+Recent verified baseline on `feat/rai-mvp-p0-p3`:
 
 ```bash
-pnpm build
-pnpm test       # 142 tests expected
+pnpm test       # 45 files / 286 tests expected after P6
 pnpm typecheck
+pnpm build
+pnpm lint
 ```
 
 ## Working Rules
@@ -51,19 +54,20 @@ Known unrelated local files may exist in the user's worktree:
 
 ## Completed Work To Trust
 
-- `wire-deferred-mvp-gaps`: boundary config to `architectural-conflict`, severity clamp, `lastReason`.
-- `close-session-feedback`: `close_session` prompts explicit human decisions; no inferred T4 writes.
-- `analyzer-fault-containment`: thrown analyzer errors become stable diagnostics; later analyzers still run.
-- `more-analyzers-render-overabstraction`: `react/render-coupling` and `react/over-abstraction` analyzers, default registry, MCP wiring, specs archived.
-- GitHub repo + CI + PR template are active.
-- Roadmap docs are current after PR #10.
+- P0-P3 MVP: parse, fingerprint, memory, core analyzers, MCP.
+- P4 breadth + temporal: snapshots, drift, graph tools, backfill, lazy type resolver, more analyzers.
+- P5 codemod apply: proposal/apply safety pipeline, proof persistence, git workspace adapter.
+- P6 Next adapter: detection, variant guard, enrichment, client-boundary-bloat, route-coupling, CLI adapter loading.
+- MCP OpenCode compatibility fix: `get_node.byteRange` uses object schema at MCP boundary.
 
 ## Important Files
 
 | File | Purpose |
 |------|---------|
-| `docs/superpowers/STATUS.md` | Current status and resume guide |
-| `docs/gaps.md` | Known gaps and recommended resolution order |
+| `docs/STATUS.md` | Canonical current status and resume guide |
+| `docs/ROADMAP.md` | Canonical post-P6 roadmap |
+| `docs/gaps.md` | Legacy audit of gaps; not canonical roadmap |
+| `docs/future-ideas.md` | Legacy idea bank; promote ideas to ROADMAP before implementation |
 | `docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md` | Full design spec |
 | `openspec/specs/architecture-analysis.md` | Active analyzer/domain behavior spec |
 | `openspec/specs/analysis-pipeline.md` | Active analyzer execution/diagnostic spec |
@@ -74,28 +78,14 @@ Known unrelated local files may exist in the user's worktree:
 
 ## Recommended Next Step
 
-Create formal P4 plan:
+Start P7 — Distribution + install.
 
-```text
-docs/superpowers/plans/p4-breadth-temporal.md
-```
+First slice should design:
 
-Plan should cover remaining P4 work in reviewable slices:
-
-1. Drift cold-start decision: no-backfill vs backfill CLI vs graceful no-history response.
-2. Snapshot population on analysis runs.
-3. `get_drift` MCP tool over persisted snapshots.
-4. `query_architecture` MCP tool for bounded graph questions.
-5. Lazy ts-morph Pass-2 for `typeOf()` as a separate slice.
-6. Remaining analyzer scope decisions: hook topology, boundary violation / convention analyzer.
-
-Recommended first implementation after plan:
-
-```text
-snapshot population + get_drift
-```
-
-Reason: schema/fingerprint groundwork already exists, and temporal value is core P4 scope.
+1. Native dependency strategy: prebuilt bindings vs Go CLI wrapper vs WASM SQLite.
+2. `rai install` with auto-detect for `opencode`, `claude-code`, `codex`, and `copilot`.
+3. Safe MCP config + agent instruction writes with markers.
+4. `rai doctor` for environment, MCP, and runtime checks.
 
 ## GitHub Workflow
 
