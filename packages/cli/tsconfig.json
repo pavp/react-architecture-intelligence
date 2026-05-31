@@ -4,7 +4,8 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "paths": {
-      "@rai/adapter-next": ["../adapter-next/dist/index.d.ts"]
+      "@rai/adapter-next": ["../adapter-next/dist/index.d.ts"],
+      "@rai/adapter-react": ["../adapter-react/dist/index.d.ts"]
     }
   },
   "include": ["src/**/*.ts"],
