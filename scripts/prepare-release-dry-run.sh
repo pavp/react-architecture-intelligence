@@ -9,7 +9,7 @@ rm -rf "$ROOT/build/release-assets/rai"
 mkdir -p \
   "$DIST/engine/packages/cli/dist" \
   "$DIST/runtime" \
-  "$DIST/native/$(go env GOOS)-$(go env GOARCH)"
+  "$DIST/native"
 
 pnpm build
 
@@ -31,6 +31,6 @@ cat >"$DIST/runtime/README.md" <<'MD'
 Runtime placeholder for P8-S2 dry-run archives. Current launcher uses system Node.
 MD
 
-cat >"$DIST/native/$(go env GOOS)-$(go env GOARCH)/README.md" <<'MD'
+cat >"$DIST/native/README.md" <<'MD'
 Native asset placeholder for P8-S2 dry-run archives. Real native support matrix gates P8-S3.
 MD
