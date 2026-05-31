@@ -9,7 +9,7 @@ them as active work.
 | Phase | Name | What it adds |
 |-------|------|--------------|
 | P7 | Distribution + install | Complete: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
-| P8 | Single-binary distribution | In progress: P8-S1 local Go launcher prototype implemented; next is dry-run release shape. |
+| P8 | Single-binary distribution | In progress: P8-S1 local Go launcher prototype and P8-S2 dry-run release shape implemented; next is publish gate after maintainer setup. |
 | P9 | Explainability | Human output, glossary for evidence terms, improved `explain_finding`, and `rai explain <file>`. |
 | P10 | React Pattern Intelligence Foundation | Builds the fact layer for broad React pattern detection: imports, exports, calls, hooks, JSX structure, static members, file roles, and a pattern catalog. |
 | P11 | React Pattern Analyzers + Pattern Drift | Detects concrete repo-derived patterns and divergences: compound components, container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
@@ -48,9 +48,10 @@ Planned capabilities:
 - Define boundary between Go CLI, TypeScript engine, and MCP stdio server. Current boundary keeps the TypeScript engine as source of truth and reserves launcher diagnostics for stderr.
 - Prototype command pass-through for `install`, `doctor`, `analyze`, and `mcp`. Current launcher preserves argv, stdout/stderr passthrough, and child exit codes.
 - Compare packaging options: embedded Node/runtime, sidecar Node server, or subprocess to installed JS engine.
+- Define dry-run release shape with disabled publish, portable archive layout, validation script, install-script placeholder, and maintainer checklist.
 - Decide production path and limitations before replacing current TypeScript CLI distribution.
 
-Next P8 slice: add GoReleaser/Homebrew/Scoop/install-script dry-run configuration and docs only. Real publishing stays blocked until maintainer-created repositories, tokens, permissions, and support policy exist.
+Next P8 slice: add publish gates only after maintainer-created repositories, tokens, permissions, and support policy exist. Real publishing remains blocked.
 
 Rule: Go may wrap distribution, but RAI facts and analyzer behavior stay governed by the existing engine contracts unless a future design changes them.
 

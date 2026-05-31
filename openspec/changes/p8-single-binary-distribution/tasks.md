@@ -47,8 +47,8 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: P8-S2 — Future Dry-Run Release Shape
 
-- [ ] 4.1 RED first: add checks/docs tests for `.goreleaser.yaml` dry-run archive/checksum/Homebrew/Scoop/install-script shape; no real publish.
-- [ ] 4.2 Add GoReleaser/Homebrew/Scoop/install-script dry-run config/docs only; document required repos, tokens, secrets, and unsupported real-publish state.
+- [x] 4.1 RED first: add checks/docs tests for `.goreleaser.yaml` dry-run archive/checksum/Homebrew/Scoop/install-script shape; no real publish.
+- [x] 4.2 Add GoReleaser/Homebrew/Scoop/install-script dry-run config/docs only; document required repos, tokens, secrets, and unsupported real-publish state.
 
 ## Phase 5: P8-S3 — Publish Gate
 

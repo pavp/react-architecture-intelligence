@@ -1,0 +1,62 @@
+version: 2
+project_name: rai
+
+# P8-S2 is dry-run/local validation only. Real publishing stays disabled until
+# maintainer-owned GitHub release, Homebrew tap, Scoop bucket, and secrets exist.
+snapshot:
+  version_template: "{{ .Tag }}-snapshot"
+
+release:
+  disable: true
+
+before:
+  hooks:
+    - pnpm release:prepare
+
+builds:
+  - id: rai
+    main: ./cmd/rai
+    binary: rai
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: portable
+    builds: [rai]
+    name_template: "rai_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - src: dist/rai/lib/rai/metadata.json
+        dst: lib/rai/metadata.json
+      - src: dist/rai/lib/rai/engine/packages/cli/dist/index.js
+        dst: lib/rai/engine/packages/cli/dist/index.js
+      - src: dist/rai/lib/rai/runtime/README.md
+        dst: lib/rai/runtime/README.md
+      - src: dist/rai/lib/rai/native/README.md
+        dst: lib/rai/native/{{ .Os }}-{{ .Arch }}/README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+brews:
+  - name: rai
+    repository:
+      owner: "DRY_RUN_ONLY"
+      name: "homebrew-rai"
+    directory: Formula
+    homepage: "https://github.com/pavp/react-architecture-intelligence"
+    description: "React Architecture Intelligence launcher"
+    license: "MIT"
+
+scoops:
+  - name: rai
+    repository:
+      owner: "DRY_RUN_ONLY"
+      name: "scoop-rai"
+    homepage: "https://github.com/pavp/react-architecture-intelligence"
+    description: "React Architecture Intelligence launcher"
+    license: "MIT"

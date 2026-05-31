@@ -52,9 +52,9 @@ type ResolveInput struct {
 }
 
 type EngineResolution struct {
-	Mode       string          `json:"mode"`
-	EnginePath string          `json:"enginePath"`
-	Metadata   *AssetMetadata  `json:"metadata,omitempty"`
+	Mode       string         `json:"mode"`
+	EnginePath string         `json:"enginePath"`
+	Metadata   *AssetMetadata `json:"metadata,omitempty"`
 }
 
 type AssetMetadata struct {
