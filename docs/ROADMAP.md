@@ -9,17 +9,18 @@ them as active work.
 | Phase | Name | What it adds |
 |-------|------|--------------|
 | P7 | Distribution + install | Complete: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
-| P8 | Explainability | Next: human output, glossary for evidence terms, improved `explain_finding`, and `rai explain <file>`. |
-| P9 | React Pattern Intelligence Foundation | Builds the fact layer for broad React pattern detection: imports, exports, calls, hooks, JSX structure, static members, file roles, and a pattern catalog. |
-| P10 | React Pattern Analyzers + Pattern Drift | Detects concrete repo-derived patterns and divergences: compound components, container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
-| P11 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
-| P12 | Calibration | Reduces noise per repo: `rai calibrate`, threshold suggestions from feedback, and no automatic config changes. |
-| P13 | Deeper graph | Expands structural intelligence: `passes` edges, prop drilling, import/call topology, and `exportKind` use in analyzers/codemods. |
-| P14 | Team memory | Shares decisions across developers: committable/importable T4/T5 feedback and “already decided” UX. |
-| P15 | Safe code proposals | Lets RAI propose patch previews for high-evidence mechanical refactors, with explicit apply, preflight hashes, verification, and rollback. |
-| P16 | Always-fresh analysis | Keeps findings current without manual `rai analyze`: watch mode, hooks, and incremental local analysis. |
-| P17 | Architecture reporting | Adds leadership/reporting views: sprint digest, architecture changelog, and onboarding reports. |
-| P18 | Advanced intelligence | Explores longer-term ideas: learned embeddings, consequence-aware prioritization, and cross-repo architectural memory. |
+| P8 | Single-binary distribution | Next: evaluate and prototype a Go CLI wrapper so developers can install RAI as a zero-runtime-dependency binary while preserving the TypeScript engine boundary. |
+| P9 | Explainability | Human output, glossary for evidence terms, improved `explain_finding`, and `rai explain <file>`. |
+| P10 | React Pattern Intelligence Foundation | Builds the fact layer for broad React pattern detection: imports, exports, calls, hooks, JSX structure, static members, file roles, and a pattern catalog. |
+| P11 | React Pattern Analyzers + Pattern Drift | Detects concrete repo-derived patterns and divergences: compound components, container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
+| P12 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
+| P13 | Calibration | Reduces noise per repo: `rai calibrate`, threshold suggestions from feedback, and no automatic config changes. |
+| P14 | Deeper graph | Expands structural intelligence: `passes` edges, prop drilling, import/call topology, and `exportKind` use in analyzers/codemods. |
+| P15 | Team memory | Shares decisions across developers: committable/importable T4/T5 feedback and “already decided” UX. |
+| P16 | Safe code proposals | Lets RAI propose patch previews for high-evidence mechanical refactors, with explicit apply, preflight hashes, verification, and rollback. |
+| P17 | Always-fresh analysis | Keeps findings current without manual `rai analyze`: watch mode, hooks, and incremental local analysis. |
+| P18 | Architecture reporting | Adds leadership/reporting views: sprint digest, architecture changelog, and onboarding reports. |
+| P19 | Advanced intelligence | Explores longer-term ideas: learned embeddings, consequence-aware prioritization, and cross-repo architectural memory. |
 
 ## P7 scope notes — complete
 
@@ -38,7 +39,21 @@ Delivered capabilities:
 
 ## P8 scope notes
 
-P8 makes RAI outputs usable by developers who are not familiar with internal terms.
+P8 targets the remaining distribution pain: using RAI without Node/native build friction.
+
+Planned capabilities:
+
+- Evaluate a Go CLI wrapper as the single-binary distribution path.
+- Define boundary between Go CLI, TypeScript engine, and MCP stdio server.
+- Prototype command pass-through for `install`, `doctor`, `analyze`, and `mcp`.
+- Compare packaging options: embedded Node/runtime, sidecar Node server, or subprocess to installed JS engine.
+- Decide production path and limitations before replacing current TypeScript CLI distribution.
+
+Rule: Go may wrap distribution, but RAI facts and analyzer behavior stay governed by the existing engine contracts unless a future design changes them.
+
+## P9 scope notes
+
+P9 makes RAI outputs usable by developers who are not familiar with internal terms.
 
 Planned capabilities:
 
@@ -49,9 +64,9 @@ Planned capabilities:
 
 Rule: core facts stay structured; UX explains facts without inventing intent.
 
-## P9 scope notes
+## P10 scope notes
 
-P9 is foundation only. It does not try to detect every pattern in one slice.
+P10 is foundation only. It does not try to detect every pattern in one slice.
 
 Planned capabilities:
 

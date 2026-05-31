@@ -10,7 +10,7 @@ This is the canonical project status after P7. Historical status in
 | Branch | `feat/rai-mvp-p0-p3` |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
 | Product state | P0–P7 complete |
-| Next phase | P8 — Explainability |
+| Next phase | P8 — Single-binary distribution |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -80,7 +80,7 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: start P8 explainability.
+Immediate next work: start P8 single-binary distribution / Go CLI wrapper evaluation.
 
 ## Active guardrails
 
