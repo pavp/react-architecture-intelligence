@@ -6,43 +6,44 @@ persistence:
   artifact_store: both
 
 context: |
-  TypeScript ESM/NodeNext pnpm workspace with packages/core and packages/cli.
+  TypeScript ESM/NodeNext pnpm workspace with packages/core, packages/cli, and packages/adapter-next.
   Runtime target is Node >=22; package manager is pnpm.
-  Core provides deterministic React architecture analysis, SQLite memory, and MCP tools.
-  CLI exposes `rai analyze` and `rai mcp` over @rai/core.
-  Tests use Vitest in node environment across packages/*/src/**/*.test.ts.
+  Core provides deterministic React architecture analysis, SQLite memory, codemod safety, and MCP tools.
+  CLI composes @rai/core with adapters and exposes install, doctor, analyze, mcp, and release checks.
+  Go launcher prototype lives under cmd/rai and delegates to the built TypeScript engine.
+  Tests use Vitest in node environment across packages/*/src/**/*.test.ts plus Go launcher tests.
   TypeScript strict mode is enabled with noUncheckedIndexedAccess and exactOptionalPropertyTypes.
-  No CI workflow, real linter, formatter, or coverage command is configured yet.
+  CI runs build, tests, typecheck, and lint guards on push/PR.
 
 strict_tdd: true
 
 testing:
-  detected: 2026-05-30
+  detected: 2026-05-31
   strict_tdd: true
   test_runner:
-    framework: Vitest
-    command: pnpm test
+    framework: Vitest + Go test
+    command: pnpm test && pnpm test:launcher
     config: vitest.config.ts
   layers:
     unit:
       available: true
-      tool: Vitest
+      tool: Vitest, Go testing
       evidence: packages/*/src/**/*.test.ts
     integration:
       available: true
-      tool: Vitest with in-memory/temporary SQLite, engine pipeline, MCP session tests, CLI tests
-      evidence: packages/core/src/engine/*.test.ts, packages/core/src/mcp/*.test.ts, packages/cli/src/cli.test.ts
+      tool: Vitest with in-memory/temporary SQLite, engine pipeline, MCP session tests, CLI/install/doctor tests, adapter tests
+      evidence: packages/core/src/engine/*.test.ts, packages/core/src/mcp/*.test.ts, packages/cli/src/*.test.ts, packages/adapter-next/src/*.test.ts
     e2e:
       available: true
-      tool: scripts/smoke.sh compiled CLI smoke test
-      evidence: scripts/smoke.sh
+      tool: smoke scripts for compiled CLI and launcher
+      evidence: scripts/smoke.sh, scripts/smoke-launcher.sh
   coverage:
     available: false
     command: ""
   quality:
     linter:
-      available: false
-      command: "pnpm lint (placeholder only: echo 'lint: TODO P4')"
+      available: true
+      command: pnpm lint
     type_checker:
       available: true
       command: pnpm typecheck
@@ -50,13 +51,13 @@ testing:
       available: false
       command: ""
   verified:
-    test: pnpm test -> 23 files, 101 tests passing
-    typecheck: pnpm typecheck -> packages/core and packages/cli clean
+    baseline: docs/STATUS.md records pnpm test -> 50 files / 316 tests, pnpm typecheck, pnpm build, pnpm lint, git diff --check
+    launcher: docs/STATUS.md records pnpm build:launcher, pnpm test:launcher, scripts/smoke-launcher.sh for P8-S1/P8-S2
 
 rules:
   proposal:
     - Include motivation, impact, rollback notes, and explicit non-goals for risky changes.
-    - Keep changes scoped to reviewable units; ask before chained PRs because chained_pr_strategy is ask-always.
+    - Keep changes scoped to reviewable units; auto-forecast chained PRs when review workload approaches the active budget.
   specs:
     - Use RFC 2119 keywords for requirements.
     - Use Given/When/Then for scenarios.
@@ -69,14 +70,14 @@ rules:
     - Include tests and docs/status updates with the code task when they belong to the same behavior.
   apply:
     tdd: true
-    test_command: pnpm test
+    test_command: pnpm test && pnpm test:launcher
     typecheck_command: pnpm typecheck
-    review_budget_lines: 400
+    review_budget_lines: 800
     rules:
       - Follow existing TypeScript ESM NodeNext imports with explicit .js extensions.
       - Preserve append-only findings/feedback semantics and deterministic pure logic.
   verify:
-    test_command: pnpm test
+    test_command: pnpm test && pnpm test:launcher
     build_command: pnpm build
     typecheck_command: pnpm typecheck
     smoke_command: ./scripts/smoke.sh --build
