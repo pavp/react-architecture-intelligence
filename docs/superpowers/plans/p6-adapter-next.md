@@ -1,6 +1,6 @@
 # P6 — Next.js Adapter — Implementation Plan
 
-**Status:** In progress — Slice 5 complete
+**Status:** Complete — Slice 6 complete
 **Branch base:** `feat/rai-mvp-p0-p3`
 **Created:** 2026-05-31
 **Design source:** [`docs/superpowers/specs/2026-05-29-react-architecture-intelligence-mcp-design.md`](../specs/2026-05-29-react-architecture-intelligence-mcp-design.md) §6, §7.2
@@ -192,30 +192,30 @@ Each slice is a reviewable work unit. If a slice approaches 400 changed lines, s
 
 ---
 
-### Slice 6 — CLI adapter loading + docs
+### Slice 6 — CLI adapter loading + docs ✅ DONE
 
 **Goal:** make CLI analysis load installed adapters without core knowing about them.
 
 **Tasks:**
 
-- [ ] Update CLI composition to detect and register `@rai/adapter-next` when present.
-- [ ] Preserve MCP tool contracts; adapter findings flow through existing `analyze_repo` result shape.
-- [ ] Update `docs/superpowers/STATUS.md`, `docs/gaps.md`, and relevant OpenSpec docs.
+- [x] Update CLI composition to detect and register `@rai/adapter-next` when present.
+- [x] Preserve MCP tool contracts; adapter findings flow through existing `analyze_repo` result shape.
+- [x] Update `docs/superpowers/STATUS.md`, `docs/gaps.md`, and relevant OpenSpec docs.
 
 **Exit criteria:**
 
-- [ ] `rai analyze` on a Next fixture returns Next analyzer counts/diagnostics.
-- [ ] `grep framework-name packages/core == 0` stays green.
-- [ ] build/test/typecheck clean; specs synced.
+- [x] `rai analyze` on a Next fixture returns Next analyzer counts/diagnostics.
+- [x] Core framework-free guard stays green.
+- [x] build/test/typecheck clean; specs synced.
 
 ---
 
 ## P6 overall exit criteria
 
-- [ ] `@rai/adapter-next` detects app-router, pages-router, mixed-router, and non-Next repos.
-- [ ] Variant mismatch diagnostic is loud, structured, and separate from findings.
-- [ ] Next analyzers fire on Next subtrees, not plain React.
-- [ ] Same shared component keeps the same structural fingerprint through plain React and Next lenses.
-- [ ] Adapters introduce no independent persistence.
-- [ ] `packages/core` contains no Next-specific imports, strings, path conventions, or branching.
-- [ ] build/test/typecheck clean; specs synced; each PR ≤400 lines or chained.
+- [x] `@rai/adapter-next` detects app-router, pages-router, mixed-router, and non-Next repos.
+- [x] Variant mismatch diagnostic is loud, structured, and separate from findings.
+- [x] Next analyzers fire on Next subtrees, not plain React.
+- [x] Same shared component keeps the same structural fingerprint through plain React and Next lenses.
+- [x] Adapters introduce no independent persistence.
+- [x] `packages/core` contains no Next-specific imports, strings, path conventions, or branching.
+- [x] build/test/typecheck clean; specs synced; each PR ≤400 lines or chained.

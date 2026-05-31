@@ -60,7 +60,7 @@ types: createTypeResolver({ files: input.files, graph, hooks: input.typeResolver
 
 ## 2. P4–P6 gaps — roadmap state
 
-The [docs/superpowers/STATUS.md](superpowers/STATUS.md) lists these under "Next steps". P4 and P5 now have executable plans; P6 still needs a phase plan.
+The [docs/superpowers/STATUS.md](superpowers/STATUS.md) lists these under "Next steps". P4, P5, and P6 have executable plans and completed delivery slices.
 
 ### 2.1 P4 — Breadth + temporal
 
@@ -91,18 +91,15 @@ Tasks that need to be formalized:
 - Append-only codemod proof artifacts (patch + verification output + rollback patch + originating fingerprint) — ✅ done
 - Type-safety of generated code when Pass-2 returns non-null types — planned, not implemented
 
-### 2.3 P6 — First framework adapter (Next.js)
+### 2.3 P6 — First framework adapter (Next.js) ✅ COMPLETE
 
-Missing plan file: `docs/superpowers/plans/p6-adapter-next.md`
+Plan file exists: `docs/superpowers/plans/p6-adapter-next.md`
 
-Tasks that need to be formalized:
-- `@rai/adapter-next` package scaffold
-- `detect()` — Next.js project detection (deps, config, conventions)
-- `enrich()` — RSC/client/route tags on frozen RepoGraph (additive, immutable input)
-- Variant guard: app-router vs pages-router (see §3.4 below)
-- 2–3 Next-specific analyzers: `client-boundary-bloat`, `server-action-in-loop`, `route-coupling`
-- CI lint: `grep framework-name packages/core == 0`
-- Adapter storage rule enforcement: adapters may not introduce independent persistence
+Completed tasks:
+- `@rai/adapter-next` package scaffold, Next detection, enrichment, and variant guard diagnostics.
+- `next/client-boundary-bloat` and `next/route-coupling` analyzer delivery.
+- CLI adapter loading for `rai analyze`, `rai backfill`, and `rai mcp` through a composition root outside `@rai/core`.
+- Core framework-free guard and adapter storage rule enforcement.
 
 ---
 
@@ -141,7 +138,7 @@ These are issues identified in the spec or through architectural review that hav
 
 **Problem (resolved in plan):** The spec (§6.5) states that app-router vs pages-router should be treated as different variants, and that a variant mismatch must fail loudly with a diagnostic event — never silently fall back.
 
-**Fix planned:** `docs/superpowers/plans/p6-adapter-next.md` defines `NextVariant = "app-router" | "pages-router" | "mixed-router"`, detection signals, explicit `mixed-router`, and `variant-mismatch` diagnostic shape. Implementation remains pending in P6.
+**Fix applied:** `docs/superpowers/plans/p6-adapter-next.md` defines `NextVariant = "app-router" | "pages-router" | "mixed-router"`, detection signals, explicit `mixed-router`, and `variant-mismatch` diagnostic shape. P6 implemented this through adapter-local diagnostics that remain separate from findings and persistence.
 
 ### 3.5 `reason` field in T4 is inert ✅ FIXED in wire-deferred-mvp-gaps
 
@@ -224,7 +221,7 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 | P0–P3 | [docs/superpowers/plans/2026-05-29-rai-mvp-p0-p3.md](superpowers/plans/2026-05-29-rai-mvp-p0-p3.md) | ✅ Exists, all 24 tasks complete |
 | P4 | [docs/superpowers/plans/p4-breadth-temporal.md](superpowers/plans/p4-breadth-temporal.md) | ✅ Complete; temporal + `query_architecture` + Band C + backfill complete |
 | P5 | [docs/superpowers/plans/p5-codemod-apply.md](superpowers/plans/p5-codemod-apply.md) | ✅ Exists; complete |
-| P6 | [docs/superpowers/plans/p6-adapter-next.md](superpowers/plans/p6-adapter-next.md) | ✅ Exists; planned |
+| P6 | [docs/superpowers/plans/p6-adapter-next.md](superpowers/plans/p6-adapter-next.md) | ✅ Complete |
 
 ---
 
@@ -248,7 +245,12 @@ P5's codemod pipeline doesn't account for this. A codemod generated for a `named
 16. ~~**Implement P5 Slice 5b2**~~ — ✅ complete: `apply_refactor` MCP tool over the existing pipeline.
 17. ~~**Implement P5 Slice 6**~~ — ✅ complete: append-only codemod proof artifacts.
 18. ~~**Resolve §3.4 (Next.js variant guard design)**~~ — ✅ complete in P6 plan.
-19. **Start P6 Slice 1** — adapter package scaffold + Next detection.
+19. ~~**Start P6 Slice 1**~~ — ✅ complete: adapter package scaffold + Next detection.
+20. ~~**Implement P6 Slice 2**~~ — ✅ complete: variant guard diagnostics.
+21. ~~**Implement P6 Slice 3**~~ — ✅ complete: Next enrichment over frozen graph.
+22. ~~**Implement P6 Slice 4**~~ — ✅ complete: `next/client-boundary-bloat`.
+23. ~~**Implement P6 Slice 5**~~ — ✅ complete: `next/route-coupling`.
+24. ~~**Implement P6 Slice 6**~~ — ✅ complete: CLI adapter loading + docs/status closure.
 
 ---
 

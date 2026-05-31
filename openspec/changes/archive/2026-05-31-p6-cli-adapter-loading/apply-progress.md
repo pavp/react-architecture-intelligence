@@ -8,8 +8,8 @@ Strict TDD — `pnpm test`.
 
 - Delivery: chained PR slice.
 - Chain strategy: stacked-to-main.
-- Current work unit: Part 2 / PR 2 — CLI adapter composition/parity.
-- Boundary: builds on Part 1 core analyzer result seam and adds Next adapter composition root for `rai analyze`, `rai backfill`, and `rai mcp`; docs/status finalization remains for Part 3.
+- Current work unit: Part 3 / PR 3 — docs/status/final task closure.
+- Boundary: builds on Part 1 core analyzer result seam and Part 2 Next adapter composition root; closes docs/status/OpenSpec state only, with no production behavior changes.
 
 ## Completed Tasks
 
@@ -29,6 +29,7 @@ Strict TDD — `pnpm test`.
 - [x] 3.4 Wire `packages/cli/src/cli.ts` so `analyze`, `backfill`, and `mcp` share adapter composition.
 - [x] 3.5 Update `packages/cli/package.json` and `packages/cli/tsconfig.json` adapter metadata/import resolution for NodeNext.
 - [x] 3.6 Add `fixtures/next/app-router-bloat/` minimal App Router fixture for adapter signals.
+- [x] 4.1 Update `docs/superpowers/STATUS.md`, `docs/gaps.md`, `docs/superpowers/plans/p6*.md` if present, and OpenSpec state/spec notes for Slice 6 delivery.
 - [x] 4.2 Run `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm lint`, and `git diff --check`; record outcomes in apply/verify notes.
 
 ## TDD Cycle Evidence
@@ -42,10 +43,11 @@ Strict TDD — `pnpm test`.
 | 3.1 / 3.2 | `packages/adapter-next/src/core-adapter.test.ts` | Integration | ✅ `pnpm --filter @rai/adapter-next test` → 21 passed | ✅ Added core-adapter tests before helper; RED failed missing module | ✅ `pnpm --filter @rai/adapter-next test src/core-adapter.test.ts` → 2 passed | ✅ 2 cases: Next fixture adds adapter findings; non-Next root returns no adapter findings/diagnostics | ✅ Helper returns no analyzers when detection is absent; targeted tests passed |
 | 1.2 / 1.3 / 1.5 / 3.4 / 3.6 | `packages/cli/src/cli.test.ts` | Integration | ✅ `pnpm --filter @rai/cli test src/cli.test.ts` → 8 passed | ✅ Added async CLI tests before composition wiring; RED showed baseline-only Next count and missing MCP helper | ✅ `pnpm --filter @rai/cli test src/adapters.test.ts src/cli.test.ts` → 16 passed | ✅ 4 cases: Next fixture analyze, plain React baseline, backfill parity, MCP parity | ✅ Shared `loadInstalledAdapters` across analyze/backfill/mcp; targeted tests passed |
 | 3.5 | `packages/cli/tsconfig.json`, `packages/cli/package.json` | Config | ✅ `pnpm typecheck` identified package resolution gap | ✅ Typecheck failed before metadata/path resolution | ✅ `pnpm typecheck` → core, adapter-next, cli clean | ➖ Structural config; one import target only | ✅ Built core + adapter declarations; final typecheck passed |
+| 4.1 | Docs/status files | Documentation | ✅ Previous Part 2 verification was green; docs-only changes inspected against current implementation state | ➖ Docs-only closure; no production behavior change or new behavior test required | ✅ Final verification commands pass after docs updates | ➖ Docs-only status sync; triangulation not applicable | ✅ STATUS/gaps/P6 plan/OpenSpec task state aligned with verified implementation |
 
 ## Test Summary
 
-- Total tests written: 17 cumulative (Part 1: 7, Part 2: 10).
+- Total tests written: 17 cumulative (Part 1: 7, Part 2: 10, Part 3: docs-only).
 - Total tests passing: 286 full suite.
 - Layers used: Unit and integration via Vitest.
 - Approval tests: None — additive composition and seam work.
@@ -68,10 +70,11 @@ Strict TDD — `pnpm test`.
 
 - Existing isolated pnpm layout did not create direct `node_modules/@rai/*` links at root or package level, so building package declarations before typecheck was needed for adapter import typing.
 - Existing unrelated dirty files remain untouched: `.gitignore`, `AGENTS.md`, `CLAUDE.md`, `.gga`, `.mcp.json`.
+- Part 3 changed docs/status artifacts only and made no production behavior changes.
 
 ## Remaining Tasks
 
-- [ ] 4.1 Update `docs/superpowers/STATUS.md`, `docs/gaps.md`, `docs/superpowers/plans/p6*.md` if present, and OpenSpec state/spec notes for Slice 6 delivery.
+- None — apply phase work is ready for full verify/archive. Do not archive in this part.
 
 ## Files Changed
 
@@ -100,5 +103,8 @@ Strict TDD — `pnpm test`.
 | `packages/cli/tsconfig.json` | Modified | Added adapter declaration path for package-local typecheck. |
 | `fixtures/next/app-router-bloat/` | Created | Added minimal App Router fixture with route coupling and client boundary signals. |
 | `pnpm-lock.yaml` | Modified | Recorded CLI adapter workspace dependency. |
-| `openspec/changes/p6-cli-adapter-loading/tasks.md` | Modified | Marked Part 2 tasks and verification complete. |
-| `openspec/changes/p6-cli-adapter-loading/apply-progress.md` | Modified | Merged Part 1 and Part 2 apply progress with TDD evidence. |
+| `docs/superpowers/STATUS.md` | Modified | Marked P6 Next adapter complete and updated verification counts. |
+| `docs/gaps.md` | Modified | Closed P6 roadmap gap and updated resolution order. |
+| `docs/superpowers/plans/p6-adapter-next.md` | Modified | Marked Slice 6 and P6 overall exit criteria complete. |
+| `openspec/changes/p6-cli-adapter-loading/tasks.md` | Modified | Marked Part 2 verification and Part 3 docs/status tasks complete. |
+| `openspec/changes/p6-cli-adapter-loading/apply-progress.md` | Modified | Merged Part 1, Part 2, and Part 3 apply progress with TDD evidence and verification. |

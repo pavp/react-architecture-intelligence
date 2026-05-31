@@ -52,5 +52,5 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Docs / OpenSpec / Verification
 
-- [ ] 4.1 Update `docs/superpowers/STATUS.md`, `docs/gaps.md`, `docs/superpowers/plans/p6*.md` if present, and OpenSpec state/spec notes for Slice 6 delivery.
+- [x] 4.1 Update `docs/superpowers/STATUS.md`, `docs/gaps.md`, `docs/superpowers/plans/p6*.md` if present, and OpenSpec state/spec notes for Slice 6 delivery.
 - [x] 4.2 Run `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm lint`, and `git diff --check`; record outcomes in apply/verify notes.

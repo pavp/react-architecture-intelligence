@@ -2,19 +2,20 @@
 
 **Last updated:** 2026-05-31
 **Branch:** `feat/rai-mvp-p0-p3` (not yet merged to `main`)
-**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Band C graph tools, backfill, Pass-2, hook topology, conventions, P5 codemod apply, and P6 Next client-boundary-bloat + route-coupling complete; CI/PR workflow active.**
+**State:** ✅ **P0–P3 MVP complete; P4 temporal, breadth, Band C graph tools, backfill, Pass-2, hook topology, conventions, P5 codemod apply, and P6 Next adapter complete; CI/PR workflow active.**
 
 ---
 
 ## TL;DR
 
-The MVP vertical slice is done, temporal drift is active, `rai backfill` can populate historical snapshots, `query_architecture` is available, Band C `get_node` / `raw_graph_query` are bounded read-only escape hatches, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, `apply_refactor` is gated through the verification pipeline, codemod proof artifacts are append-only, P6 Next client-boundary-bloat and route-coupling analyzers are exported from `@rai/adapter-next`, and GitHub PRs run CI.
+The MVP vertical slice is done, temporal drift is active, `rai backfill` can populate historical snapshots, `query_architecture` is available, Band C `get_node` / `raw_graph_query` are bounded read-only escape hatches, lazy Pass-2 is wired, hook topology is analyzed, convention violations are configurable, `propose_refactor` is proposal-only, `apply_refactor` is gated through the verification pipeline, codemod proof artifacts are append-only, P6 Next analyzers are exported from `@rai/adapter-next`, CLI adapter loading wires them into `rai analyze`, `rai backfill`, and `rai mcp`, and GitHub PRs run CI.
 
 ```
 typecheck:  0 errors (strict: noUncheckedIndexedAccess + exactOptionalPropertyTypes)
-tests:      270 passing / 42 files (Vitest)
+tests:      286 passing / 45 files (Vitest)
 build:      workspace packages compile; schema.sql copied to dist
 CLI smoke:  rai analyze fixtures/duplication/buttons → { opportunity: 1, warn: 1 }
+            rai analyze fixtures/next/app-router-bloat → includes next/* findings
             rai mcp fixtures/duplication/buttons    → stdio handshake + 4 tools listed
 github:     https://github.com/pavp/react-architecture-intelligence
 ci:         .github/workflows/ci.yml runs pnpm build/test/typecheck on PRs
@@ -43,7 +44,7 @@ append-only, and **a human rejection survives re-analysis and suppresses the fin
 | Engine | `core/src/engine/pipeline.ts` | `analyzeRepo`: graph→analyze→persist→overlay, with per-analyzer crash diagnostics |
 | Golden | `fixtures/`, `engine/golden.test.ts` | corpus + rebuild/determinism-replay |
 | MCP | `core/src/mcp/` | Band-A/B/C tools session + stdio server, including `get_drift`, `query_architecture`, `get_node`, and `raw_graph_query` |
-| CLI | `cli/src/{index,cli}.ts` | `rai analyze [dir]`, `rai backfill [dir] --from <sha> --to <sha> --db <path>`, `rai mcp [dir]`; reuses core `readSources` |
+| CLI | `cli/src/{index,cli}.ts`, `cli/src/adapters.ts` | `rai analyze [dir]`, `rai backfill [dir] --from <sha> --to <sha> --db <path>`, `rai mcp [dir]`; loads installed adapters outside core and reuses core `readSources` |
 
 ## Verified invariants (P3 exit criteria)
 - ✅ Findings/feedback are **append-only** (no UPDATE/DELETE on those tables anywhere)
@@ -57,7 +58,7 @@ append-only, and **a human rejection survives re-analysis and suppresses the fin
 
 ```bash
 pnpm install            # IMPORTANT: wires workspace symlinks (@rai/core ← cli) + builds better-sqlite3
-pnpm test               # 270 passing
+pnpm test               # 286 passing
 pnpm typecheck          # clean
 pnpm build              # both packages → dist/ (+ schema.sql copy)
 node packages/cli/dist/index.js analyze fixtures/duplication/buttons   # → { opportunity: 1, warn: 1 }
@@ -135,7 +136,7 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - ✅ Slice 6 complete: `codemod_proof` stores append-only patch, verification output, rollback patch, fingerprint, status, commit SHA, and timestamp.
 - `propose_refactor` (proposal-only) → `apply_refactor` with the §4.6 capability-token gate (current+active+opportunity finding) → DRY-RUN → TYPECHECK → TESTS → GIT-clean → commit + reversal patch. NO `--force`.
 - Append-only codemod proof artifacts (patch + verification output + rollback patch + originating fingerprint)
-- **P5 complete. Next:** Start P6 Slice 1: `@rai/adapter-next` scaffold + detection.
+- **P5 complete.**
 
 ### P6 — First framework adapter (prove the seam)
 - ✅ Formal P6 plan exists: [`docs/superpowers/plans/p6-adapter-next.md`](plans/p6-adapter-next.md).
@@ -145,8 +146,9 @@ These are explicitly **post-MVP** per the design's §7 phasing. Each should get 
 - ✅ Slice 3 complete: `enrichNext` adds route/layout/client/server tags, role index, and enrichment-only layout edges over frozen graph input.
 - ✅ Slice 4 complete: `next/client-boundary-bloat` emits generic adapter metric evidence for App Router `ClientComponent` render-topology breaches and returns `variant-mismatch` diagnostics for Pages/Mixed Router.
 - ✅ Slice 5 complete: `next/route-coupling` emits route-owned render-topology evidence for App Router and Pages Router `RouteSegment` nodes, with `variant-mismatch` diagnostics for Mixed/Non-Next inputs and no adapter persistence writes.
-- `@rai/adapter-next`: detect + enrich (RSC/client/route tags, frozen-input append-only) + 2–3 Next analyzers + variant-guard diagnostics + nominal/positional-only fp extension
-- CI lint: `grep framework-name packages/core == 0`
+- ✅ Slice 6 complete: CLI adapter loading registers `@rai/adapter-next` when available; `rai analyze`, `rai backfill`, and `rai mcp` share adapter composition and keep diagnostics separate from findings.
+- ✅ P6 complete: `@rai/adapter-next` detects/enriches Next projects, ships client-boundary-bloat and route-coupling analyzers, preserves core-owned persistence, and keeps `packages/core` framework-free.
+- CI lint: core framework-free guard stays green.
 - **Adapter storage rule**: adapters may NOT introduce independent persistence — all truth stays core-owned
 
 ### Repo/release engineering (§9 of the design — not yet set up)
