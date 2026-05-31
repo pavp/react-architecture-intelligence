@@ -54,12 +54,12 @@ const requiredConfigSnippets = [
 
 const requiredSecrets = ["RAI_RELEASE_GITHUB_TOKEN", "RAI_HOMEBREW_TAP_TOKEN", "RAI_SCOOP_BUCKET_TOKEN"];
 
-const installAvailabilityNote = "first successful vX.Y.Z release makes Homebrew/Scoop install available";
+const installAvailabilityNote = "first successful installable release";
 
 const requiredChecklistSnippets = [
   ...requiredSecrets,
   installAvailabilityNote,
-  "apply does not create tags or releases",
+  "future releases still require explicit maintainer-approved",
   "rollback for GitHub Release assets, Homebrew formulae, and Scoop manifests",
 ];
 

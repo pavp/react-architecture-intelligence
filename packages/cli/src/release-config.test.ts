@@ -117,9 +117,10 @@ test("release validation requires docs to state post-release install availabilit
   const report = validateReleaseDryRunConfig(root);
 
   expect(report.status).toBe("fail");
-  expect(report.failures).toContain("release maintainer checklist missing first successful vX.Y.Z release makes Homebrew/Scoop install available");
-  expect(report.failures).toContain("status doc missing first successful vX.Y.Z release makes Homebrew/Scoop install available");
-  expect(report.failures).toContain("roadmap doc missing first successful vX.Y.Z release makes Homebrew/Scoop install available");
+  expect(report.failures).toContain("release maintainer checklist missing first successful installable release");
+  expect(report.failures).toContain("release maintainer checklist missing future releases still require explicit maintainer-approved");
+  expect(report.failures).toContain("status doc missing first successful installable release");
+  expect(report.failures).toContain("roadmap doc missing first successful installable release");
 });
 
 function tempRoot(): string {
@@ -232,8 +233,8 @@ function requiredChecklistDoc(): string {
   return `RAI_RELEASE_GITHUB_TOKEN
 RAI_HOMEBREW_TAP_TOKEN
 RAI_SCOOP_BUCKET_TOKEN
-first successful vX.Y.Z release makes Homebrew/Scoop install available
-apply does not create tags or releases
+first successful installable release
+future releases still require explicit maintainer-approved
 rollback for GitHub Release assets, Homebrew formulae, and Scoop manifests
 `;
 }
@@ -249,9 +250,9 @@ semantic-release is not added in P8
 }
 
 function requiredStatusDoc(): string {
-  return "first successful vX.Y.Z release makes Homebrew/Scoop install available\n";
+  return "first successful installable release\n";
 }
 
 function requiredRoadmapDoc(): string {
-  return "first successful vX.Y.Z release makes Homebrew/Scoop install available\n";
+  return "first successful installable release\n";
 }

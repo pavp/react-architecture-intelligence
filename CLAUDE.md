@@ -13,7 +13,7 @@ Use this file as the stable entry point for agent sessions in this repo. Do not 
 
 | Area | Value |
 |------|-------|
-| Main working branch | `feat/rai-mvp-p0-p3` |
+| Main working branch | `main` |
 | GitHub repo | `https://github.com/pavp/react-architecture-intelligence` |
 | Canonical status | `docs/STATUS.md` |
 | Canonical roadmap | `docs/ROADMAP.md` |

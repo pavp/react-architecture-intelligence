@@ -11,7 +11,7 @@ OpenCode should use `CLAUDE.md` as the canonical repo handoff. This file exists 
 
 ## Local Rules
 
-- Main working branch: `feat/rai-mvp-p0-p3`.
+- Main working branch: `main`.
 - GitHub repo: `https://github.com/pavp/react-architecture-intelligence`.
 - Use squash merge unless user says otherwise.
 - Every PR must link an approved issue and have exactly one `type:*` label.
@@ -27,4 +27,4 @@ Known unrelated local files may exist:
 
 ## Next Recommended Work
 
-Start P7 — Distribution + install. First slice should design native dependency strategy, `rai install`, platform auto-detect, and `rai doctor`.
+Start P9 — Explainability. First slice should improve human-readable findings, glossary terms, and `rai explain` UX without changing core facts.

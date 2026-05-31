@@ -1,6 +1,6 @@
 # RAI Roadmap
 
-This is the canonical roadmap after P7. Older roadmap notes in `docs/superpowers/`,
+This is the canonical roadmap after P8. Older roadmap notes in `docs/superpowers/`,
 `docs/gaps.md`, and `docs/future-ideas.md` are historical inputs unless this file links
 them as active work.
 
@@ -9,7 +9,7 @@ them as active work.
 | Phase | Name | What it adds |
 |-------|------|--------------|
 | P7 | Distribution + install | Complete: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
-| P8 | Single-binary distribution | Complete: P8-S1 local Go launcher prototype, P8-S2 dry-run release shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, and release activation verified/archived; actual release tag remains maintainer-gated. |
+| P8 | Single-binary distribution | Complete: P8-S1 local Go launcher prototype, P8-S2 release shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, release activation, and first installable `v0.1.3` release. |
 | P9 | Explainability | Human output, glossary for evidence terms, improved `explain_finding`, and `rai explain <file>`. |
 | P10 | React Pattern Intelligence Foundation | Builds the fact layer for broad React pattern detection: imports, exports, calls, hooks, JSX structure, static members, file roles, and a pattern catalog. |
 | P11 | React Pattern Analyzers + Pattern Drift | Detects concrete repo-derived patterns and divergences: compound components, container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
@@ -54,7 +54,7 @@ Planned capabilities:
 - Add safe publish gates and activation for real channel repository names, exact secrets, manual release preflight, support matrix, and rollback policy without creating tags or publishing artifacts during apply.
 - Decide production path and limitations before replacing current TypeScript CLI distribution.
 
-P8 is verified and archived. `pavp/homebrew-tap` and `pavp/scoop-bucket` are initialized with README-only `main` branches; Homebrew/Scoop install becomes available only after the first successful vX.Y.Z release makes Homebrew/Scoop install available through generated tap formula and bucket manifest commits. GoReleaser/manual `vX.Y.Z` tags remain release authority; explicit maintainer authorization is still required before any tag creation. `semantic-release` is not added in P8. P8-S3c commitlint and PR-title CI workflow enforcement are implemented; local hooks stay optional.
+P8 is verified and archived. `v0.1.3` is the first successful installable release. GitHub Release assets, Homebrew formula, and Scoop manifest were generated through GoReleaser; Homebrew install and `rai doctor . --json` passed locally. GoReleaser/manual `vX.Y.Z` tags remain release authority; explicit maintainer authorization is still required before future tag creation. `semantic-release` is not added in P8. P8-S3c commitlint and PR-title CI workflow enforcement are implemented; local hooks stay optional.
 
 Rule: Go may wrap distribution, but RAI facts and analyzer behavior stay governed by the existing engine contracts unless a future design changes them.
 

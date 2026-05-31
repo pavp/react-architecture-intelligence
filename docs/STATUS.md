@@ -1,15 +1,15 @@
 # RAI Status
 
-This is the canonical project status after P7. Historical status in
+This is the canonical project status after P8. Historical status in
 `docs/superpowers/STATUS.md` remains useful for archaeology, but new sessions should start here.
 
 ## Current state
 
 | Area | Status |
 |------|--------|
-| Branch | `feat/rai-mvp-p0-p3` now legacy integration; `main` is target trunk/default branch after P8 policy migration. |
+| Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P8 complete; P8-S1 local launcher prototype, P8-S2 release dry-run shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, and P8 release activation verified/archived |
+| Product state | P0–P8 complete; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
 | Next phase | P9 explainability |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
@@ -17,15 +17,27 @@ This is the canonical project status after P7. Historical status in
 
 ## Latest verified baseline
 
-Latest full verification after P7:
+Latest release verification after P8:
 
 ```bash
-pnpm test       # 50 files / 316 tests
+pnpm release:check
+pnpm test       # 52 files / 326 tests
 pnpm typecheck
 pnpm build
 pnpm lint
 git diff --check
+gh release view v0.1.3 --repo pavp/react-architecture-intelligence
+brew fetch pavp/tap/rai
+brew install pavp/tap/rai
+rai doctor . --json
 ```
+
+Latest published release:
+
+- `v0.1.3`: first successful installable release; GitHub Release published with darwin/linux/windows amd64/arm64 archives plus `checksums.txt`.
+- Homebrew formula: `pavp/homebrew-tap/Formula/rai.rb` references `0.1.3` and passed `brew fetch pavp/tap/rai`.
+- Scoop manifest: `pavp/scoop-bucket/rai.json` references `0.1.3`.
+- Failed immutable tags retained for audit: `v0.1.0`, `v0.1.1`, `v0.1.2`.
 
 Latest MCP compatibility fix:
 
@@ -80,7 +92,7 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: start P9 explainability. Real publish still requires explicit maintainer tag authorization; Homebrew/Scoop install becomes available only after the first successful vX.Y.Z release makes Homebrew/Scoop install available through generated tap formula and bucket manifest commits.
+Immediate next work: start P9 explainability. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
 
 ## P8 single-binary distribution
 
@@ -96,9 +108,10 @@ P8-S1 adds a local Go launcher prototype without changing analyzer truth:
 - P8-S3c adds commitlint conventional defaults, flexible scopes, `pnpm lint:pr-title`, and PR-title CI on `pull_request` `opened`, `edited`, `synchronize`, and `reopened` events.
 - GoReleaser/manual `vX.Y.Z` tags remain release authority; `semantic-release`, branch/default/tag mutation, and mandatory local hooks remain out of scope.
 - P8-S3b replaces GoReleaser Homebrew/Scoop placeholders with real channel repo names `pavp/homebrew-tap` and `pavp/scoop-bucket`, adds read-only publish readiness validation, and adds a manual `workflow_dispatch` release preflight that runs GoReleaser snapshot with `--skip=publish`.
-- GoReleaser publishing is enabled in config but guarded by release workflow tag regex, `origin/main` ancestry, exact secrets, `pnpm release:check`, tests, typecheck, build, release prepare, and dry-run preflight.
-- Channel repos `pavp/homebrew-tap` and `pavp/scoop-bucket` are initialized with `main` and README only; first Formula/bucket manifest generation remains pending first successful real release.
-- Remaining publish blocker: explicit post-verify maintainer authorization to create a manual `vX.Y.Z`/`vX.Y.Z-rc.N` tag. Apply created no tag or release.
+- GoReleaser publishing is enabled in config but guarded by release workflow tag regex, `origin/main` ancestry, exact secrets, `pnpm release:check`, tests, typecheck, build, and GoReleaser-owned release asset preparation.
+- `v0.1.3` is the first successful real release. It generated GitHub Release assets, `pavp/homebrew-tap/Formula/rai.rb`, and `pavp/scoop-bucket/rai.json`.
+- Homebrew install was verified locally with `brew install pavp/tap/rai`; installed `rai doctor . --json` passed.
+- Failed tags `v0.1.0`, `v0.1.1`, and `v0.1.2` are immutable audit history and must not be moved or reused.
 
 ## Active guardrails
 
