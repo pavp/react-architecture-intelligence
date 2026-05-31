@@ -220,6 +220,7 @@ function installRepo(): string {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "rai-cli-install-")));
   dirs.push(dir);
   writeFileSync(join(dir, "opencode.json"), "{}\n");
+  process.env.XDG_CONFIG_HOME = join(dir, ".config");
   return dir;
 }
 
@@ -236,6 +237,7 @@ function doctorRepo(): string {
 async function captureStdout(runCommand: () => Promise<number>): Promise<{ code: number; stdout: string }> {
   const originalCwd = process.cwd();
   const originalStdoutWrite = process.stdout.write;
+  const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
   let stdout = "";
   process.chdir(dirs.at(-1) ?? originalCwd);
   process.stdout.write = ((chunk: string | Uint8Array) => {
@@ -247,6 +249,11 @@ async function captureStdout(runCommand: () => Promise<number>): Promise<{ code:
   } finally {
     process.chdir(originalCwd);
     process.stdout.write = originalStdoutWrite;
+    if (originalXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+    }
   }
 }
 
