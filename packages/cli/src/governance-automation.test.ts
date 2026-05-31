@@ -50,4 +50,12 @@ describe("P8 governance automation", () => {
     expect(scripts.precommit).toBeUndefined();
     expect(scripts.publish).toBeUndefined();
   });
+
+  test("typecheck script builds workspace declarations before package typechecking", () => {
+    const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as {
+      scripts?: Record<string, string>;
+    };
+
+    expect(pkg.scripts?.typecheck).toBe("pnpm -r --sort run build && pnpm -r --sort run typecheck");
+  });
 });

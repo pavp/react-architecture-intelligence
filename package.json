@@ -13,7 +13,7 @@
     "test:launcher": "go test ./...",
     "test:watch": "vitest",
     "lint:pr-title": "commitlint",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r --sort run build && pnpm -r --sort run typecheck",
     "lint": "node scripts/check-core-framework-free.mjs"
   },
   "devDependencies": {
