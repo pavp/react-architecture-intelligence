@@ -16,8 +16,12 @@ import { runApplyRefactorPipeline, type ApplyPipelineResult, type ApplyWorkspace
 import { CodemodProofStore } from "../memory/codemod-proof-store.js";
 import { createTypeResolver } from "../parse/type-resolver.js";
 import type { TypeInfo, TypeResolver } from "../analyzers/analyzer.js";
+import type { AnalyzerRegistry } from "../analyzers/registry.js";
 
-export interface SessionOpts { config: RaiConfig; dbPath?: string; }
+export interface RegistryFactoryInput { files: SourceFile[]; }
+export type RegistryFactory = (input: RegistryFactoryInput) => AnalyzerRegistry;
+
+export interface SessionOpts { config: RaiConfig; dbPath?: string; registryFactory?: RegistryFactory | undefined; }
 
 export interface CloseSessionDecision {
   fingerprint: string;
@@ -165,8 +169,9 @@ export class Session {
 
   // ── analyze_repo (§5.2) — counts + handles, never a finding dump ──────
   analyzeRepo(input: { files: SourceFile[]; asOf: number; analysisVersion?: number | undefined; runId?: string | undefined; commitSha?: string | undefined }) {
+    const registry = this.opts.registryFactory?.({ files: input.files }) ?? this.registry;
     const res = analyzeRepo({
-      files: input.files, registry: this.registry, findings: this.findings, feedback: this.feedback,
+      files: input.files, registry, findings: this.findings, feedback: this.feedback,
       config: this.opts.config, runId: input.runId ?? "run-" + input.asOf, commitSha: input.commitSha ?? "head",
       asOf: input.asOf, analysisVersion: input.analysisVersion,
     });

@@ -3,12 +3,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { createSession, type Session } from "./tools.js";
+import { createSession, type RegistryFactory, type Session } from "./tools.js";
 import type { RaiConfig } from "../config/schema.js";
 import { resolveCommitSha } from "../engine/git-sha.js";
 import { createGitWorkspace } from "../codemod/git-workspace.js";
 
-export interface McpServerOpts { config: RaiConfig; rootDir: string; }
+export interface McpServerOpts { config: RaiConfig; rootDir: string; registryFactory?: RegistryFactory | undefined; }
 
 /** Reads .tsx/.ts source files under rootDir (excluding node_modules/dist) for analysis. */
 export function readSources(rootDir: string): { file: string; source: string }[] {
@@ -29,7 +29,7 @@ export function readSources(rootDir: string): { file: string; source: string }[]
 /** Build the MCP server + register Band A/B tools (§5). Returns it for serving + the tool names for tests. */
 export function buildMcpServer(opts: McpServerOpts): { server: McpServer; session: Session; toolNames: string[] } {
   const server = new McpServer({ name: "rai", version: "0.0.0" });
-  const session = createSession({ config: opts.config });
+  const session = createSession({ config: opts.config, registryFactory: opts.registryFactory });
   const toolNames: string[] = [];
 
   const now = () => Date.now();

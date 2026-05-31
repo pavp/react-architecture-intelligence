@@ -1,9 +1,7 @@
-import type { Finding, Span } from "../types.js";
+import type { AnalysisDiagnostic, Finding, Span } from "../types.js";
 import type { RepoGraph } from "../graph/repograph.js";
 import type { RaiConfig } from "../config/schema.js";
 import type { MemoryReader } from "../memory/memory-reader.js";
-
-export type FrameworkId = "react" | "next" | "tanstack" | "remix" | "expo";
 
 export interface TypeInfo { text: string; symbolName?: string | undefined; }
 
@@ -31,8 +29,10 @@ export interface AnalysisContext {
   boundaryRules: readonly BoundaryRule[];
 }
 
+export type AnalyzerResult = Finding[] | { findings: Finding[]; diagnostics?: AnalysisDiagnostic[] | undefined };
+
 export interface Analyzer {
   ruleId: string;
-  framework: FrameworkId;
-  analyze(ctx: AnalysisContext): Finding[];
+  framework: string;
+  analyze(ctx: AnalysisContext): AnalyzerResult;
 }

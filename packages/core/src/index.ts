@@ -12,8 +12,9 @@ export { renderCoupling, RULE_ID as RENDER_COUPLING_RULE_ID } from "./analyzers/
 export { overAbstraction, RULE_ID as OVER_ABSTRACTION_RULE_ID } from "./analyzers/over-abstraction.js";
 export { hookTopology, RULE_ID as HOOK_TOPOLOGY_RULE_ID } from "./analyzers/hook-topology.js";
 export { boundaryViolation, RULE_ID as BOUNDARY_VIOLATION_RULE_ID } from "./analyzers/boundary-violation.js";
-export type { Analyzer, AnalysisContext, BoundaryRule, FrameworkId, TypeInfo, TypeResolver } from "./analyzers/analyzer.js";
+export type { Analyzer, AnalyzerResult, AnalysisContext, BoundaryRule, TypeInfo, TypeResolver } from "./analyzers/analyzer.js";
 export { AnalyzerRegistry, createDefaultAnalyzerRegistry } from "./analyzers/registry.js";
+export type { RegistryFactory, RegistryFactoryInput, SessionOpts } from "./mcp/tools.js";
 export { buildSharedExtractionProposal } from "./codemod/proposal.js";
 export type { SharedExtractionProposal, ProposalRefusalReason, ProposalRisk, ProposalRiskLevel, ProposalRiskReason } from "./codemod/proposal.js";
 export { mayExecuteCodemod } from "./codemod/capability-gate.js";

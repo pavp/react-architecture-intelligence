@@ -8,7 +8,7 @@ import { FeedbackStore } from "../memory/feedback-store.js";
 import { MemoryReader } from "../memory/memory-reader.js";
 import { overlay } from "../memory/overlay.js";
 import { EMBED_MODEL_VERSION } from "../similarity/embed.js";
-import type { Analyzer, AnalysisContext, BoundaryRule } from "../analyzers/analyzer.js";
+import type { Analyzer, AnalyzerResult, AnalysisContext, BoundaryRule } from "../analyzers/analyzer.js";
 import { SnapshotStore } from "../memory/snapshot-store.js";
 import { createTypeResolver, type TypeResolverHooks } from "../parse/type-resolver.js";
 
@@ -59,7 +59,7 @@ export function analyzeRepo(input: AnalyzeRepoInput): AnalyzeRepoResult {
   for (const analyzer of input.registry.list()) {
     const result = runAnalyzerSafely(analyzer, ctx);
     raw.push(...result.findings);
-    if (result.diagnostic) diagnostics.push(result.diagnostic);
+    diagnostics.push(...result.diagnostics);
   }
 
   // 7. persist findings (append-only) + 8. overlay with memory
@@ -100,19 +100,24 @@ export function analyzeRepo(input: AnalyzeRepoInput): AnalyzeRepoResult {
   return { presented, diagnostics, analysisVersion, runId: input.runId, graph };
 }
 
-function runAnalyzerSafely(analyzer: Analyzer, ctx: AnalysisContext): { findings: Finding[]; diagnostic: AnalysisDiagnostic | null } {
+function runAnalyzerSafely(analyzer: Analyzer, ctx: AnalysisContext): { findings: Finding[]; diagnostics: AnalysisDiagnostic[] } {
   try {
-    return { findings: analyzer.analyze(ctx), diagnostic: null };
+    return normalizeAnalyzerResult(analyzer.analyze(ctx));
   } catch (error) {
     return {
       findings: [],
-      diagnostic: {
+      diagnostics: [{
         ruleId: analyzer.ruleId,
         kind: "analyzer-error",
         ...normalizeAnalyzerError(error),
-      },
+      }],
     };
   }
+}
+
+function normalizeAnalyzerResult(result: AnalyzerResult): { findings: Finding[]; diagnostics: AnalysisDiagnostic[] } {
+  if (Array.isArray(result)) return { findings: result, diagnostics: [] };
+  return { findings: result.findings, diagnostics: result.diagnostics ?? [] };
 }
 
 function normalizeAnalyzerError(error: unknown): { errorName: string; message: string } {

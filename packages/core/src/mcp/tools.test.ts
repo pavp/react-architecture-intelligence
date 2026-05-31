@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG } from "../config/resolve.js";
 import type { Analyzer } from "../analyzers/analyzer.js";
 import type { AdapterMetricEvidence, Finding } from "../types.js";
 import type { ApplyWorkspace } from "../codemod/apply-pipeline.js";
+import { AnalyzerRegistry } from "../analyzers/registry.js";
 
 const A = `function LoginButton({ label, onClick, variant }) { const t = useTheme(); return <button onClick={onClick}>{label}</button>; }
 export default LoginButton;`;
@@ -59,6 +60,26 @@ test("analyze_repo returns counts + handles, not a finding dump", () => {
   expect(r.topFingerprints.length).toBe(1);
   expect((r as any).findings).toBeUndefined(); // handles, not bodies
   expect((r as any).graph).toBeUndefined(); // graph stays internal to query_architecture
+});
+
+test("analyze_repo builds its registry from the current files when a registry factory is configured", () => {
+  const seen: string[][] = [];
+  const s = createSession({
+    config: DEFAULT_CONFIG,
+    registryFactory: ({ files }) => {
+      seen.push(files.map((file) => file.file));
+      const registry = new AnalyzerRegistry();
+      registry.register(analyzer(`factory/${files[0]!.file}`, () => [makeFinding(`factory/${files[0]!.file}`)]));
+      return registry;
+    },
+  });
+
+  const first = s.analyzeRepo({ files: [{ file: "First.tsx", source: "export function First() { return <div />; }" }], asOf: 0, commitSha: "c1" });
+  const second = s.analyzeRepo({ files: [{ file: "Second.tsx", source: "export function Second() { return <div />; }" }], asOf: 1, commitSha: "c2" });
+
+  expect(seen).toEqual([["First.tsx"], ["Second.tsx"]]);
+  expect(first.topFingerprints).toEqual(["factory/First.tsx-structural"]);
+  expect(second.topFingerprints).toEqual(["factory/Second.tsx-structural"]);
 });
 
 // ─── queryArchitecture tests ────────────────────────────────────────────────

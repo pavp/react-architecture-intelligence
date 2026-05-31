@@ -7,7 +7,7 @@ import { AnalyzerRegistry, createDefaultAnalyzerRegistry } from "../analyzers/re
 import { FindingsStore } from "../memory/findings-store.js";
 import { FeedbackStore } from "../memory/feedback-store.js";
 import { DEFAULT_CONFIG } from "../config/resolve.js";
-import type { Analyzer } from "../analyzers/analyzer.js";
+import type { Analyzer, AnalyzerResult } from "../analyzers/analyzer.js";
 import type { Finding, AnalysisDiagnostic } from "../types.js";
 
 // A1 — compile-time assertion: snapshot-skipped diagnostic is assignable to AnalysisDiagnostic
@@ -54,7 +54,7 @@ function makeFinding(ruleId: string): Finding {
   };
 }
 
-function analyzer(ruleId: string, run: () => Finding[]): Analyzer {
+function analyzer(ruleId: string, run: () => AnalyzerResult): Analyzer {
   return { ruleId, framework: "react", analyze: run };
 }
 
@@ -335,4 +335,59 @@ test("returns deterministic analyzer diagnostics without finding or volatile fie
   expect((res.diagnostics[0] as any).evidence).toBeUndefined();
   expect((res.diagnostics[0] as any).body).toBeUndefined();
   expect((res.diagnostics[0] as any).fingerprint).toBeUndefined();
+});
+
+test("normalizes analyzer outputs from legacy arrays and diagnostic-aware results", () => {
+  const { db, findings, feedback } = setup();
+  const registry = new AnalyzerRegistry();
+  registry.register(analyzer("rule/legacy", () => [makeFinding("rule/legacy")]));
+  registry.register(analyzer("rule/diagnostic-aware", () => ({
+    findings: [makeFinding("rule/diagnostic-aware")],
+    diagnostics: [{ kind: "variant-mismatch", adapterId: "adapter", analyzerId: "rule/diagnostic-aware", detectedVariant: "alpha", supportedVariants: ["beta"], rootDir: "/repo", message: "unsupported variant" }],
+  })));
+
+  const res = analyzeRepo({ files, registry, findings, feedback, config: DEFAULT_CONFIG, runId: "run1", commitSha: "c1", asOf: 0 });
+
+  expect(res.presented.map((finding) => finding.ruleId)).toEqual(["rule/diagnostic-aware", "rule/legacy"]);
+  expect(res.diagnostics).toEqual([
+    { kind: "variant-mismatch", adapterId: "adapter", analyzerId: "rule/diagnostic-aware", detectedVariant: "alpha", supportedVariants: ["beta"], rootDir: "/repo", message: "unsupported variant" },
+  ]);
+  const rows = db.prepare("SELECT rule_id FROM finding ORDER BY rule_id").all() as { rule_id: string }[];
+  expect(rows.map((row) => row.rule_id)).toEqual(["rule/diagnostic-aware", "rule/legacy"]);
+});
+
+test("keeps analyzer diagnostics out of findings, feedback targets, and snapshot rows", () => {
+  const { db, findings, feedback } = setup();
+  const registry = new AnalyzerRegistry();
+  registry.register(analyzer("rule/diagnostic-only", () => ({
+    findings: [],
+    diagnostics: [{ kind: "variant-mismatch", adapterId: "adapter", analyzerId: "rule/diagnostic-only", detectedVariant: "alpha", supportedVariants: ["beta"], rootDir: "/repo", message: "unsupported variant" }],
+  })));
+
+  const res = analyzeRepo({ files, registry, findings, feedback, config: DEFAULT_CONFIG, runId: "run1", commitSha: "c1", asOf: 0 });
+
+  expect(res.presented).toEqual([]);
+  expect(res.diagnostics).toHaveLength(1);
+  const findingCount = (db.prepare("SELECT COUNT(*) as n FROM finding").get() as { n: number }).n;
+  const snapshotCount = (db.prepare("SELECT COUNT(*) as n FROM snapshot").get() as { n: number }).n;
+  const feedbackCount = (db.prepare("SELECT COUNT(*) as n FROM feedback_event").get() as { n: number }).n;
+  expect({ findingCount, snapshotCount, feedbackCount }).toEqual({ findingCount: 0, snapshotCount: 0, feedbackCount: 0 });
+});
+
+test("isolates thrown analyzer diagnostics while preserving later diagnostic-aware findings", () => {
+  const { findings, feedback } = setup();
+  const registry = new AnalyzerRegistry();
+  registry.register(analyzer("rule/failing", () => { throw new TypeError("boom"); }));
+  registry.register(analyzer("rule/success", () => ({
+    findings: [makeFinding("rule/success")],
+    diagnostics: [{ kind: "variant-mismatch", adapterId: "adapter", analyzerId: "rule/success", detectedVariant: "alpha", supportedVariants: ["beta"], rootDir: "/repo", message: "unsupported variant" }],
+  })));
+
+  const res = analyzeRepo({ files, registry, findings, feedback, config: DEFAULT_CONFIG, runId: "run1", commitSha: "c1", asOf: 0 });
+
+  expect(res.presented.map((finding) => finding.ruleId)).toEqual(["rule/success"]);
+  expect(res.diagnostics).toEqual([
+    { ruleId: "rule/failing", kind: "analyzer-error", errorName: "TypeError", message: "boom" },
+    { kind: "variant-mismatch", adapterId: "adapter", analyzerId: "rule/success", detectedVariant: "alpha", supportedVariants: ["beta"], rootDir: "/repo", message: "unsupported variant" },
+  ]);
 });
