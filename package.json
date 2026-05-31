@@ -12,14 +12,17 @@
     "test": "vitest run",
     "test:launcher": "go test ./...",
     "test:watch": "vitest",
+    "lint:pr-title": "commitlint",
     "typecheck": "pnpm -r typecheck",
     "lint": "node scripts/check-core-framework-free.mjs"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0",
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@types/node": "^22.7.0",
     "tsx": "^4.19.0",
-    "@types/node": "^22.7.0"
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": ["better-sqlite3"]
