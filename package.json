@@ -6,7 +6,9 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "build": "pnpm -r build",
+    "build:launcher": "mkdir -p dist/rai && go build -o dist/rai/rai ./cmd/rai",
     "test": "vitest run",
+    "test:launcher": "go test ./...",
     "test:watch": "vitest",
     "typecheck": "pnpm -r typecheck",
     "lint": "node scripts/check-core-framework-free.mjs"
