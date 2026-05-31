@@ -85,6 +85,27 @@ rai install . --platform opencode,claude-code,codex --yes
 
 Use `--no-instructions` when you only want MCP config and do not want RAI to update agent instruction files.
 
+## How RAI works with agents
+
+`rai install` connects your coding agent to RAI through MCP and writes a small instruction block that tells the agent when to use it.
+
+| Step | What happens |
+|------|--------------|
+| 1. Configure MCP | RAI adds an MCP server entry that runs `rai mcp <repo>`. |
+| 2. Add routing instructions | RAI writes a bounded `RAI:BEGIN` / `RAI:END` block to the agent instruction file. |
+| 3. Agent calls tools | The agent can ask RAI to analyze the repo, explain findings, inspect graph nodes, query drift, or propose refactors. |
+| 4. Human decides | RAI returns grounded evidence; it does not automatically change code or record feedback. |
+
+The generated instructions tell the agent to use RAI for React architecture findings, drift, evidence, explanations, and refactor insight. They also tell the agent not to use RAI for generic file reads, non-React questions, or changes without explicit human direction.
+
+Example agent flow:
+
+```text
+You: What architecture issues changed in this PR?
+Agent: calls RAI MCP tools → gets findings and evidence → explains what to inspect first.
+You: Approve, reject, or ask for deeper analysis.
+```
+
 ## Example explain output
 
 ```text
