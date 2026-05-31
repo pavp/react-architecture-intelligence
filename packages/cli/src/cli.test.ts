@@ -114,12 +114,12 @@ test("run install --dry-run prints a read-only plan and writes nothing", async (
 
 test("run install without --yes prints a plan and requires confirmation before writing", async () => {
   const dir = installRepo();
-  const output = await captureStdout(() => run(["install", "--no-instructions"]));
+  const output = await captureStdout(() => run(["install", "--platform", "opencode", "--no-instructions"]));
 
   expect(output.code).toBe(1);
-  const envelope = JSON.parse(output.stdout) as { status: string; plan: { operations: unknown[] } };
+  const envelope = JSON.parse(output.stdout) as { status: string; plan: { operations: Array<{ path: string }> } };
   expect(envelope.status).toBe("confirmation-required");
-  expect(envelope.plan.operations).toHaveLength(2);
+  expect(envelope.plan.operations).toEqual([expect.objectContaining({ path: join(dir, "opencode.json") })]);
   expect(readFileSync(join(dir, "opencode.json"), "utf8")).toBe("{}\n");
 });
 
