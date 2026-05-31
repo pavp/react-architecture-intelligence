@@ -1,13 +1,14 @@
 import { afterEach, expect, test } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { parseArgs, runAnalyze, runBackfillCommand } from "./cli.js";
+import { parseArgs, runAnalyze, runBackfillCommand, buildCliMcpServer } from "./cli.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BUTTONS = resolve(HERE, "../../../fixtures/duplication/buttons");
+const NEXT_APP_ROUTER_BLOAT = resolve(HERE, "../../../fixtures/next/app-router-bloat");
 const dirs: string[] = [];
 
 afterEach(() => {
@@ -44,16 +45,51 @@ test("parseArgs returns help for an unknown command", () => {
   expect(parseArgs(["frobnicate"]).cmd).toBe("help");
 });
 
-test("runAnalyze on the buttons fixture finds one opportunity", () => {
-  const r = runAnalyze(BUTTONS);
+test("runAnalyze on the buttons fixture finds one opportunity", async () => {
+  const r = await runAnalyze(BUTTONS);
   expect(r.counts.byType.opportunity).toBe(1);
   expect(r.counts.bySeverity.warn).toBe(1);
 });
 
-test("runBackfillCommand analyzes historical commits into a persistent db", () => {
+test("runAnalyze on the Next fixture returns Next adapter findings through the normal result shape", async () => {
+  const r = await runAnalyze(NEXT_APP_ROUTER_BLOAT);
+
+  expect(r.counts.byType.opportunity).toBeGreaterThanOrEqual(2);
+  expect(r.counts.diagnostics).toBe(0);
+  expect(r.topFingerprints).toHaveLength(r.counts.byType.opportunity + r.counts.byType.conflict);
+});
+
+test("runAnalyze on plain React emits no Next adapter diagnostics or extra findings", async () => {
+  const r = await runAnalyze(BUTTONS);
+
+  expect(r.counts.byType.opportunity).toBe(1);
+  expect(r.counts.diagnostics).toBe(0);
+  expect(r.diagnostics).toEqual([]);
+});
+
+test("runBackfillCommand snapshots Next adapter findings with analyze parity", async () => {
+  const dir = nextRepo();
+  const analyze = await runAnalyze(dir);
+  const backfill = await runBackfillCommand({ dir, from: "HEAD~1", to: "HEAD", dbPath: ".git/rai.db" });
+
+  expect(backfill.status).toBe("ok");
+  expect(backfill.commits.map((commit) => commit.status)).toEqual(["snapshotted", "snapshotted"]);
+  expect(backfill.commits.at(-1)).toMatchObject({ findings: analyze.topFingerprints.length });
+});
+
+test("buildCliMcpServer reuses CLI adapter composition for analyze_repo", async () => {
+  const { session } = await buildCliMcpServer(NEXT_APP_ROUTER_BLOAT);
+  const r = session.analyzeRepo({ files: readSourcesForTest(NEXT_APP_ROUTER_BLOAT), asOf: 0, runId: "mcp", commitSha: "sha" });
+
+  expect(r.counts.byType.opportunity).toBeGreaterThanOrEqual(2);
+  expect(r.counts.diagnostics).toBe(0);
+  expect(r.topFingerprints).toHaveLength(r.counts.byType.opportunity + r.counts.byType.conflict);
+});
+
+test("runBackfillCommand analyzes historical commits into a persistent db", async () => {
   const dir = repo();
   const dbPath = ".git/rai.db";
-  const result = runBackfillCommand({ dir, from: "HEAD~1", to: "HEAD", dbPath });
+  const result = await runBackfillCommand({ dir, from: "HEAD~1", to: "HEAD", dbPath });
 
   expect(result.status).toBe("ok");
   expect(result.commits.map((commit) => commit.status)).toEqual(["snapshotted", "snapshotted"]);
@@ -71,6 +107,32 @@ function repo(): string {
   git(dir, "add", ".");
   git(dir, "commit", "-m", "one");
   writeFileSync(join(dir, "C.tsx"), "export function C() { return <button>C</button>; }\n");
+  git(dir, "add", ".");
+  git(dir, "commit", "-m", "two");
+  return dir;
+}
+
+function readSourcesForTest(rootDir: string): { file: string; source: string }[] {
+  return [
+    { file: "app/dashboard/page.tsx", source: "export default function DashboardPage() { return <main><A /><B /><C /><D /></main>; }\nfunction A() { return <section />; }\nfunction B() { return <section />; }\nfunction C() { return <section><D /></section>; }\nfunction D() { return <section />; }\n" },
+    { file: "app/dashboard/layout.tsx", source: "'use client';\nexport default function DashboardLayout() { return <div><A /><B /><C /><D /></div>; }\nfunction A() { return <section />; }\nfunction B() { return <section />; }\nfunction C() { return <section><D /></section>; }\nfunction D() { return <section />; }\n" },
+  ];
+}
+
+function nextRepo(): string {
+  const dir = mkdtempSync(join(tmpdir(), "rai-cli-next-backfill-"));
+  dirs.push(dir);
+  git(dir, "init");
+  git(dir, "config", "user.email", "test@example.com");
+  git(dir, "config", "user.name", "Test User");
+  mkdirSync(join(dir, "app", "dashboard"), { recursive: true });
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ dependencies: { next: "15.0.0" } }));
+  writeFileSync(join(dir, "next.config.js"), "export default {};\n");
+  writeFileSync(join(dir, "app", "dashboard", "page.tsx"), "export default function DashboardPage() { return <main><A /><B /></main>; }\nfunction A() { return <section />; }\nfunction B() { return <section />; }\n");
+  git(dir, "add", ".");
+  git(dir, "commit", "-m", "one");
+  writeFileSync(join(dir, "app", "dashboard", "page.tsx"), "export default function DashboardPage() { return <main><A /><B /><C /><D /></main>; }\nfunction A() { return <section />; }\nfunction B() { return <section />; }\nfunction C() { return <section><D /></section>; }\nfunction D() { return <section />; }\n");
+  writeFileSync(join(dir, "app", "dashboard", "layout.tsx"), "'use client';\nexport default function DashboardLayout() { return <div><A /><B /><C /><D /></div>; }\nfunction A() { return <section />; }\nfunction B() { return <section />; }\nfunction C() { return <section><D /></section>; }\nfunction D() { return <section />; }\n");
   git(dir, "add", ".");
   git(dir, "commit", "-m", "two");
   return dir;

@@ -29,6 +29,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@rai/adapter-next':
+        specifier: workspace:*
+        version: link:../adapter-next
       '@rai/core':
         specifier: workspace:*
         version: link:../core

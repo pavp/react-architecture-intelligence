@@ -1,5 +1,6 @@
-import { createSession, serveStdio, readSources, resolveConfig, runBackfill } from "@rai/core";
+import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, type AnalysisDiagnostic } from "@rai/core";
 import { isAbsolute, join } from "node:path";
+import { loadInstalledAdapters } from "./adapters.js";
 
 export type Command = "analyze" | "mcp" | "backfill" | "help";
 export interface ParsedArgs {
@@ -29,18 +30,20 @@ export function parseArgs(argv: string[]): ParsedArgs {
 }
 
 /** Walk a repo, run one analysis pass, return the §5.2 counts envelope. */
-export function runAnalyze(dir: string) {
+export async function runAnalyze(dir: string) {
   const config = resolveConfig({});
-  const session = createSession({ config });
+  const adapters = await loadInstalledAdapters({ rootDir: dir });
+  const session = createSession({ config, registryFactory: adapters.registryFactory });
   const files = readSources(dir);
-  return session.analyzeRepo({ files, asOf: 0 });
+  return withCompositionDiagnostics(session.analyzeRepo({ files, asOf: 0 }), adapters.diagnostics);
 }
 
-export function runBackfillCommand(input: { dir: string; from: string; to: string; dbPath: string }) {
+export async function runBackfillCommand(input: { dir: string; from: string; to: string; dbPath: string }) {
   const config = resolveConfig({});
+  const adapters = await loadInstalledAdapters({ rootDir: input.dir });
   let session: ReturnType<typeof createSession> | null = null;
   const getSession = () => {
-    session ??= createSession({ config, dbPath: resolveDbPath(input.dir, input.dbPath) });
+    session ??= createSession({ config, dbPath: resolveDbPath(input.dir, input.dbPath), registryFactory: adapters.registryFactory });
     return session;
   };
   return runBackfill({
@@ -50,18 +53,24 @@ export function runBackfillCommand(input: { dir: string; from: string; to: strin
     hasSnapshot: (commitSha) => getSession().hasSnapshot(commitSha),
     analyzeCommit: (commitSha) => {
       try {
-        const r = getSession().analyzeRepo({
+        const r = withCompositionDiagnostics(getSession().analyzeRepo({
           files: readSources(input.dir),
           asOf: 0,
           commitSha,
           runId: `backfill-${commitSha}`,
-        });
+        }), adapters.diagnostics);
         return { ok: true, findings: r.topFingerprints.length };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
       }
     },
   });
+}
+
+export async function buildCliMcpServer(dir: string) {
+  const config = resolveConfig({});
+  const adapters = await loadInstalledAdapters({ rootDir: dir });
+  return buildMcpServer({ config, rootDir: dir, registryFactory: ({ files }) => adapters.registryFactory({ files: files.length > 0 ? files : readSources(dir) }) });
 }
 
 const USAGE = `rai — React Architecture Intelligence
@@ -77,16 +86,17 @@ export async function run(argv: string[]): Promise<number> {
   const { cmd, dir, from, to, dbPath } = parseArgs(argv);
   switch (cmd) {
     case "analyze": {
-      const r = runAnalyze(dir);
+      const r = await runAnalyze(dir);
       process.stdout.write(JSON.stringify(r, null, 2) + "\n");
       return 0;
     }
     case "mcp": {
-      await serveStdio({ config: resolveConfig({}), rootDir: dir });
+      const adapters = await loadInstalledAdapters({ rootDir: dir });
+      await serveStdio({ config: resolveConfig({}), rootDir: dir, registryFactory: adapters.registryFactory });
       return 0; // serveStdio resolves only when the transport closes
     }
     case "backfill": {
-      const r = runBackfillCommand({ dir, from: from ?? "HEAD~1", to: to ?? "HEAD", dbPath: dbPath ?? ".git/rai.sqlite" });
+      const r = await runBackfillCommand({ dir, from: from ?? "HEAD~1", to: to ?? "HEAD", dbPath: dbPath ?? ".git/rai.sqlite" });
       process.stdout.write(JSON.stringify(r, null, 2) + "\n");
       return r.status === "ok" ? 0 : 1;
     }
@@ -103,4 +113,10 @@ function flag(argv: string[], name: string): string | undefined {
 
 function resolveDbPath(dir: string, dbPath: string): string {
   return isAbsolute(dbPath) ? dbPath : join(dir, dbPath);
+}
+
+function withCompositionDiagnostics<T extends { counts: { diagnostics: number }; diagnostics: AnalysisDiagnostic[] }>(result: T, diagnostics: AnalysisDiagnostic[]): T {
+  if (diagnostics.length === 0) return result;
+  const merged = [...result.diagnostics, ...diagnostics];
+  return { ...result, diagnostics: merged, counts: { ...result.counts, diagnostics: merged.length } };
 }

@@ -8,3 +8,5 @@ export { CLIENT_BOUNDARY_BLOAT_RULE_ID, createClientBoundaryBloatAnalyzer } from
 export type { ClientBoundaryBloatAnalyzer, ClientBoundaryBloatInput, ClientBoundaryBloatThresholds, NextAdapterAnalyzerResult } from "./client-boundary-bloat.js";
 export { ROUTE_COUPLING_RULE_ID, createRouteCouplingAnalyzer } from "./route-coupling.js";
 export type { RouteCouplingAnalyzer, RouteCouplingAnalyzerResult, RouteCouplingInput, RouteCouplingThresholds } from "./route-coupling.js";
+export { createNextCoreAnalyzers } from "./core-adapter.js";
+export type { NextCoreAnalyzerInput } from "./core-adapter.js";

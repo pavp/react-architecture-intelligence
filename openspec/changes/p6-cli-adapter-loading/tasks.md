@@ -28,10 +28,10 @@ Chain strategy: stacked-to-main
 ## Phase 1: RED Tests
 
 - [x] 1.1 Add failing core pipeline tests in `packages/core/src/engine/pipeline.test.ts` for legacy `Finding[]`, `{ findings, diagnostics }`, and thrown analyzer diagnostic isolation.
-- [ ] 1.2 Add failing CLI Next fixture test in `packages/cli/src/cli.test.ts` proving `rai analyze fixtures/next/app-router-bloat` returns `next/*` findings and diagnostics channel shape.
-- [ ] 1.3 Add failing plain React baseline test in `packages/cli/src/cli.test.ts` proving `fixtures/duplication/buttons` emits no `next/*` findings.
-- [ ] 1.4 Add failing CLI loader failure test in `packages/cli/src/adapters.test.ts` for unavailable/import-failing `@rai/adapter-next` no-op plus optional `adapter-load-skipped` diagnostic.
-- [ ] 1.5 Add failing command parity tests for `rai backfill` snapshots and `rai mcp` `analyze_repo` counts/diagnostics matching `rai analyze`.
+- [x] 1.2 Add failing CLI Next fixture test in `packages/cli/src/cli.test.ts` proving `rai analyze fixtures/next/app-router-bloat` returns `next/*` findings and diagnostics channel shape.
+- [x] 1.3 Add failing plain React baseline test in `packages/cli/src/cli.test.ts` proving `fixtures/duplication/buttons` emits no `next/*` findings.
+- [x] 1.4 Add failing CLI loader failure test in `packages/cli/src/adapters.test.ts` for unavailable/import-failing `@rai/adapter-next` no-op plus optional `adapter-load-skipped` diagnostic.
+- [x] 1.5 Add failing command parity tests for `rai backfill` snapshots and `rai mcp` `analyze_repo` counts/diagnostics matching `rai analyze`.
 - [x] 1.6 Add failing framework-free guard coverage proving `FrameworkId`/framework names are banned from `packages/core/src`.
 
 ## Phase 2: Core Seam GREEN
@@ -43,14 +43,14 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: CLI / Adapter GREEN
 
-- [ ] 3.1 Create `packages/adapter-next/src/core-adapter.ts` with `createNextCoreAnalyzers({ rootDir, files })` wrapping detection, enrichment, findings, and diagnostics.
-- [ ] 3.2 Export helper/types from `packages/adapter-next/src/index.ts`.
-- [ ] 3.3 Create `packages/cli/src/adapters.ts` dynamic loader returning composed `registryFactory` and deterministic load diagnostics or no-op.
-- [ ] 3.4 Wire `packages/cli/src/cli.ts` so `analyze`, `backfill`, and `mcp` share adapter composition.
-- [ ] 3.5 Update `packages/cli/package.json` optional/workspace adapter metadata if NodeNext import resolution needs it.
-- [ ] 3.6 Add `fixtures/next/app-router-bloat/` minimal App Router fixture for adapter signals.
+- [x] 3.1 Create `packages/adapter-next/src/core-adapter.ts` with `createNextCoreAnalyzers({ rootDir, files })` wrapping detection, enrichment, findings, and diagnostics.
+- [x] 3.2 Export helper/types from `packages/adapter-next/src/index.ts`.
+- [x] 3.3 Create `packages/cli/src/adapters.ts` dynamic loader returning composed `registryFactory` and deterministic load diagnostics or no-op.
+- [x] 3.4 Wire `packages/cli/src/cli.ts` so `analyze`, `backfill`, and `mcp` share adapter composition.
+- [x] 3.5 Update `packages/cli/package.json` optional/workspace adapter metadata if NodeNext import resolution needs it.
+- [x] 3.6 Add `fixtures/next/app-router-bloat/` minimal App Router fixture for adapter signals.
 
 ## Phase 4: Docs / OpenSpec / Verification
 
 - [ ] 4.1 Update `docs/superpowers/STATUS.md`, `docs/gaps.md`, `docs/superpowers/plans/p6*.md` if present, and OpenSpec state/spec notes for Slice 6 delivery.
-- [ ] 4.2 Run `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm lint`, and `git diff --check`; record outcomes in apply/verify notes.
+- [x] 4.2 Run `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm lint`, and `git diff --check`; record outcomes in apply/verify notes.

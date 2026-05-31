@@ -130,11 +130,12 @@ export interface PresentedFinding extends Finding {
 }
 
 // ── Analysis Diagnostics ────────────────────────────────────────────────
-export type AnalysisDiagnosticKind = "analyzer-error" | "snapshot-skipped" | "variant-mismatch";
+export type AnalysisDiagnosticKind = "analyzer-error" | "snapshot-skipped" | "variant-mismatch" | "adapter-load-skipped";
 export type AnalysisDiagnostic =
   | { kind: "analyzer-error"; ruleId: string; errorName: string; message: string }
   | { kind: "snapshot-skipped"; message: string }
-  | { kind: "variant-mismatch"; adapterId: string; analyzerId: string; detectedVariant: string; supportedVariants: string[]; rootDir: string; message: string };
+  | { kind: "variant-mismatch"; adapterId: string; analyzerId: string; detectedVariant: string; supportedVariants: string[]; rootDir: string; message: string }
+  | { kind: "adapter-load-skipped"; adapterId: string; packageName: string; errorName: string; message: string };
 
 // ── Memory (§3) ─────────────────────────────────────────────────────────
 export type Verdict = "accept" | "reject" | "wontfix" | "confirm" | "dismiss";
