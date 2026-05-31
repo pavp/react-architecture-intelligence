@@ -67,7 +67,7 @@ Apply the detected setup automatically after review:
 rai install . --yes
 ```
 
-RAI is not OpenCode-only. Supported installer targets: `opencode`, `claude-code`, `codex`, and `copilot`.
+Supported installer targets: `opencode`, `claude-code`, `codex`, and `copilot`.
 
 | Agent | Preview install | Apply install | Writes |
 |-------|-----------------|---------------|--------|
