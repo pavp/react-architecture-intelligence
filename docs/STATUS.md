@@ -1,6 +1,6 @@
 # RAI Status
 
-This is the canonical project status after P8. Historical status in
+This is the canonical project status after P9. Historical status in
 `docs/superpowers/STATUS.md` remains useful for archaeology, but new sessions should start here.
 
 ## Current state
@@ -9,11 +9,11 @@ This is the canonical project status after P8. Historical status in
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P8 complete; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P9 explainability |
+| Product state | P0–P9 complete; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P10 React Pattern Intelligence Foundation |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
-| MCP | `analyze_repo`, findings, diagnostics, `explain_finding`, `get_node`, drift/query/refactor tools active |
+| MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
 
 ## Latest verified baseline
 
@@ -54,6 +54,8 @@ Latest MCP compatibility fix:
 | P5 | Complete | Codemod proposal/apply safety pipeline, proof persistence, real git workspace adapter. |
 | P6 | Complete | Next adapter: detection, variant guard, enrichment, client-boundary-bloat, route-coupling, CLI adapter loading. |
 | P7 | Complete | Distribution + install: `rai install`, platform auto-detect, safe config/instruction writes, `rai doctor`, and near-term TypeScript CLI distribution decision. |
+| P8 | Complete | Single-binary distribution: Go launcher prototype, release shape/governance, safe publish gates, and first installable `v0.1.3` release. |
+| P9 | Complete | Explainability: deterministic explanation envelope, glossary, additive MCP `explain_finding`, `rai explain <file>`, and README onboarding. |
 
 ## P7 distribution + install
 
@@ -92,7 +94,28 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: start P9 explainability. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+Immediate next work: start P10 React Pattern Intelligence Foundation. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+
+## P9 explainability
+
+P9 makes existing RAI facts easier to understand without changing analyzer truth:
+
+- Core explainability helpers derive bounded summaries, inspect-first guidance, limits, grounding fields, and glossary entries from existing findings.
+- MCP `explain_finding` now returns raw finding data plus an additive `explanation` envelope.
+- CLI `rai explain <file>` shows relevant findings for a file in human-readable output, with JSON support following existing CLI conventions.
+- Root `README.md` now gives new users a quick path: install, doctor, analyze, explain, reading guide, glossary, limits, and next step.
+- Guardrail: presentation explains facts; it does not infer intent, ownership, root cause, or remediation not present in evidence.
+
+Latest P9 verification:
+
+```bash
+pnpm test       # 56 files / 344 tests
+pnpm test:launcher
+pnpm typecheck
+pnpm build
+pnpm lint
+git diff --check
+```
 
 ## P8 single-binary distribution
 

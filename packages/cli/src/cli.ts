@@ -1,4 +1,4 @@
-import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, type AnalysisDiagnostic } from "@rai/core";
+import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope } from "@rai/core";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { loadInstalledAdapters } from "./adapters.js";
@@ -6,10 +6,11 @@ import { formatDoctorReport, runDoctor } from "./doctor.js";
 import { buildInstallPlan } from "./install/plan.js";
 import { applyInstallPlan } from "./install/writers.js";
 
-export type Command = "analyze" | "mcp" | "backfill" | "install" | "doctor" | "help";
+export type Command = "analyze" | "explain" | "mcp" | "backfill" | "install" | "doctor" | "help";
 export interface ParsedArgs {
   cmd: Command;
   dir: string;
+  file?: string | undefined;
   from?: string | undefined;
   to?: string | undefined;
   dbPath?: string | undefined;
@@ -24,6 +25,11 @@ export interface ParsedArgs {
 export function parseArgs(argv: string[]): ParsedArgs {
   const [cmd, dir] = argv;
   if (cmd === "analyze") return { cmd: "analyze", dir: dir ?? "." };
+  if (cmd === "explain") {
+    const positional = argv.slice(1).filter((arg) => !arg.startsWith("--"));
+    const [first, second] = positional;
+    return { cmd: "explain", dir: second ? first ?? "." : ".", file: second ?? first, json: argv.includes("--json") };
+  }
   if (cmd === "mcp") return { cmd: "mcp", dir: dir ?? "." };
   if (cmd === "install") {
     const installDir = dir && !dir.startsWith("--") ? dir : ".";
@@ -91,6 +97,20 @@ export async function runBackfillCommand(input: { dir: string; from: string; to:
   });
 }
 
+export async function runExplainCommand(input: { dir: string; file: string }) {
+  const config = resolveConfig({});
+  const adapters = await loadInstalledAdapters({ rootDir: input.dir });
+  const session = createSession({ config, registryFactory: adapters.registryFactory });
+  const files = readSources(input.dir);
+  session.analyzeRepo({ files, asOf: 0 });
+  const current = session.findSharedOpportunities({ includeSuppressed: false });
+  const findings = [...current.opportunities, ...current.conflicts].filter((finding) => findingMatchesFile(finding, input.file));
+  return {
+    file: input.file,
+    findings: findings.map((finding) => session.explainFinding({ fingerprint: finding.fingerprint.structural }) as ExplainedFinding),
+  };
+}
+
 export async function runInstallCommand(input: { dir: string; platforms?: string[]; dryRun?: boolean; yes?: boolean; includeInstructions?: boolean }) {
   const projectRoot = isAbsolute(input.dir) ? input.dir : join(process.cwd(), input.dir);
   const homeDir = homedir();
@@ -122,6 +142,8 @@ const USAGE = `rai — React Architecture Intelligence
 
 Usage:
   rai analyze [dir]   Analyze a repo; prints finding counts (default dir: .)
+  rai explain <file> [--json]   Explain findings for one file (default dir: .)
+  rai explain [dir] <file> [--json]
   rai backfill [dir] --from <sha> --to <sha> --db <path>
   rai install [dir] [--platform <id[,id]>] [--dry-run] [--yes] [--no-instructions]
   rai doctor [dir] [--json]
@@ -130,11 +152,20 @@ Usage:
 
 /** Run the CLI. Returns the process exit code; serves indefinitely for mcp. */
 export async function run(argv: string[]): Promise<number> {
-  const { cmd, dir, from, to, dbPath, platforms, dryRun, yes, includeInstructions, json } = parseArgs(argv);
+  const { cmd, dir, file, from, to, dbPath, platforms, dryRun, yes, includeInstructions, json } = parseArgs(argv);
   switch (cmd) {
     case "analyze": {
       const r = await runAnalyze(dir);
       process.stdout.write(JSON.stringify(r, null, 2) + "\n");
+      return 0;
+    }
+    case "explain": {
+      if (!file) {
+        process.stderr.write(USAGE);
+        return 1;
+      }
+      const r = await runExplainCommand({ dir, file });
+      process.stdout.write(json ? `${JSON.stringify(r, null, 2)}\n` : renderExplainReport(r));
       return 0;
     }
     case "mcp": {
@@ -162,6 +193,30 @@ export async function run(argv: string[]): Promise<number> {
       process.stderr.write(USAGE);
       return 1;
   }
+}
+
+interface ExplainedFinding {
+  finding: PresentedFinding;
+  evidence: PresentedFinding["evidence"];
+  groundingFields: string[];
+  explanation: ExplanationEnvelope;
+  memory: unknown;
+}
+
+function renderExplainReport(result: { file: string; findings: ExplainedFinding[] }): string {
+  if (result.findings.length === 0) return `No relevant findings for ${result.file}.\n`;
+  const lines = [`RAI explain: ${result.file}`, ""];
+  result.findings.forEach((item, index) => {
+    lines.push(`${index + 1}. ${item.finding.ruleId} (${item.finding.severity}, ${item.finding.status})`);
+    lines.push(`   ${item.explanation.summary}`);
+    lines.push(`   Why it matters: ${item.explanation.whyItMatters}`);
+    lines.push(`   Fingerprint: ${item.finding.fingerprint.structural}`);
+    if (item.explanation.inspectFirst.length > 0) lines.push(`   What to inspect first: ${item.explanation.inspectFirst.join(", ")}`);
+    lines.push(`   Evidence terms: ${item.explanation.groundingFields.join(", ")}`);
+    lines.push(`   Limits: ${item.explanation.limits.join(" ")}`);
+    lines.push("");
+  });
+  return `${lines.join("\n")}\n`;
 }
 
 function flag(argv: string[], name: string): string | undefined {

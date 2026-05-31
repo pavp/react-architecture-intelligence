@@ -370,14 +370,30 @@ test("applyRefactor refuses suppressed findings before workspace mutation", () =
   expect(countRows(s, "codemod_proof")).toBe(0);
 });
 
-test("explain_finding returns evidence + groundingFields, no prose", () => {
+test("explain_finding returns additive explanation beside unchanged evidence and memory", () => {
   const s = createSession({ config: DEFAULT_CONFIG });
   const a = s.analyzeRepo({ files, asOf: 0 });
   const fp = a.topFingerprints[0]!;
   const e = s.explainFinding({ fingerprint: fp });
   expect(e.evidence.kind).toBe("shared-extraction");
   expect(e.groundingFields).toContain("sharedSurface");
-  expect((e as any).explanation).toBeUndefined(); // no prose field
+  expect(e.finding.fingerprint.structural).toBe(fp);
+  expect(e.memory).toMatchObject({ weight: 0, confidence: 0, eventCount: 0, net: "neutral", lastReason: null });
+  expect(e.explanation).toMatchObject({
+    summary: "RAI found 3 similar components for react/shared-extraction.",
+    groundingFields: expect.arrayContaining(["cosine", "propOverlap", "hookOverlap", "sharedSurface"]),
+    glossary: expect.arrayContaining([expect.objectContaining({ term: "cosine", known: true })]),
+  });
+  expect(e.explanation.limits).toContain("Do not assume shared ownership, intent, or safe remediation from this finding alone.");
+});
+
+test("explain_finding refuses an unknown fingerprint without synthesizing an explanation", () => {
+  const s = createSession({ config: DEFAULT_CONFIG });
+  s.analyzeRepo({ files, asOf: 0 });
+  const beforeFeedback = countRows(s, "feedback_event");
+
+  expect(() => s.explainFinding({ fingerprint: "unknown-fingerprint" })).toThrow("unknown fingerprint in current analysis");
+  expect(countRows(s, "feedback_event")).toBe(beforeFeedback);
 });
 
 test("record_feedback (human reject) then re-analyze -> finding suppressed", () => {

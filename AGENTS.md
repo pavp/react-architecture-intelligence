@@ -27,4 +27,4 @@ Known unrelated local files may exist:
 
 ## Next Recommended Work
 
-Start P9 — Explainability. First slice should improve human-readable findings, glossary terms, and `rai explain` UX without changing core facts.
+Start P9 — Explainability. First slice should improve human-readable findings, glossary terms, `rai explain` UX, and README onboarding without changing core facts.

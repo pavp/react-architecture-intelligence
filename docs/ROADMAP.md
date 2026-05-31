@@ -1,6 +1,6 @@
 # RAI Roadmap
 
-This is the canonical roadmap after P8. Older roadmap notes in `docs/superpowers/`,
+This is the canonical roadmap after P9. Older roadmap notes in `docs/superpowers/`,
 `docs/gaps.md`, and `docs/future-ideas.md` are historical inputs unless this file links
 them as active work.
 
@@ -10,7 +10,7 @@ them as active work.
 |-------|------|--------------|
 | P7 | Distribution + install | Complete: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
 | P8 | Single-binary distribution | Complete: P8-S1 local Go launcher prototype, P8-S2 release shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, release activation, and first installable `v0.1.3` release. |
-| P9 | Explainability | Human output, glossary for evidence terms, improved `explain_finding`, and `rai explain <file>`. |
+| P9 | Explainability | Complete: deterministic human output, glossary for evidence terms, additive `explain_finding`, `rai explain <file>`, and README onboarding. |
 | P10 | React Pattern Intelligence Foundation | Builds the fact layer for broad React pattern detection: imports, exports, calls, hooks, JSX structure, static members, file roles, and a pattern catalog. |
 | P11 | React Pattern Analyzers + Pattern Drift | Detects concrete repo-derived patterns and divergences: compound components, container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
 | P12 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
@@ -58,16 +58,17 @@ P8 is verified and archived. `v0.1.3` is the first successful installable releas
 
 Rule: Go may wrap distribution, but RAI facts and analyzer behavior stay governed by the existing engine contracts unless a future design changes them.
 
-## P9 scope notes
+## P9 scope notes — complete
 
 P9 makes RAI outputs usable by developers who are not familiar with internal terms.
 
-Planned capabilities:
+Delivered capabilities:
 
-- Human output mode alongside JSON.
-- Glossary for `cosine`, `propOverlap`, `hookOverlap`, `sharedSurface`, `groundingFields`, `span`, and `diagnostic`.
+- Human-readable explain output alongside JSON where CLI conventions allow it.
+- Glossary for `cosine`, `propOverlap`, `hookOverlap`, `sharedSurface`, `groundingFields`, `span`, `diagnostic`, and related graph/topology terms.
 - Grounded summaries that explain what RAI found, why it matters, what to inspect first, and what not to assume.
-- `rai explain <file>` for memory/finding inspection without an agent session.
+- `rai explain <file>` for finding inspection without an agent session.
+- README quick start that explains what RAI does, install path, first commands, how to read findings, current limitations, and next step.
 
 Rule: core facts stay structured; UX explains facts without inventing intent.
 

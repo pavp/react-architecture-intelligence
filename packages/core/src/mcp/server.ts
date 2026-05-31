@@ -86,7 +86,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("apply_refactor");
 
-  server.tool("explain_finding", "Return a finding's structured evidence + grounding fields (render only these; do not infer).",
+  server.tool("explain_finding", "Return a finding's raw evidence plus bounded deterministic explanation and grounding fields (do not infer).",
     { fingerprint: z.string() },
     async (args) => {
       const r = session.explainFinding({ fingerprint: args.fingerprint });

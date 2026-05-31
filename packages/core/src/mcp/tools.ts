@@ -15,6 +15,7 @@ import { previewSharedExtractionPatch, type DryRunPatchPreview } from "../codemo
 import { runApplyRefactorPipeline, type ApplyPipelineResult, type ApplyWorkspace } from "../codemod/apply-pipeline.js";
 import { CodemodProofStore } from "../memory/codemod-proof-store.js";
 import { createTypeResolver } from "../parse/type-resolver.js";
+import { explainFinding as explainPresentedFinding } from "../explainability/explain.js";
 import type { TypeInfo, TypeResolver } from "../analyzers/analyzer.js";
 import type { AnalyzerRegistry } from "../analyzers/registry.js";
 
@@ -312,7 +313,7 @@ export class Session {
     return row !== undefined;
   }
 
-  // ── explain_finding (§5.2) — evidence + groundingFields, NO prose (§5-Fix-1) ──
+  // ── explain_finding (§5.2) — raw facts plus bounded explanation ──
   explainFinding(input: { fingerprint: string }) {
     const f = this.lastPresented.find((p) => p.fingerprint.structural === input.fingerprint);
     if (!f) throw new Error("unknown fingerprint in current analysis");
@@ -321,6 +322,7 @@ export class Session {
       finding: f,
       evidence: f.evidence,
       groundingFields: Object.keys(f.evidence), // the closed license set Claude may cite
+      explanation: explainPresentedFinding(f),
       memory: {
         weight: f.weight?.value ?? 0,
         confidence: f.weight?.confidence ?? 0,

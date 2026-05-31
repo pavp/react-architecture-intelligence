@@ -35,6 +35,14 @@ test("Band C tools are listed in toolNames", () => {
   expect(toolNames).toContain("raw_graph_query");
 });
 
+test("explain_finding description promises bounded explanation plus raw evidence", () => {
+  const { server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
+  const registeredTool = (server as any)._registeredTools?.["explain_finding"];
+
+  expect(registeredTool?.description).toContain("bounded deterministic explanation");
+  expect(registeredTool?.description).toContain("raw evidence");
+});
+
 test("get_node MCP schema avoids tuple byteRange for opencode compatibility", async () => {
   const { session, server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
   const registeredTool = (server as any)._registeredTools?.["get_node"];

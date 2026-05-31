@@ -52,6 +52,14 @@ test("parseArgs routes doctor with JSON output", () => {
   expect(parseArgs(["doctor", "/repo", "--json"])).toEqual({ cmd: "doctor", dir: "/repo", json: true });
 });
 
+test("parseArgs routes explain with a direct file and JSON output", () => {
+  expect(parseArgs(["explain", "LoginButton.tsx", "--json"])).toEqual({ cmd: "explain", dir: ".", file: "LoginButton.tsx", json: true });
+});
+
+test("parseArgs keeps explicit repo directory form for explain", () => {
+  expect(parseArgs(["explain", BUTTONS, "LoginButton.tsx", "--json"])).toEqual({ cmd: "explain", dir: BUTTONS, file: "LoginButton.tsx", json: true });
+});
+
 test("parseArgs returns help for no args", () => {
   expect(parseArgs([]).cmd).toBe("help");
 });
@@ -80,6 +88,44 @@ test("runAnalyze on plain React emits no Next adapter diagnostics or extra findi
   expect(r.counts.byType.opportunity).toBe(1);
   expect(r.counts.diagnostics).toBe(0);
   expect(r.diagnostics).toEqual([]);
+});
+
+test("run explain renders relevant finding summaries for a file without feedback writes", async () => {
+  const cwd = process.cwd();
+  process.chdir(BUTTONS);
+  try {
+    const output = await captureStdout(() => run(["explain", "LoginButton.tsx"]));
+
+    expect(output.code).toBe(0);
+    expect(output.stdout).toContain("RAI explain: LoginButton.tsx");
+    expect(output.stdout).toContain("react/shared-extraction");
+    expect(output.stdout).toContain("RAI found 3 similar components for react/shared-extraction.");
+    expect(output.stdout).toContain("What to inspect first:");
+    expect(output.stdout).not.toContain("Inspect first:");
+    expect(output.stdout).toContain("Fingerprint:");
+    expect(output.stdout).toContain("Do not assume shared ownership, intent, or safe remediation from this finding alone.");
+    expect(output.stdout).not.toContain("record_feedback");
+  } finally {
+    process.chdir(cwd);
+  }
+});
+
+test("run explain reports no relevant findings for an unrelated file", async () => {
+  const output = await captureStdout(() => run(["explain", BUTTONS, "Missing.tsx"]));
+
+  expect(output.code).toBe(0);
+  expect(output.stdout).toBe("No relevant findings for Missing.tsx.\n");
+});
+
+test("run explain --json returns relevant raw findings with explanation envelopes", async () => {
+  const output = await captureStdout(() => run(["explain", BUTTONS, "LoginButton.tsx", "--json"]));
+
+  expect(output.code).toBe(0);
+  const parsed = JSON.parse(output.stdout) as { file: string; findings: Array<{ explanation: { summary: string }; finding: { fingerprint: { structural: string } } }> };
+  expect(parsed.file).toBe("LoginButton.tsx");
+  expect(parsed.findings).toHaveLength(1);
+  expect(parsed.findings[0]!.explanation.summary).toBe("RAI found 3 similar components for react/shared-extraction.");
+  expect(parsed.findings[0]!.finding.fingerprint.structural.length).toBeGreaterThan(10);
 });
 
 test("runBackfillCommand snapshots Next adapter findings with analyze parity", async () => {

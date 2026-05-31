@@ -28,3 +28,8 @@ export { createGitWorkspace } from "./codemod/git-workspace.js";
 export type { GitWorkspaceOpts } from "./codemod/git-workspace.js";
 export { CodemodProofStore } from "./memory/codemod-proof-store.js";
 export type { CodemodProofInput, CodemodProofRow, CodemodProofStatus } from "./memory/codemod-proof-store.js";
+export { explainTerm, glossaryEntries } from "./explainability/glossary.js";
+export type { GlossaryEntry } from "./explainability/glossary.js";
+export { explainFinding } from "./explainability/explain.js";
+export { findingFileRefs, findingMatchesFile } from "./explainability/file-refs.js";
+export type { FindingFileRef } from "./explainability/file-refs.js";

@@ -129,6 +129,22 @@ export interface PresentedFinding extends Finding {
   weight: Weight | null;
 }
 
+// ── Explainability (presentation-only; derived, never persisted) ────────────
+export interface ExplanationGlossaryEntry {
+  term: string;
+  definition: string;
+  known: boolean;
+}
+
+export interface ExplanationEnvelope {
+  summary: string;
+  whyItMatters: string;
+  inspectFirst: string[];
+  limits: string[];
+  groundingFields: string[];
+  glossary: ExplanationGlossaryEntry[];
+}
+
 // ── Analysis Diagnostics ────────────────────────────────────────────────
 export type AnalysisDiagnosticKind = "analyzer-error" | "snapshot-skipped" | "variant-mismatch" | "adapter-load-skipped";
 export type AnalysisDiagnostic =
