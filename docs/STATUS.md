@@ -9,8 +9,8 @@ This is the canonical project status after P7. Historical status in
 |------|--------|
 | Branch | `feat/rai-mvp-p0-p3` now legacy integration; `main` is target trunk/default branch after P8 policy migration. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P7 complete; P8-S1 local launcher prototype, P8-S2 release dry-run shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, and P8-S3b safe publish gates implemented |
-| Next phase | P8 verify/archive, then P9 explainability |
+| Product state | P0–P8 complete; P8-S1 local launcher prototype, P8-S2 release dry-run shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, and P8 release activation verified/archived |
+| Next phase | P9 explainability |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -80,7 +80,7 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: verify/archive P8. Real publish still requires first-release tap formula/bucket manifest generation and repository Actions secrets.
+Immediate next work: start P9 explainability. Real publish still requires explicit maintainer tag authorization; Homebrew/Scoop install becomes available only after the first successful vX.Y.Z release makes Homebrew/Scoop install available through generated tap formula and bucket manifest commits.
 
 ## P8 single-binary distribution
 
@@ -94,11 +94,11 @@ P8-S1 adds a local Go launcher prototype without changing analyzer truth:
 - P8-S2 adds dry-run release shape only: `.goreleaser.yaml`, `pnpm release:check`, `pnpm release:prepare`, `scripts/install-rai.sh`, and `docs/release-maintainer-checklist.md`.
 - P8-S3a adds `docs/repository-workflow.md` plus read-only release checks for `main` trunk/default branch target, retirement of legacy `feat/rai-mvp-p0-p3` after P8, branch naming, Conventional Commit commit/PR titles, PR template use, stable `vX.Y.Z` tags, optional `vX.Y.Z-rc.N` tags, immutable published tags, rollback through new patch/prerelease tags, and manual maintainer gates.
 - P8-S3c adds commitlint conventional defaults, flexible scopes, `pnpm lint:pr-title`, and PR-title CI on `pull_request` `opened`, `edited`, `synchronize`, and `reopened` events.
-- GoReleaser/manual `vX.Y.Z` tags remain release authority; `semantic-release`, real publish activation, branch/default/tag mutation, and mandatory local hooks remain out of scope.
+- GoReleaser/manual `vX.Y.Z` tags remain release authority; `semantic-release`, branch/default/tag mutation, and mandatory local hooks remain out of scope.
 - P8-S3b replaces GoReleaser Homebrew/Scoop placeholders with real channel repo names `pavp/homebrew-tap` and `pavp/scoop-bucket`, adds read-only publish readiness validation, and adds a manual `workflow_dispatch` release preflight that runs GoReleaser snapshot with `--skip=publish`.
-- GoReleaser publishing stays disabled with `release.disable: true`; real GitHub Release publishing remains blocked until secrets and maintainer gates exist.
-- Channel repos `pavp/homebrew-tap` and `pavp/scoop-bucket` are initialized with `main` and README only; first Formula/bucket manifest generation remains pending first real release.
-- Remaining publish blockers: add `RAI_RELEASE_GITHUB_TOKEN`, `RAI_HOMEBREW_TAP_TOKEN`, and `RAI_SCOOP_BUCKET_TOKEN`; run `pnpm release:check`; keep release disabled/manual preflight only until approval; then use manual `vX.Y.Z`/`vX.Y.Z-rc.N` tag flow.
+- GoReleaser publishing is enabled in config but guarded by release workflow tag regex, `origin/main` ancestry, exact secrets, `pnpm release:check`, tests, typecheck, build, release prepare, and dry-run preflight.
+- Channel repos `pavp/homebrew-tap` and `pavp/scoop-bucket` are initialized with `main` and README only; first Formula/bucket manifest generation remains pending first successful real release.
+- Remaining publish blocker: explicit post-verify maintainer authorization to create a manual `vX.Y.Z`/`vX.Y.Z-rc.N` tag. Apply created no tag or release.
 
 ## Active guardrails
 

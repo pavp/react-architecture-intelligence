@@ -7,7 +7,7 @@ RAI uses a simple trunk workflow: `main` is the principal trunk/default branch t
 1. Branch from `main` for one reviewable work unit using documented branch examples: feat/p8-release-policy, fix/release-check, docs/repository-workflow, chore/release-config, test/release-validator.
 2. Open a PR to `main` with an approved issue, exactly one `type:*` label, passing CI, reviewable diff, repository PR template, and Conventional Commit squash merge title.
 3. Let CI validate the PR title with commitlint; optional local checks may use `pnpm lint:pr-title --edit <file>` before opening or editing a PR.
-4. Keep release work dry-run only until P8-S3b maintainer setup is complete.
+4. Release publishing runs only from validated `v*` tags on `main`; manual dispatch without confirmation remains read-only preflight.
 
 ## Branch policy
 
@@ -70,17 +70,17 @@ pnpm lint:pr-title --edit /tmp/pr-title.txt
 
 The PR-title workflow runs on `pull_request` `opened`, `edited`, `synchronize`, and `reopened` events. It writes the GitHub PR title to a temporary file and runs `pnpm commitlint --edit <file>` using the same root `commitlint.config.cjs` as local/manual checks.
 
-Commitlint dependencies are governance-only. semantic-release is not added in P8, automated versioning is not activated, and real publish remains disabled.
+Commitlint dependencies are governance-only. semantic-release is not added in P8, automated versioning is not activated, and real publish is activated only behind tag, main ancestry, secret, and check gates.
 
 ## Manual gates
 
 Branch renames, remote branch creation or deletion, default-branch changes, branch protection changes, tag creation, and publishing require explicit maintainer/user confirmation and are not executed in P8-S3c. This supersedes the P8-S3a statement that remote mutations were not executed in P8-S3a.
 
-real publish remains disabled until P8-S3b maintainer setup, protected `main`/tag rules, release channels, secrets, permissions, and support policy exist. Channel repos are initialized with README-only `main` branches; Formula/bucket manifests are pending first approved real release. The release tag ruleset for refs/tags/v* blocks deletion and non-fast-forward. The publish workflow must fail closed without release secrets, including `RAI_RELEASE_GITHUB_TOKEN`, `RAI_HOMEBREW_TAP_TOKEN`, and `RAI_SCOOP_BUCKET_TOKEN`.
+real publish is active only through fail-closed gates after P8-S3b maintainer setup, protected `main`/tag rules, release channels, secrets, permissions, and support policy exist. Channel repos are initialized with README-only `main` branches; Formula/bucket manifests are pending first approved real release. The release tag ruleset for refs/tags/v* blocks deletion and non-fast-forward. The publish workflow must fail closed without release secrets, including `RAI_RELEASE_GITHUB_TOKEN`, `RAI_HOMEBREW_TAP_TOKEN`, and `RAI_SCOOP_BUCKET_TOKEN`.
 
 ## Publish readiness policy
 
-P8-S3b validates real channel names but does not publish. Safe activation requires all of these gates:
+P8 release activation validates real channel names and enables checked-in publish config, but apply does not create tags or releases. Safe publish requires all of these gates:
 
 - `main` is the GitHub default branch and protected with required checks, one review, stale review dismissal, linear history, conversation resolution, and no force pushes/deletions.
 - `refs/tags/v*` is protected against deletion and non-fast-forward updates.
@@ -88,6 +88,7 @@ P8-S3b validates real channel names but does not publish. Safe activation requir
 - `pavp/scoop-bucket` has a README-only `main` default branch; first manifest write waits for an approved real release.
 - Release secrets exist with exact names: `RAI_RELEASE_GITHUB_TOKEN`, `RAI_HOMEBREW_TAP_TOKEN`, and `RAI_SCOOP_BUCKET_TOKEN`.
 - Publish runs require manual maintainer confirmation and a manual `vX.Y.Z` or `vX.Y.Z-rc.N` tag. No auto-tagging, force-push, deletion, or `semantic-release` is allowed.
+- Homebrew/Scoop install becomes available only after the first successful vX.Y.Z release makes Homebrew/Scoop install available through generated channel files.
 
 ## Rollback
 

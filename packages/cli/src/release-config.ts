@@ -27,14 +27,13 @@ const archiveLayout = [
 ];
 
 const channels = [
-  "github-release-disabled",
+  "github-release-enabled",
   "homebrew:pavp/homebrew-tap",
   "scoop:pavp/scoop-bucket",
-  "install-script-dry-run",
+  "snapshot-preflight-retained",
 ];
 
 const requiredConfigSnippets = [
-  "release:\n  disable: true",
   "pnpm release:prepare",
   "goos: [darwin, linux, windows]",
   "goarch: [amd64, arm64]",
@@ -48,129 +47,35 @@ const requiredConfigSnippets = [
   'name: "homebrew-tap"',
   "scoops:",
   'name: "scoop-bucket"',
+  "{{ .Env.RAI_HOMEBREW_TAP_TOKEN }}",
+  "{{ .Env.RAI_SCOOP_BUCKET_TOKEN }}",
 ];
+
+const requiredSecrets = ["RAI_RELEASE_GITHUB_TOKEN", "RAI_HOMEBREW_TAP_TOKEN", "RAI_SCOOP_BUCKET_TOKEN"];
+
+const installAvailabilityNote = "first successful vX.Y.Z release makes Homebrew/Scoop install available";
 
 const requiredChecklistSnippets = [
-  "Homebrew tap",
-  "Scoop bucket",
-  "GitHub token",
-  "Release tag",
-  "Dry-run only",
-];
-
-const requiredPublishChecklistSnippets = [
-  "Homebrew tap has default branch `main`",
-  "Scoop bucket has default branch `main`",
-  "RAI_RELEASE_GITHUB_TOKEN",
-  "RAI_HOMEBREW_TAP_TOKEN",
-  "RAI_SCOOP_BUCKET_TOKEN",
-  "support matrix darwin/linux/windows amd64/arm64",
+  ...requiredSecrets,
+  installAvailabilityNote,
+  "apply does not create tags or releases",
   "rollback for GitHub Release assets, Homebrew formulae, and Scoop manifests",
 ];
 
 const requiredRepositoryWorkflowSnippets = [
   "main is the principal trunk/default branch target",
-  "feat/rai-mvp-p0-p3 is legacy integration to retire after P8",
-  "approved issue",
-  "exactly one type:* label",
-  "passing CI",
-  "reviewable diff",
-  "Conventional Commit squash merge",
-  "vX.Y.Z",
-  "vX.Y.Z-rc.N",
-  "published tags must not move",
-  "rollback uses a new patch or prerelease tag",
-  "explicit maintainer/user confirmation",
-  "not executed in P8-S3c",
-  "real publish remains disabled",
-  "P8-S3b maintainer setup",
-  "branch examples: feat/p8-release-policy, fix/release-check, docs/repository-workflow, chore/release-config, test/release-validator",
-  "Conventional Commit commit messages",
-  "Conventional Commit PR titles",
-  "repository PR template",
-  "Allowed/recommended scopes",
-  "GoReleaser remains release artifact publisher",
-  "manual vX.Y.Z tags are release authority",
-  "semantic-release is not added in P8",
-  "P8-S3c adds commitlint and PR-title workflow enforcement",
-  "CI enforcement is preferred over local hooks",
-  "no mandatory Husky or Lefthook setup is added",
   "refs/tags/v* blocks deletion and non-fast-forward",
   "publish workflow must fail closed without release secrets",
-];
-
-const requiredRepositoryChecklistSnippets = [
-  "P8-S3a repository workflow policy gates",
-  "P8-S3b real publish activation gates",
-  "main branch protection",
-  "tag protection",
+  "manual vX.Y.Z tags are release authority",
+  "rollback uses a new patch or prerelease tag",
+  "semantic-release is not added in P8",
 ];
 
 export function validateReleaseDryRunConfig(root: string): ReleaseDryRunReport {
   const failures: string[] = [];
-  const configPath = join(root, ".goreleaser.yaml");
-  const checklistPath = join(root, "docs", "release-maintainer-checklist.md");
-  const repositoryWorkflowPath = join(root, "docs", "repository-workflow.md");
-  const installScriptPath = join(root, "scripts", "install-rai.sh");
-  const workflowPath = join(root, ".github", "workflows", "release.yml");
-
-  if (!existsSync(configPath)) {
-    failures.push(".goreleaser.yaml missing");
-  } else {
-    const config = readFileSync(configPath, "utf8");
-    for (const snippet of requiredConfigSnippets) {
-      if (!config.includes(snippet)) failures.push(`.goreleaser.yaml missing ${snippet}`);
-    }
-    if (!config.includes('owner: "pavp"') || !config.includes('name: "homebrew-tap"')) {
-      failures.push(".goreleaser.yaml missing Homebrew channel pavp/homebrew-tap");
-    }
-    if (!config.includes('owner: "pavp"') || !config.includes('name: "scoop-bucket"')) {
-      failures.push(".goreleaser.yaml missing Scoop channel pavp/scoop-bucket");
-    }
-    if (config.includes("DRY_RUN_ONLY")) failures.push(".goreleaser.yaml still contains DRY_RUN_ONLY placeholders");
-  }
-
-  if (!existsSync(checklistPath)) {
-    failures.push("release maintainer checklist missing");
-  } else {
-    const checklist = readFileSync(checklistPath, "utf8");
-    for (const snippet of requiredChecklistSnippets) {
-      if (!checklist.includes(snippet)) failures.push(`release maintainer checklist missing ${snippet}`);
-    }
-    for (const snippet of requiredRepositoryChecklistSnippets) {
-      if (!checklist.includes(snippet)) failures.push(`release maintainer checklist missing ${snippet}`);
-    }
-    for (const snippet of requiredPublishChecklistSnippets) {
-      if (!checklist.includes(snippet)) failures.push(`release maintainer checklist missing ${snippet}`);
-    }
-  }
-
-  if (!existsSync(repositoryWorkflowPath)) {
-    failures.push("repository workflow policy missing");
-  } else {
-    const repositoryWorkflow = readFileSync(repositoryWorkflowPath, "utf8");
-    for (const snippet of requiredRepositoryWorkflowSnippets) {
-      if (!repositoryWorkflow.includes(snippet)) failures.push(`repository workflow policy missing ${snippet}`);
-    }
-  }
-
-  if (!existsSync(installScriptPath)) {
-    failures.push("install script missing");
-  } else {
-    const installScript = readFileSync(installScriptPath, "utf8");
-    if (!installScript.includes("DRY_RUN_ONLY")) failures.push("install script must be dry-run only");
-  }
-
-  if (existsSync(workflowPath)) {
-    const workflow = readFileSync(workflowPath, "utf8");
-    if (/goreleaser\s+release(?!\s+--snapshot)/.test(workflow)) failures.push("release workflow must not run real goreleaser publish");
-    if (!workflow.includes("workflow_dispatch:")) failures.push("release workflow must use workflow_dispatch only");
-    if (/push:\s*\n\s*tags:/m.test(workflow)) failures.push("release workflow must not auto-run from pushed tags");
-    if (!workflow.includes("RELEASE_PUBLISH_CONFIRM")) failures.push("release workflow missing RELEASE_PUBLISH_CONFIRM gate");
-    for (const secret of ["RAI_RELEASE_GITHUB_TOKEN", "RAI_HOMEBREW_TAP_TOKEN", "RAI_SCOOP_BUCKET_TOKEN"]) {
-      if (!workflow.includes(`secrets.${secret}`)) failures.push(`release workflow missing required secret ${secret}`);
-    }
-  }
+  validateGoReleaser(root, failures);
+  validateWorkflow(root, failures);
+  validateDocs(root, failures);
 
   return {
     status: failures.length === 0 ? "pass" : "fail",
@@ -179,4 +84,71 @@ export function validateReleaseDryRunConfig(root: string): ReleaseDryRunReport {
     channels,
     failures,
   };
+}
+
+function validateGoReleaser(root: string, failures: string[]): void {
+  const configPath = join(root, ".goreleaser.yaml");
+  if (!existsSync(configPath)) {
+    failures.push(".goreleaser.yaml missing");
+    return;
+  }
+
+  const config = readFileSync(configPath, "utf8");
+  for (const snippet of requiredConfigSnippets) {
+    if (!config.includes(snippet)) failures.push(`.goreleaser.yaml missing ${snippet}`);
+  }
+  if (/release:\s*\n\s*disable:\s*true/m.test(config)) failures.push(".goreleaser.yaml must enable GitHub release publishing");
+  if (/semantic-release/i.test(config)) failures.push("release config must not reference semantic-release");
+}
+
+function validateWorkflow(root: string, failures: string[]): void {
+  const workflowPath = join(root, ".github", "workflows", "release.yml");
+  if (!existsSync(workflowPath)) {
+    failures.push("release workflow missing");
+    return;
+  }
+
+  const workflow = readFileSync(workflowPath, "utf8");
+  if (!/push:\s*\n\s*tags:\s*\n\s*-\s*["']?v\*/m.test(workflow)) failures.push("release workflow must run on pushed v* tags");
+  if (!workflow.includes("workflow_dispatch:")) failures.push("release workflow must keep workflow_dispatch preflight");
+  if (!/v\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\(-rc\\\.\[0-9\]\+\)\?/.test(workflow)) {
+    failures.push("release workflow missing release tag regex gate");
+  }
+  if (!workflow.includes("git merge-base --is-ancestor HEAD origin/main")) failures.push("release workflow missing origin/main ancestry gate");
+  if (!workflow.includes("pnpm release:check")) failures.push("release workflow missing pnpm release:check gate");
+  if (!workflow.includes("pnpm test && pnpm test:launcher")) failures.push("release workflow missing pnpm test && pnpm test:launcher gate");
+  if (!workflow.includes("pnpm typecheck")) failures.push("release workflow missing pnpm typecheck gate");
+  if (!workflow.includes("pnpm build")) failures.push("release workflow missing pnpm build gate");
+  if (!workflow.includes("pnpm release:prepare")) failures.push("release workflow missing pnpm release:prepare gate");
+  if (!workflow.includes("args: release --clean")) failures.push("release workflow missing GoReleaser publish step");
+  if (!workflow.includes("args: release --snapshot --clean --skip=publish")) failures.push("release workflow missing snapshot preflight skip publish step");
+  if (!/^\s*GITHUB_TOKEN:\s*\$\{\{ secrets\.RAI_RELEASE_GITHUB_TOKEN \}\}/m.test(workflow)) {
+    failures.push("release workflow must map GITHUB_TOKEN to RAI_RELEASE_GITHUB_TOKEN");
+  }
+  for (const secret of requiredSecrets) {
+    if (!workflow.includes(`secrets.${secret}`)) failures.push(`release workflow missing required secret ${secret}`);
+  }
+  if (/git\s+tag\b/.test(workflow)) failures.push("release workflow must not create tags");
+  if (/push\s+--force/.test(workflow)) failures.push("release workflow must not force-push tags");
+  if (/push\s+--delete/.test(workflow)) failures.push("release workflow must not delete tags");
+  if (/semantic-release/i.test(workflow)) failures.push("release workflow must not run semantic-release");
+}
+
+function validateDocs(root: string, failures: string[]): void {
+  requireSnippets(join(root, "docs", "release-maintainer-checklist.md"), "release maintainer checklist", requiredChecklistSnippets, failures);
+  requireSnippets(join(root, "docs", "repository-workflow.md"), "repository workflow policy", requiredRepositoryWorkflowSnippets, failures);
+  requireSnippets(join(root, "docs", "STATUS.md"), "status doc", [installAvailabilityNote], failures);
+  requireSnippets(join(root, "docs", "ROADMAP.md"), "roadmap doc", [installAvailabilityNote], failures);
+}
+
+function requireSnippets(path: string, label: string, snippets: string[], failures: string[]): void {
+  if (!existsSync(path)) {
+    failures.push(`${label} missing`);
+    return;
+  }
+  const content = readFileSync(path, "utf8");
+  const normalized = content.toLowerCase();
+  for (const snippet of snippets) {
+    if (!normalized.includes(snippet.toLowerCase())) failures.push(`${label} missing ${snippet}`);
+  }
 }

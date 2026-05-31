@@ -1,13 +1,13 @@
 version: 2
 project_name: rai
 
-# P8-S3b uses real channel repository names for readiness validation, but GitHub
-# release publishing stays disabled until maintainer secrets and gates are ready.
+# Real publishing is enabled only through the gated release workflow. Local and
+# manual dry-run validation should keep using `goreleaser release --snapshot --clean --skip=publish`.
 snapshot:
   version_template: "{{ .Tag }}-snapshot"
 
 release:
-  disable: true
+  mode: replace
 
 before:
   hooks:
@@ -47,6 +47,7 @@ brews:
     repository:
       owner: "pavp"
       name: "homebrew-tap"
+      token: "{{ .Env.RAI_HOMEBREW_TAP_TOKEN }}"
     directory: Formula
     homepage: "https://github.com/pavp/react-architecture-intelligence"
     description: "React Architecture Intelligence launcher"
@@ -57,6 +58,7 @@ scoops:
     repository:
       owner: "pavp"
       name: "scoop-bucket"
+      token: "{{ .Env.RAI_SCOOP_BUCKET_TOKEN }}"
     homepage: "https://github.com/pavp/react-architecture-intelligence"
     description: "React Architecture Intelligence launcher"
     license: "MIT"
