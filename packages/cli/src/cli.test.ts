@@ -4,11 +4,13 @@ import { dirname, join, resolve } from "node:path";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
+import { readSources } from "@rai/core";
 import { parseArgs, run, runAnalyze, runBackfillCommand, buildCliMcpServer } from "./cli.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BUTTONS = resolve(HERE, "../../../fixtures/duplication/buttons");
 const NEXT_APP_ROUTER_BLOAT = resolve(HERE, "../../../fixtures/next/app-router-bloat");
+const REACT_COMPOUND_PRIMITIVES = resolve(HERE, "../../../fixtures/react/compound-primitives");
 const dirs: string[] = [];
 
 afterEach(() => {
@@ -133,7 +135,7 @@ test("runBackfillCommand snapshots Next adapter findings with analyze parity", a
   const analyze = await runAnalyze(dir);
   const backfill = await runBackfillCommand({ dir, from: "HEAD~1", to: "HEAD", dbPath: ".git/rai.db" });
 
-  expect(backfill.status).toBe("ok");
+  if (backfill.status !== "ok") throw new Error(backfill.message);
   expect(backfill.commits.map((commit) => commit.status)).toEqual(["snapshotted", "snapshotted"]);
   expect(backfill.commits.at(-1)).toMatchObject({ findings: analyze.topFingerprints.length });
 });
@@ -145,6 +147,21 @@ test("buildCliMcpServer reuses CLI adapter composition for analyze_repo", async 
   expect(r.counts.byType.opportunity).toBeGreaterThanOrEqual(2);
   expect(r.counts.diagnostics).toBe(0);
   expect(r.topFingerprints).toHaveLength(r.counts.byType.opportunity + r.counts.byType.conflict);
+});
+
+test("buildCliMcpServer includes React adapter compound divergence through analyze_repo", async () => {
+  const { session } = await buildCliMcpServer(REACT_COMPOUND_PRIMITIVES);
+  const r = session.analyzeRepo({ files: readSources(REACT_COMPOUND_PRIMITIVES), asOf: 0, runId: "mcp-react", commitSha: "sha" });
+  const findings = session.findSharedOpportunities({ includeSuppressed: false }).opportunities.filter((finding) => finding.ruleId === "react/compound-component-api-drift");
+
+  expect(r.counts.byType.opportunity).toBeGreaterThanOrEqual(1);
+  expect(r.counts.diagnostics).toBe(0);
+  expect(findings).toHaveLength(1);
+  expect(findings[0]!.evidence).toMatchObject({
+    kind: "adapter-metric",
+    adapterId: "react",
+    topology: { exceeded: ["missingDeclarations:Footer"] },
+  });
 });
 
 test("run install --dry-run prints a read-only plan and writes nothing", async () => {
@@ -181,7 +198,7 @@ test("run install --yes applies MCP config and skips instructions when requested
 });
 
 test("run doctor --json exits zero for a healthy temp project", async () => {
-  const dir = doctorRepo();
+  doctorRepo();
   const output = await captureStdout(() => run(["doctor", ".", "--json"]));
 
   expect(output.code).toBe(0);
@@ -215,7 +232,7 @@ test("runBackfillCommand analyzes historical commits into a persistent db", asyn
   const dbPath = ".git/rai.db";
   const result = await runBackfillCommand({ dir, from: "HEAD~1", to: "HEAD", dbPath });
 
-  expect(result.status).toBe("ok");
+  if (result.status !== "ok") throw new Error(result.message);
   expect(result.commits.map((commit) => commit.status)).toEqual(["snapshotted", "snapshotted"]);
 });
 
@@ -236,7 +253,7 @@ function repo(): string {
   return dir;
 }
 
-function readSourcesForTest(rootDir: string): { file: string; source: string }[] {
+function readSourcesForTest(_rootDir: string): { file: string; source: string }[] {
   return [
     { file: "app/dashboard/page.tsx", source: "export default function DashboardPage() { return <main><A /><B /><C /><D /></main>; }\nfunction A() { return <section />; }\nfunction B() { return <section />; }\nfunction C() { return <section><D /></section>; }\nfunction D() { return <section />; }\n" },
     { file: "app/dashboard/layout.tsx", source: "'use client';\nexport default function DashboardLayout() { return <div><A /><B /><C /><D /></div>; }\nfunction A() { return <section />; }\nfunction B() { return <section />; }\nfunction C() { return <section><D /></section>; }\nfunction D() { return <section />; }\n" },
@@ -287,7 +304,7 @@ async function captureStdout(runCommand: () => Promise<number>): Promise<{ code:
   let stdout = "";
   process.chdir(dirs.at(-1) ?? originalCwd);
   process.stdout.write = ((chunk: string | Uint8Array) => {
-    stdout += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
     return true;
   }) as typeof process.stdout.write;
   try {

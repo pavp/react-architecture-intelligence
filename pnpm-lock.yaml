@@ -44,6 +44,9 @@ importers:
       '@rai/adapter-next':
         specifier: workspace:*
         version: link:../adapter-next
+      '@rai/adapter-react':
+        specifier: workspace:*
+        version: link:../adapter-react
       '@rai/core':
         specifier: workspace:*
         version: link:../core
