@@ -55,13 +55,35 @@ rai doctor .
 
 ### Agent setup
 
-Use install dry-run first so you can review MCP config writes. OpenCode example:
+`rai install` can auto-detect supported agent configs in your project or home directory. Start with dry-run so you can review the MCP config and instruction-file writes:
 
 ```bash
-rai install . --platform opencode --dry-run
+rai install . --dry-run
+```
+
+Apply the detected setup automatically after review:
+
+```bash
+rai install . --yes
 ```
 
 RAI is not OpenCode-only. Supported installer targets: `opencode`, `claude-code`, `codex`, and `copilot`.
+
+| Agent | Preview install | Apply install | Writes |
+|-------|-----------------|---------------|--------|
+| OpenCode | `rai install . --platform opencode --dry-run` | `rai install . --platform opencode --yes` | `opencode.json` + `AGENTS.md` |
+| Claude Code | `rai install . --platform claude-code --dry-run` | `rai install . --platform claude-code --yes` | `.mcp.json` + `CLAUDE.md` |
+| Codex | `rai install . --platform codex --dry-run` | `rai install . --platform codex --yes` | `~/.codex/config.toml` + `AGENTS.md` |
+| Copilot | `rai install . --platform copilot --dry-run` | `rai install . --platform copilot --yes` | `.vscode/mcp.json` + `.github/copilot-instructions.md` |
+
+Install multiple agents in one pass:
+
+```bash
+rai install . --platform opencode,claude-code,codex --dry-run
+rai install . --platform opencode,claude-code,codex --yes
+```
+
+Use `--no-instructions` when you only want MCP config and do not want RAI to update agent instruction files.
 
 ## Example explain output
 
