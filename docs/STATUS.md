@@ -9,7 +9,7 @@ This is the canonical project status after P7. Historical status in
 |------|--------|
 | Branch | `feat/rai-mvp-p0-p3` now legacy integration; `main` is target trunk/default branch after P8 policy migration. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P7 complete; P8-S1 local launcher prototype, P8-S2 release dry-run shape, and P8-S3a repository workflow/tag/naming policy implemented |
+| Product state | P0–P7 complete; P8-S1 local launcher prototype, P8-S2 release dry-run shape, P8-S3a repository workflow/tag/naming policy, and P8-S3c governance automation implemented |
 | Next phase | P8-S3b — real publish activation after maintainer setup |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
@@ -93,8 +93,8 @@ P8-S1 adds a local Go launcher prototype without changing analyzer truth:
 - Local scripts: `pnpm build:launcher`, `pnpm test:launcher`, and `scripts/smoke-launcher.sh`.
 - P8-S2 adds dry-run release shape only: `.goreleaser.yaml`, `pnpm release:check`, `pnpm release:prepare`, `scripts/install-rai.sh`, and `docs/release-maintainer-checklist.md`.
 - P8-S3a adds `docs/repository-workflow.md` plus read-only release checks for `main` trunk/default branch target, retirement of legacy `feat/rai-mvp-p0-p3` after P8, branch naming, Conventional Commit commit/PR titles, PR template use, stable `vX.Y.Z` tags, optional `vX.Y.Z-rc.N` tags, immutable published tags, rollback through new patch/prerelease tags, and manual maintainer gates.
-- GoReleaser/manual `vX.Y.Z` tags remain release authority; `semantic-release`, new dependencies, commitlint, PR-title workflow, and local hooks remain deferred out of P8-S3a.
-- Future P8-S3c may add CI-preferred commitlint/PR-title enforcement after policy stabilizes.
+- P8-S3c adds commitlint conventional defaults, flexible scopes, `pnpm lint:pr-title`, and PR-title CI on `pull_request` `opened`, `edited`, `synchronize`, and `reopened` events.
+- GoReleaser/manual `vX.Y.Z` tags remain release authority; `semantic-release`, real publish activation, branch/default/tag mutation, and mandatory local hooks remain out of scope.
 - GoReleaser publishing stays disabled with `release.disable: true`; Homebrew/Scoop use `DRY_RUN_ONLY` placeholders until maintainer setup exists.
 - Real publish activation remains deferred to P8-S3b.
 

@@ -57,7 +57,7 @@ const requiredRepositoryWorkflowSnippets = [
   "published tags must not move",
   "rollback uses a new patch or prerelease tag",
   "explicit maintainer/user confirmation",
-  "not executed in P8-S3a",
+  "not executed in P8-S3c",
   "real publish remains disabled",
   "P8-S3b maintainer setup",
   "branch examples: feat/p8-release-policy, fix/release-check, docs/repository-workflow, chore/release-config, test/release-validator",
@@ -68,9 +68,9 @@ const requiredRepositoryWorkflowSnippets = [
   "GoReleaser remains release artifact publisher",
   "manual vX.Y.Z tags are release authority",
   "semantic-release is not added in P8",
-  "no new dependencies in P8-S3a",
-  "Future P8-S3c may add commitlint and PR-title workflow",
+  "P8-S3c adds commitlint and PR-title workflow enforcement",
   "CI enforcement is preferred over local hooks",
+  "no mandatory Husky or Lefthook setup is added",
 ];
 
 const requiredRepositoryChecklistSnippets = [

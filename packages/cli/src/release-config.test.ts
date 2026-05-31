@@ -15,6 +15,7 @@ afterEach(() => {
 test("release config defines dry-run archive and channel shape without publish", () => {
   const report = validateReleaseDryRunConfig(resolve("."));
 
+  expect(report.failures).toEqual([]);
   expect(report.status).toBe("pass");
   expect(report.supportedTargets).toEqual([
     "darwin/amd64",
@@ -32,7 +33,6 @@ test("release config defines dry-run archive and channel shape without publish",
     "lib/rai/native/<os>-<arch>/",
   ]);
   expect(report.channels).toEqual(["github-release-disabled", "homebrew-dry-run", "scoop-dry-run", "install-script-dry-run"]);
-  expect(report.failures).toEqual([]);
 });
 
 test("release validation rejects real publish workflow shape", () => {
@@ -128,11 +128,11 @@ test("release validation requires naming policy and automation deferral snippets
   expect(report.failures).toContain("repository workflow policy missing GoReleaser remains release artifact publisher");
   expect(report.failures).toContain("repository workflow policy missing manual vX.Y.Z tags are release authority");
   expect(report.failures).toContain("repository workflow policy missing semantic-release is not added in P8");
-  expect(report.failures).toContain("repository workflow policy missing no new dependencies in P8-S3a");
   expect(report.failures).toContain(
-    "repository workflow policy missing Future P8-S3c may add commitlint and PR-title workflow",
+    "repository workflow policy missing P8-S3c adds commitlint and PR-title workflow enforcement",
   );
   expect(report.failures).toContain("repository workflow policy missing CI enforcement is preferred over local hooks");
+  expect(report.failures).toContain("repository workflow policy missing no mandatory Husky or Lefthook setup is added");
 });
 
 function tempRoot(): string {

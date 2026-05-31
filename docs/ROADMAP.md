@@ -9,7 +9,7 @@ them as active work.
 | Phase | Name | What it adds |
 |-------|------|--------------|
 | P7 | Distribution + install | Complete: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
-| P8 | Single-binary distribution | In progress: P8-S1 local Go launcher prototype, P8-S2 dry-run release shape, and P8-S3a repository workflow/tag/naming policy implemented; P8-S3b real publish activation remains maintainer-gated. |
+| P8 | Single-binary distribution | In progress: P8-S1 local Go launcher prototype, P8-S2 dry-run release shape, P8-S3a repository workflow/tag/naming policy, and P8-S3c governance automation implemented; P8-S3b real publish activation remains maintainer-gated. |
 | P9 | Explainability | Human output, glossary for evidence terms, improved `explain_finding`, and `rai explain <file>`. |
 | P10 | React Pattern Intelligence Foundation | Builds the fact layer for broad React pattern detection: imports, exports, calls, hooks, JSX structure, static members, file roles, and a pattern catalog. |
 | P11 | React Pattern Analyzers + Pattern Drift | Detects concrete repo-derived patterns and divergences: compound components, container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
@@ -50,9 +50,10 @@ Planned capabilities:
 - Compare packaging options: embedded Node/runtime, sidecar Node server, or subprocess to installed JS engine.
 - Define dry-run release shape with disabled publish, portable archive layout, validation script, install-script placeholder, and maintainer checklist.
 - Define repository workflow policy: `main` trunk/default branch target, short-lived work-unit branches, branch naming, Conventional Commit commit/PR titles, PR template use, legacy `feat/rai-mvp-p0-p3` retirement after P8, PR gates, release tag policy, rollback policy, and manual mutation gates.
+- Add P8-S3c governance automation: commitlint conventional defaults, flexible scopes, `pnpm lint:pr-title`, and PR-title CI without semantic-release, real publish activation, branch/default/tag mutation, or mandatory local hooks.
 - Decide production path and limitations before replacing current TypeScript CLI distribution.
 
-Next P8 slice: P8-S3b real publish activation only after maintainer-created repositories, tokens, permissions, protected `main`/tags, and support policy exist. Real publishing remains blocked. GoReleaser/manual `vX.Y.Z` tags remain release authority; `semantic-release` is not added in P8. Future P8-S3c may add commitlint and PR-title CI workflow enforcement; local hooks stay optional later.
+Next P8 slice: P8-S3b real publish activation only after maintainer-created repositories, tokens, permissions, protected `main`/tags, and support policy exist. Real publishing remains blocked. GoReleaser/manual `vX.Y.Z` tags remain release authority; `semantic-release` is not added in P8. P8-S3c commitlint and PR-title CI workflow enforcement are implemented; local hooks stay optional.
 
 Rule: Go may wrap distribution, but RAI facts and analyzer behavior stay governed by the existing engine contracts unless a future design changes them.
 

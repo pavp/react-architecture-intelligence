@@ -6,7 +6,8 @@ RAI uses a simple trunk workflow: `main` is the principal trunk/default branch t
 
 1. Branch from `main` for one reviewable work unit using documented branch examples: feat/p8-release-policy, fix/release-check, docs/repository-workflow, chore/release-config, test/release-validator.
 2. Open a PR to `main` with an approved issue, exactly one `type:*` label, passing CI, reviewable diff, repository PR template, and Conventional Commit squash merge title.
-3. Keep release work dry-run only until P8-S3b maintainer setup is complete.
+3. Let CI validate the PR title with commitlint; optional local checks may use `pnpm lint:pr-title --edit <file>` before opening or editing a PR.
+4. Keep release work dry-run only until P8-S3b maintainer setup is complete.
 
 ## Branch policy
 
@@ -25,11 +26,11 @@ Use naming to tell reviewers what changed before they read the diff.
 | Item | Policy | Examples |
 |------|--------|----------|
 | Branches | Use short-lived `<type>/<kebab-case-scope>` names. Preferred types are `feat`, `fix`, `docs`, `chore`, and `test`. | `feat/p8-release-policy`, `fix/release-check`, `docs/repository-workflow`, `chore/release-config`, `test/release-validator` |
-| Commit messages | Use Conventional Commit commit messages. | `docs(workflow): document repository naming policy`, `test(release): require workflow automation deferral` |
-| PR titles | Use Conventional Commit PR titles because squash merge should preserve release-readable history. | `docs(workflow): document repository naming policy` |
+| Commit messages | Use Conventional Commit commit messages. CI-enforceable naming uses commitlint conventional defaults. | `docs(workflow): document repository naming policy`, `test(release): require workflow automation deferral` |
+| PR titles | Use Conventional Commit PR titles because squash merge should preserve release-readable history. PR-title CI validates the squash-title candidate on pull_request events. | `docs(workflow): document repository naming policy` |
 | PR body | Preserve the repository PR template and fill issue, type, verification, and scope fields. | Link approved issue, select exactly one `type:*` label, list tests run, and state out-of-scope work. |
 
-Allowed/recommended scopes: `workflow`, `release`, `launcher`, `install`, `doctor`, `mcp`, `adapter-next`, `core`, `cli`, `docs`, `test`, and `openspec`. Prefer the narrowest scope reviewers can verify.
+Allowed/recommended scopes: `workflow`, `release`, `launcher`, `install`, `doctor`, `mcp`, `adapter-next`, `core`, `cli`, `docs`, `test`, and `openspec`. Prefer the narrowest scope reviewers can verify. Commitlint intentionally keeps flexible scopes and does not enforce a fixed package-scope list.
 
 ## PR gates
 
@@ -38,6 +39,7 @@ Every PR to trunk needs:
 - approved issue
 - exactly one type:* label
 - passing CI
+- PR-title CI check passing
 - reviewable diff
 - Conventional Commit squash merge
 
@@ -55,16 +57,27 @@ P8-S3a documents tag policy only. It does not create tags.
 
 GoReleaser remains release artifact publisher, and manual vX.Y.Z tags are release authority. semantic-release is not added in P8.
 
-## Automation deferral
+## Governance automation
 
-P8-S3a adds no local hooks, no CI workflow enforcement, and no new dependencies in P8-S3a. Future P8-S3c may add commitlint and PR-title workflow after policy is stable; CI enforcement is preferred over local hooks. Local hooks may remain optional later.
+P8-S3c adds commitlint and PR-title workflow enforcement after policy stabilization. CI enforcement is preferred over local hooks: local hooks are optional, not required for compliance, and no mandatory Husky or Lefthook setup is added.
+
+Manual PR-title check:
+
+```bash
+printf '%s\n' 'docs(workflow): document repository naming policy' > /tmp/pr-title.txt
+pnpm lint:pr-title --edit /tmp/pr-title.txt
+```
+
+The PR-title workflow runs on `pull_request` `opened`, `edited`, `synchronize`, and `reopened` events. It writes the GitHub PR title to a temporary file and runs `pnpm commitlint --edit <file>` using the same root `commitlint.config.cjs` as local/manual checks.
+
+Commitlint dependencies are governance-only. semantic-release is not added in P8, automated versioning is not activated, and real publish remains disabled.
 
 ## Manual gates
 
-Branch renames, remote branch creation or deletion, default-branch changes, branch protection changes, tag creation, and publishing require explicit maintainer/user confirmation and are not executed in P8-S3a.
+Branch renames, remote branch creation or deletion, default-branch changes, branch protection changes, tag creation, and publishing require explicit maintainer/user confirmation and are not executed in P8-S3c. This supersedes the P8-S3a statement that remote mutations were not executed in P8-S3a.
 
 real publish remains disabled until P8-S3b maintainer setup, protected `main`/tag rules, release channels, secrets, permissions, and support policy exist.
 
 ## Rollback
 
-Rollback for P8-S3a reverts policy docs and release validator checks only. It does not mutate branches, default-branch settings, tags, secrets, remotes, or publish channels.
+Rollback for P8-S3c reverts policy docs, commitlint dependency/config changes, PR-title workflow, and release validator checks only. It does not mutate branches, default-branch settings, tags, secrets, remotes, or publish channels.
