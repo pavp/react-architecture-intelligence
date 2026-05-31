@@ -35,6 +35,20 @@ test("Band C tools are listed in toolNames", () => {
   expect(toolNames).toContain("raw_graph_query");
 });
 
+test("get_node MCP schema avoids tuple byteRange for opencode compatibility", async () => {
+  const { session, server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
+  const registeredTool = (server as any)._registeredTools?.["get_node"];
+  const schema = registeredTool?.inputSchema;
+  const shape = typeof schema?._def?.shape === "function" ? schema._def.shape() : schema?.shape;
+  const byteRange = shape?.byteRange;
+
+  expect(byteRange?._def?.innerType?._def?.typeName).toBe("ZodObject");
+
+  const spy = vi.spyOn(session, "getNode");
+  await registeredTool.handler({ file: "Page.tsx", byteRange: { start: 0, end: 80 } }, {});
+  expect(spy).toHaveBeenCalledWith({ file: "Page.tsx", fingerprint: undefined, byteRange: [0, 80] });
+});
+
 test("analyze_repo handler passes resolved SHA (not literal 'head') to session.analyzeRepo", async () => {
   const { session, server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
   const spy = vi.spyOn(session, "analyzeRepo");
