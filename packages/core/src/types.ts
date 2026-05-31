@@ -7,6 +7,74 @@ export interface Span {
   astPath: string; // position-independent structural index, e.g. "module>fn[2]>jsx>child[0]"
 }
 
+// ── Pattern syntax facts (framework-neutral source observations) ───────────
+export type PatternFactKind = "import" | "export" | "call" | "jsx" | "hook-call" | "member-assignment" | "file-role-seed";
+
+export interface PatternImportSpecifierFact {
+  imported: string;
+  local: string;
+  mode: "default" | "named" | "namespace";
+}
+
+export interface PatternFactBase {
+  id: string;
+  kind: PatternFactKind;
+  file: string;
+  span: Span;
+}
+
+export interface PatternImportFact extends PatternFactBase {
+  kind: "import";
+  source: string;
+  specifiers: PatternImportSpecifierFact[];
+}
+
+export interface PatternExportFact extends PatternFactBase {
+  kind: "export";
+  exported: string;
+  local: string;
+  source: string;
+  mode: "default" | "named";
+}
+
+export interface PatternCallFact extends PatternFactBase {
+  kind: "call";
+  callee: string;
+}
+
+export interface PatternJsxFact extends PatternFactBase {
+  kind: "jsx";
+  tag: string;
+  parentTag: string;
+}
+
+export interface PatternHookCallFact extends PatternFactBase {
+  kind: "hook-call";
+  name: string;
+}
+
+export interface PatternMemberAssignmentFact extends PatternFactBase {
+  kind: "member-assignment";
+  object: string;
+  property: string;
+  value: string;
+}
+
+export interface PatternFileRoleSeedFact extends PatternFactBase {
+  kind: "file-role-seed";
+  seed: string;
+  source: "path" | "directive";
+}
+
+export type PatternFact =
+  | PatternImportFact
+  | PatternExportFact
+  | PatternCallFact
+  | PatternJsxFact
+  | PatternHookCallFact
+  | PatternMemberAssignmentFact
+  | PatternFileRoleSeedFact;
+
 // ── Graph (§2.2) ────────────────────────────────────────────────────────
 export type ComponentKind = "fn" | "class" | "memo" | "forwardRef" | "arrow";
 export interface ComponentNode {

@@ -33,6 +33,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/adapter-react:
+    dependencies:
+      '@rai/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/cli:
     dependencies:
       '@rai/adapter-next':

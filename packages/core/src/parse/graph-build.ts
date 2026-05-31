@@ -1,7 +1,7 @@
 import { pass1 } from "./pass1.js";
 import { contentHash } from "../graph/content-hash.js";
 import type { RepoGraph } from "../graph/repograph.js";
-import type { GraphEdge, ModuleNode, ComponentNode, HookNode } from "../types.js";
+import type { GraphEdge, ModuleNode, ComponentNode, HookNode, PatternFact } from "../types.js";
 
 export interface SourceFile { file: string; source: string; }
 
@@ -10,11 +10,13 @@ export function buildGraph(files: SourceFile[]): RepoGraph {
   const hooks: HookNode[] = [];
   const modules: ModuleNode[] = [];
   const edges: GraphEdge[] = [];
+  const patternFacts: PatternFact[] = [];
 
   for (const { file, source } of files) {
     const r = pass1(file, source);
     components.push(...r.components);
     hooks.push(...r.hooks);
+    patternFacts.push(...r.patternFacts);
     modules.push({ id: file, file, contentHash: contentHash(source) });
   }
 
@@ -46,7 +48,7 @@ export function buildGraph(files: SourceFile[]): RepoGraph {
     }
   }
 
-  return { components, hooks, modules, edges: dedupeEdges(edges).sort(compareEdges) };
+  return { components, hooks, modules, edges: dedupeEdges(edges).sort(compareEdges), patternFacts: dedupePatternFacts(patternFacts).sort(comparePatternFacts) };
 }
 
 function dedupeEdges(edges: GraphEdge[]): GraphEdge[] {
@@ -57,4 +59,14 @@ function dedupeEdges(edges: GraphEdge[]): GraphEdge[] {
 
 function compareEdges(a: GraphEdge, b: GraphEdge): number {
   return a.kind.localeCompare(b.kind) || a.srcId.localeCompare(b.srcId) || a.dstId.localeCompare(b.dstId);
+}
+
+function dedupePatternFacts(facts: PatternFact[]): PatternFact[] {
+  const byKey = new Map<string, PatternFact>();
+  for (const fact of facts) byKey.set(fact.id, fact);
+  return [...byKey.values()];
+}
+
+function comparePatternFacts(a: PatternFact, b: PatternFact): number {
+  return a.id.localeCompare(b.id);
 }

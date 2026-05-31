@@ -1,6 +1,6 @@
 # RAI Roadmap
 
-This is the canonical roadmap after P9. Older roadmap notes in `docs/superpowers/`,
+This is the canonical roadmap after P10. Older roadmap notes in `docs/superpowers/`,
 `docs/gaps.md`, and `docs/future-ideas.md` are historical inputs unless this file links
 them as active work.
 
@@ -11,7 +11,7 @@ them as active work.
 | P7 | Distribution + install | Complete: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
 | P8 | Single-binary distribution | Complete: P8-S1 local Go launcher prototype, P8-S2 release shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, release activation, and first installable `v0.1.3` release. |
 | P9 | Explainability | Complete: deterministic human output, glossary for evidence terms, additive `explain_finding`, `rai explain <file>`, and README onboarding. |
-| P10 | React Pattern Intelligence Foundation | Builds the fact layer for broad React pattern detection: imports, exports, calls, hooks, JSX structure, static members, file roles, and a pattern catalog. |
+| P10 | React Pattern Intelligence Foundation | Complete: generic pattern fact extraction for imports, exports, calls, hooks, JSX structure, static members, file roles, and a React catalog scaffold outside core. |
 | P11 | React Pattern Analyzers + Pattern Drift | Detects concrete repo-derived patterns and divergences: compound components, container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
 | P12 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
 | P13 | Calibration | Reduces noise per repo: `rai calibrate`, threshold suggestions from feedback, and no automatic config changes. |
@@ -72,16 +72,18 @@ Delivered capabilities:
 
 Rule: core facts stay structured; UX explains facts without inventing intent.
 
-## P10 scope notes
+## P10 scope notes — complete
 
 P10 is foundation only. It does not try to detect every pattern in one slice.
 
-Planned capabilities:
+Delivered capabilities:
 
 - Pattern fact extraction for imports, exports, calls, JSX children, hook usage, static members, and file roles.
-- Pattern catalog design for known React patterns and repo-derived patterns.
-- Fixtures for examples such as Modal/Popover compound UI primitives.
-- Explainable evidence that future analyzers can consume.
+- React pattern catalog scaffold outside `packages/core`.
+- Fixtures for Modal/Popover compound UI primitives.
+- Explainable syntax evidence that future analyzers can consume without emitting findings yet.
+
+Rule: P10 facts are syntax observations only. They must not infer React intent, pattern labels, root cause, or remediation.
 
 ## Future-scope guardrails
 

@@ -88,6 +88,69 @@ export default W;`);
   expect(w.compositionMarkers.sort()).toEqual(["forwardRef", "memo"]);
 });
 
+describe("pattern facts", () => {
+  test("extracts generic syntax facts with spans", () => {
+    const source = `
+import DefaultThing, { named as alias, other } from "pkg";
+import * as Namespace from "namespace-lib";
+export { alias as renamed } from "re-export-lib";
+export const Widget = () => {
+  const value = makeThing(useThing());
+  Thing.Item = Item;
+  return <Namespace.Root><Namespace.Trigger /></Namespace.Root>;
+};
+`;
+
+    const result = pass1("src/Widget.tsx", source);
+
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({
+      kind: "import",
+      file: "src/Widget.tsx",
+      source: "pkg",
+      specifiers: [
+        { imported: "default", local: "DefaultThing", mode: "default" },
+        { imported: "named", local: "alias", mode: "named" },
+        { imported: "other", local: "other", mode: "named" },
+      ],
+    }));
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({
+      kind: "import",
+      source: "namespace-lib",
+      specifiers: [{ imported: "*", local: "Namespace", mode: "namespace" }],
+    }));
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({
+      kind: "export",
+      exported: "renamed",
+      local: "alias",
+      source: "re-export-lib",
+      mode: "named",
+    }));
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({ kind: "call", callee: "makeThing" }));
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({ kind: "hook-call", name: "useThing" }));
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({ kind: "member-assignment", object: "Thing", property: "Item", value: "Item" }));
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({ kind: "jsx", tag: "Namespace.Root", parentTag: "" }));
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({ kind: "jsx", tag: "Namespace.Trigger", parentTag: "Namespace.Root" }));
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({ kind: "file-role-seed", seed: "extension:tsx", source: "path" }));
+    expect(result.patternFacts.every((fact) => fact.span.file === "src/Widget.tsx" && fact.span.end > fact.span.start)).toBe(true);
+  });
+
+  test("keeps ambiguous syntax raw without catalog intent", () => {
+    const result = pass1("src/ambiguous.tsx", `
+import { Root as AliasRoot } from "ui-kit";
+export { AliasRoot as PublicRoot };
+Namespace.Part = AliasRoot;
+`);
+    const text = JSON.stringify(result.patternFacts);
+
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({
+      kind: "import",
+      specifiers: [{ imported: "Root", local: "AliasRoot", mode: "named" }],
+    }));
+    expect(result.patternFacts).toContainEqual(expect.objectContaining({ kind: "member-assignment", object: "Namespace", property: "Part", value: "AliasRoot" }));
+    expect(text).not.toMatch(/compound|controlled|provider/i);
+  });
+});
+
 describe("KI-1 fix", () => {
   test("SC-1: route handler GET is NOT admitted as a component", () => {
     const source = readFileSync(join(FIX, "duplication/route-handlers/GET.ts"), "utf8");

@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import { buildGraph } from "./graph-build.js";
+import { freezeGraph } from "../graph/repograph.js";
 
 const A = `function Card({ title }) { return <div>{title}</div>; }
 export default Card;`;
@@ -39,4 +40,31 @@ function usePrice() { return 1; }` },
 test("modules carry a content hash", () => {
   const g = buildGraph([{ file: "Card.tsx", source: A }]);
   expect(g.modules[0]!.contentHash).toMatch(/^[0-9a-f]{64}$/);
+});
+
+test("carries sorted deduped JSON-safe pattern facts", () => {
+  const source = `
+import { Button } from "ui";
+export { Button };
+export function Page() {
+  useReady();
+  return <Button />;
+}`;
+  const first = buildGraph([{ file: "Page.tsx", source }]);
+  const second = buildGraph([{ file: "Page.tsx", source }]);
+
+  expect(first.patternFacts).toEqual(second.patternFacts);
+  expect(first.patternFacts.map((fact) => fact.id)).toEqual([...first.patternFacts.map((fact) => fact.id)].sort());
+  expect(new Set(first.patternFacts.map((fact) => fact.id)).size).toBe(first.patternFacts.length);
+  expect(JSON.parse(JSON.stringify(first.patternFacts))).toEqual(first.patternFacts);
+});
+
+test("freezes graph pattern facts", () => {
+  const frozen = freezeGraph(buildGraph([{ file: "Page.tsx", source: B }]));
+  const firstFact = frozen.patternFacts[0]!;
+
+  expect(Object.isFrozen(frozen.patternFacts)).toBe(true);
+  expect(Object.isFrozen(firstFact)).toBe(true);
+  expect(() => { (frozen.patternFacts as unknown[]).push(firstFact); }).toThrow(TypeError);
+  expect(() => { (firstFact as { id: string }).id = "mutated"; }).toThrow(TypeError);
 });

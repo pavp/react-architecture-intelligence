@@ -1,6 +1,6 @@
 # RAI Status
 
-This is the canonical project status after P9. Historical status in
+This is the canonical project status after P10. Historical status in
 `docs/superpowers/STATUS.md` remains useful for archaeology, but new sessions should start here.
 
 ## Current state
@@ -9,8 +9,8 @@ This is the canonical project status after P9. Historical status in
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P9 complete; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P10 React Pattern Intelligence Foundation |
+| Product state | P0–P10 complete; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P11 React Pattern Analyzers + Pattern Drift |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -56,6 +56,7 @@ Latest MCP compatibility fix:
 | P7 | Complete | Distribution + install: `rai install`, platform auto-detect, safe config/instruction writes, `rai doctor`, and near-term TypeScript CLI distribution decision. |
 | P8 | Complete | Single-binary distribution: Go launcher prototype, release shape/governance, safe publish gates, and first installable `v0.1.3` release. |
 | P9 | Complete | Explainability: deterministic explanation envelope, glossary, additive MCP `explain_finding`, `rai explain <file>`, and README onboarding. |
+| P10 | Complete | React Pattern Intelligence Foundation: generic syntax facts, React catalog scaffold outside core, compound primitive fixtures, and OpenSpec specs. |
 
 ## P7 distribution + install
 
@@ -94,7 +95,28 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: start P10 React Pattern Intelligence Foundation. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+Immediate next work: start P11 React Pattern Analyzers + Pattern Drift. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+
+## P10 React Pattern Intelligence Foundation
+
+P10 adds deterministic foundation facts for later React pattern analyzers without adding findings yet:
+
+- `RepoGraph.patternFacts` carries sorted/deduped/frozen syntax facts.
+- Core extracts imports, exports, calls, hook-like calls, JSX parent/child tags, member assignments, and file-role seeds.
+- `@rai/core` remains framework-agnostic: facts describe syntax only and do not include React catalog names or intent claims.
+- `packages/adapter-react` holds React catalog scaffolding outside core and currently emits no findings or memory writes.
+- Modal/Popover fixtures cover compound primitive syntax evidence for future analyzers.
+- OpenSpec specs added: `pattern-fact-extraction` and `react-pattern-catalog`.
+
+Latest P10 verification:
+
+```bash
+pnpm test       # 57 files / 351 tests
+pnpm typecheck
+pnpm build
+pnpm lint
+git diff --check
+```
 
 ## P9 explainability
 

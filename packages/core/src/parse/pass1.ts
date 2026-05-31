@@ -1,11 +1,12 @@
 import { parseSync } from "oxc-parser";
-import type { ComponentNode, HookNode, Span } from "../types.js";
+import type { ComponentNode, HookNode, PatternFact, PatternImportSpecifierFact, Span } from "../types.js";
 
 export interface Pass1Result {
   file: string;
   components: ComponentNode[];
   hooks: HookNode[];
   imports: { from: string }[];
+  patternFacts: PatternFact[];
 }
 
 const COMPONENT_NAME = /^[A-Z]/;
@@ -20,6 +21,7 @@ export function pass1(file: string, source: string): Pass1Result {
   const components: ComponentNode[] = [];
   const hooks: HookNode[] = [];
   const imports: { from: string }[] = [];
+  const patternFacts = collectPatternFacts(file, source, program);
 
   let cid = 0;
   let hid = 0;
@@ -110,7 +112,147 @@ export function pass1(file: string, source: string): Pass1Result {
     }
   }
 
-  return { file, components, hooks, imports };
+  return { file, components, hooks, imports, patternFacts };
+}
+
+function collectPatternFacts(file: string, source: string, program: any): PatternFact[] {
+  const facts: PatternFact[] = [];
+  const body: any[] = program.body ?? [];
+  const span = (node: any, kind: string, astPath: string): Span => ({
+    file,
+    start: typeof node?.start === "number" ? node.start : 0,
+    end: typeof node?.end === "number" ? node.end : Math.max(source.length, 1),
+    kind,
+    astPath,
+  });
+  const push = (fact: Omit<PatternFact, "id"> & Record<string, unknown>) => {
+    facts.push({ ...fact, id: patternFactId(fact) } as PatternFact);
+  };
+
+  const ext = file.match(/\.([cm]?[jt]sx?)$/)?.[1] ?? "unknown";
+  push({ kind: "file-role-seed", file, span: span({ start: 0, end: Math.max(source.length, 1) }, "file-role-seed", "module>file-role-seed[0]"), seed: `extension:${ext}`, source: "path" });
+
+  body.forEach((stmt, idx) => {
+    const astPath = `module>stmt[${idx}]`;
+    if (stmt.type === "ImportDeclaration") {
+      const specifiers = importSpecifiers(stmt.specifiers ?? []);
+      push({ kind: "import", file, span: span(stmt, "import", astPath), source: stringValue(stmt.source), specifiers });
+      return;
+    }
+    if (stmt.type === "ExportNamedDeclaration") {
+      for (const exportFact of exportFacts(stmt, file, span(stmt, "export", astPath))) push(exportFact);
+    }
+    if (stmt.type === "ExportDefaultDeclaration") {
+      const local = declarationName(stmt.declaration) || "default";
+      push({ kind: "export", file, span: span(stmt, "export", astPath), exported: "default", local, source: "", mode: "default" });
+    }
+  });
+
+  const visit = (node: any, astPath: string, jsxParentTag = "") => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      node.forEach((child, idx) => visit(child, `${astPath}[${idx}]`, jsxParentTag));
+      return;
+    }
+    if (node.type === "CallExpression") {
+      const callee = expressionText(node.callee);
+      if (callee) push({ kind: "call", file, span: span(node, "call", astPath), callee });
+      if (node.callee?.type === "Identifier" && HOOK_NAME.test(node.callee.name)) {
+        push({ kind: "hook-call", file, span: span(node, "hook-call", astPath), name: node.callee.name });
+      }
+    }
+    if (node.type === "JSXElement") {
+      const tag = jsxNameText(node.openingElement?.name) ?? "";
+      if (tag) push({ kind: "jsx", file, span: span(node.openingElement, "jsx", `${astPath}>opening`), tag, parentTag: jsxParentTag });
+      (node.children ?? []).forEach((child: any, idx: number) => visit(child, `${astPath}>child[${idx}]`, tag || jsxParentTag));
+      return;
+    }
+    if (node.type === "AssignmentExpression") {
+      const member = staticMemberParts(node.left);
+      if (member) push({ kind: "member-assignment", file, span: span(node, "member-assignment", astPath), object: member.object, property: member.property, value: expressionText(node.right) });
+    }
+    for (const key of Object.keys(node)) {
+      if (key === "type" || key === "start" || key === "end") continue;
+      visit(node[key], `${astPath}>${key}`, jsxParentTag);
+    }
+  };
+  visit(program, "module");
+  return facts;
+}
+
+function patternFactId(fact: Omit<PatternFact, "id"> & Record<string, unknown>): string {
+  const detail = JSON.stringify({ ...fact, id: undefined, span: undefined, file: undefined });
+  return `${fact.file}#pattern:${fact.kind}:${fact.span.start}:${fact.span.end}:${detail}`;
+}
+
+function importSpecifiers(specifiers: any[]): PatternImportSpecifierFact[] {
+  return specifiers.map((specifier) => {
+    if (specifier.type === "ImportDefaultSpecifier") return { imported: "default", local: specifier.local?.name ?? "", mode: "default" };
+    if (specifier.type === "ImportNamespaceSpecifier") return { imported: "*", local: specifier.local?.name ?? "", mode: "namespace" };
+    return { imported: specifier.imported?.name ?? stringValue(specifier.imported), local: specifier.local?.name ?? "", mode: "named" };
+  });
+}
+
+function exportFacts(stmt: any, file: string, factSpan: Span): Array<Omit<PatternFact, "id"> & Record<string, unknown>> {
+  const source = stringValue(stmt.source);
+  if (Array.isArray(stmt.specifiers) && stmt.specifiers.length > 0) {
+    return stmt.specifiers.map((specifier: any) => ({
+      kind: "export",
+      file,
+      span: factSpan,
+      exported: specifier.exported?.name ?? stringValue(specifier.exported),
+      local: specifier.local?.name ?? stringValue(specifier.local),
+      source,
+      mode: "named",
+    }));
+  }
+  const local = declarationName(stmt.declaration);
+  if (!local) return [];
+  return [{ kind: "export", file, span: factSpan, exported: local, local, source, mode: "named" }];
+}
+
+function declarationName(declaration: any): string {
+  if (!declaration) return "";
+  if (declaration.id?.name) return declaration.id.name;
+  if (declaration.type === "VariableDeclaration") return declaration.declarations?.[0]?.id?.name ?? "";
+  if (declaration.type === "Identifier") return declaration.name;
+  return "";
+}
+
+function staticMemberParts(node: any): { object: string; property: string } | null {
+  if (node?.type !== "StaticMemberExpression" && node?.type !== "MemberExpression") return null;
+  const object = expressionText(node.object);
+  const property = node.property?.name ?? stringValue(node.property);
+  if (!object || !property) return null;
+  return { object, property };
+}
+
+function expressionText(node: any): string {
+  if (!node) return "";
+  if (node.type === "Identifier" || node.type === "JSXIdentifier") return node.name;
+  if (node.type === "StringLiteral" || node.type === "Literal") return String(node.value ?? "");
+  if (node.type === "StaticMemberExpression" || node.type === "MemberExpression") {
+    const object = expressionText(node.object);
+    const property = expressionText(node.property);
+    return object && property ? `${object}.${property}` : object || property;
+  }
+  if (node.type === "CallExpression") return expressionText(node.callee);
+  return "";
+}
+
+function stringValue(node: any): string {
+  return typeof node?.value === "string" ? node.value : node?.name ?? "";
+}
+
+function jsxNameText(name: any): string | null {
+  if (!name) return null;
+  if (name.type === "JSXIdentifier") return name.name;
+  if (name.type === "JSXMemberExpression") {
+    const object = jsxNameText(name.object);
+    const property = jsxNameText(name.property);
+    return object && property ? `${object}.${property}` : object || property;
+  }
+  return null;
 }
 
 /** Name referenced by a default export: `Button`, or `memo(Button)`/`forwardRef(Button)`. */
