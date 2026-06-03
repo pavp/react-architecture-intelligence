@@ -27,7 +27,8 @@ Use this file as the stable entry point for agent sessions in this repo. Do not 
 - Split planned PRs above 400 changed lines unless the maintainer accepts a size exception.
 - Prefer feature-branch-chain for large integrated work.
 - Use squash merge unless the user explicitly changes preference.
-- Every PR must link an approved issue and have exactly one `type:*` label.
+- All app changes must land through a PR before reaching `main`; do not commit directly to `main`.
+- Keep exactly one `type:*` label on PRs when labels are used.
 - Do not touch unrelated local files unless the user explicitly asks.
 
 Known unrelated local files may exist in the user's worktree:

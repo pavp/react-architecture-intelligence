@@ -1,4 +1,4 @@
-import type { AnalysisDiagnostic, Finding, Span } from "../types.js";
+import type { AnalysisDiagnostic, ExplanationEnvelope, Finding, PresentedFinding, Span } from "../types.js";
 import type { RepoGraph } from "../graph/repograph.js";
 import type { RaiConfig } from "../config/schema.js";
 import type { MemoryReader } from "../memory/memory-reader.js";
@@ -35,4 +35,5 @@ export interface Analyzer {
   ruleId: string;
   framework: string;
   analyze(ctx: AnalysisContext): AnalyzerResult;
+  explain?: ((finding: PresentedFinding) => ExplanationEnvelope | null) | undefined;
 }

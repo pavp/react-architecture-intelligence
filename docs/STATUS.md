@@ -1,6 +1,6 @@
 # RAI Status
 
-This is the canonical project status after P11-S1. Historical status in
+This is the canonical project status after P9-S2 and P11-S2. Historical status in
 `docs/superpowers/STATUS.md` remains useful for archaeology, but new sessions should start here.
 
 ## Current state
@@ -9,8 +9,8 @@ This is the canonical project status after P11-S1. Historical status in
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P10 complete plus P11-S1; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P11-S2 React pattern analyzers (deferred pattern families) |
+| Product state | P0–P10 complete plus P9-S2, P11-S1, and P11-S2; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P9-S3 Human Output Coverage Audit, then P11-S3 React pattern analyzers |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -55,9 +55,10 @@ Latest MCP compatibility fix:
 | P6 | Complete | Next adapter: detection, variant guard, enrichment, client-boundary-bloat, route-coupling, CLI adapter loading. |
 | P7 | Complete | Distribution + install: `rai install`, platform auto-detect, safe config/instruction writes, `rai doctor`, and near-term TypeScript CLI distribution decision. |
 | P8 | Complete | Single-binary distribution: Go launcher prototype, release shape/governance, safe publish gates, and first installable `v0.1.3` release. |
-| P9 | Complete | Explainability: deterministic explanation envelope, glossary, additive MCP `explain_finding`, `rai explain <file>`, and README onboarding. |
+| P9 | Complete | Explainability: deterministic explanation envelope, glossary, additive MCP `explain_finding`, `rai explain <file>`, README onboarding, and analyzer-owned human explanation hooks for high-quality adapter explanations. |
 | P10 | Complete | React Pattern Intelligence Foundation: generic syntax facts, React catalog scaffold outside core, compound primitive fixtures, and OpenSpec specs. |
-| P11-S1 | Complete | First React pattern analyzer slice: `react/compound-component-api-drift` in `@rai/adapter-react`, CLI/MCP adapter composition, drift terminology, and OpenSpec specs `react-pattern-analyzers`, `pattern-drift`, `cli-adapter-loading`. Remaining P11 pattern families deferred. |
+| P11-S1 | Complete | First React pattern analyzer slice: `react/compound-component-api-drift` in `@rai/adapter-react`, CLI/MCP adapter composition, drift terminology, and OpenSpec specs `react-pattern-analyzers`, `pattern-drift`, `cli-adapter-loading`. |
+| P11-S2 | Complete | Container/presenter role-name divergence slice: `react/container-presenter-role-drift` in `@rai/adapter-react`, grounded in existing component names, file paths, direct render edges, and high-signal presenter hook calls. |
 
 ## P7 distribution + install
 
@@ -96,18 +97,44 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: start P11-S2, the next React pattern analyzer family (for example provider/context or container/presenter). Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+Immediate next work: start P9-S3 Human Output Coverage Audit to upgrade remaining human-facing RAI outputs while preserving machine-facing JSON/MCP contracts. After P9-S3, continue P11-S3, the next React pattern analyzer family (for example provider/context or controlled/uncontrolled). Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
 
-## P11-S1 React Pattern Analyzers + Pattern Drift
+## P11 React Pattern Analyzers + Pattern Drift
+
+P11 now has two concrete React pattern analyzer slices on top of P10 pattern facts, without changing the `@rai/core` boundary.
+
+### P11-S2 Container/Presenter Role Divergence
+
+P11-S2 adds the second adapter-owned React analyzer:
+
+- `@rai/adapter-react` now also ships `react/container-presenter-role-drift`.
+- The analyzer reports only observed current-source container/presenter role-name and syntax divergence: a container-like component directly renders a presenter-like component, and the presenter-like component has high-signal hook evidence.
+- Evidence is grounded in existing graph facts: component names, file/path role seeds, direct `renders` edges, presenter `hookCalls`, hook-call spans when available, and stable SHA fingerprints.
+- Finding language remains bounded to observed role-name/syntax divergence. It does not claim wrong architecture, team intent, root cause, historical change, or required remediation.
+- Implementation stays in `packages/adapter-react`; `@rai/core` remains framework-agnostic and no provider/context, controlled/uncontrolled, forms, data-fetching, design-system, overlay, or broad API-convention findings are emitted.
+
+Latest P11-S2 verification:
+
+```bash
+pnpm test       # 60 files / 380 tests
+pnpm test:launcher
+pnpm typecheck
+pnpm build
+rtk proxy pnpm lint
+./scripts/smoke.sh --build  # includes human-readable react/container-presenter-role-drift CLI smoke
+git diff --check
+```
+
+### P11-S1 Compound Component API Drift
 
 P11-S1 delivers the first concrete React pattern analyzer on top of P10 pattern facts, without changing the `@rai/core` boundary:
 
-- `@rai/adapter-react` now ships `react/compound-component-api-drift`, which detects compound-component API divergence from grounded `RepoGraph.patternFacts` syntax evidence.
+- `@rai/adapter-react` ships `react/compound-component-api-drift`, which detects compound-component API divergence from grounded `RepoGraph.patternFacts` syntax evidence.
 - The analyzer is pure and deterministic: it reads pattern facts, sorts/freezes evidence, uses stable SHA fingerprints, and performs no fs/network/memory/config/clock/random/LLM writes.
-- CLI/MCP composition loads the React adapter through the same registry factory as the Next adapter, so `analyze_repo`, findings, and diagnostics see the React finding without core framework coupling and without a new MCP drift tool.
+- CLI/MCP composition loads the React adapter through the same registry factory as the Next adapter, so `analyze_repo`, findings, and diagnostics see the React findings without core framework coupling and without a new MCP drift tool.
 - Drift terminology stays distinct: current-source findings use repo-local divergence wording; historical change wording stays in existing `get_drift` snapshot results.
 - OpenSpec specs added/updated: `react-pattern-analyzers`, `pattern-drift`, and `cli-adapter-loading`.
-- Deferred to later P11 slices (no findings emitted yet): provider/context, controlled/uncontrolled, forms, data fetching, design-system usage, overlays beyond compound primitives, container/presenter, and broad API conventions.
+- Deferred to later P11 slices (no findings emitted yet): provider/context, controlled/uncontrolled, forms, data fetching, design-system usage, overlays beyond compound primitives, and broad API conventions.
 - Deferred PR3 follow-ups (optional, non-blocking): backfill/snapshot/`get_drift` parity test coverage and `rai explain <file>` / file-ref parity test coverage.
 
 Latest P11-S1 verification:
@@ -147,12 +174,15 @@ git diff --check
 P9 makes existing RAI facts easier to understand without changing analyzer truth:
 
 - Core explainability helpers derive bounded summaries, inspect-first guidance, limits, grounding fields, and glossary entries from existing findings.
-- MCP `explain_finding` now returns raw finding data plus an additive `explanation` envelope.
+- MCP `explain_finding` returns raw finding data plus an additive `explanation` envelope.
 - CLI `rai explain <file>` shows relevant findings for a file in human-readable output, with JSON support following existing CLI conventions.
-- Root `README.md` now gives new users a quick path: install, doctor, analyze, explain, reading guide, glossary, limits, and next step.
-- Guardrail: presentation explains facts; it does not infer intent, ownership, root cause, or remediation not present in evidence.
+- P9-S2 adds an analyzer-owned explanation hook so adapters can provide high-quality human wording without moving adapter semantics into `@rai/core`.
+- `react/container-presenter-role-drift` now explains the concrete observation in human language: a container-like component renders a presenter-like component, and the presenter-like side has high-signal hook evidence.
+- Next explainability slice: P9-S3 Human Output Coverage Audit for remaining human-facing RAI outputs, including other analyzers and CLI UX surfaces.
+- Root `README.md` gives new users a quick path: install, doctor, analyze, explain, reading guide, glossary, limits, and next step.
+- Guardrail: human-facing presentation explains facts; machine-facing JSON/raw evidence stays stable and structured; presentation does not infer intent, ownership, root cause, or remediation not present in evidence.
 
-Latest P9 verification:
+Latest P9/P11 explainability verification:
 
 ```bash
 pnpm test       # 56 files / 344 tests

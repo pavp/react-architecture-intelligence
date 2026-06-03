@@ -159,6 +159,7 @@ export class Session {
   private lastPresented: PresentedFinding[] = [];
   private lastGraph: Readonly<RepoGraph> | null = null;
   private lastTypeResolver: TypeResolver | null = null;
+  private lastRegistry: AnalyzerRegistry | null = null;
   private lastAnalysisVersion = 0;
 
   constructor(private opts: SessionOpts) {
@@ -178,6 +179,7 @@ export class Session {
     });
     this.lastPresented = res.presented;
     this.lastGraph = res.graph;
+    this.lastRegistry = registry;
     this.lastTypeResolver = createTypeResolver({ files: input.files, graph: res.graph });
     this.lastAnalysisVersion = res.analysisVersion;
     const active = res.presented.filter((p) => p.status !== "suppressed");
@@ -318,11 +320,12 @@ export class Session {
     const f = this.lastPresented.find((p) => p.fingerprint.structural === input.fingerprint);
     if (!f) throw new Error("unknown fingerprint in current analysis");
     const events = this.feedback.eventsFor(input.fingerprint, f.ruleId);
+    const analyzerExplanation = this.lastRegistry?.get(f.ruleId)?.explain?.(f) ?? null;
     return {
       finding: f,
       evidence: f.evidence,
       groundingFields: Object.keys(f.evidence), // the closed license set Claude may cite
-      explanation: explainPresentedFinding(f),
+      explanation: analyzerExplanation ?? explainPresentedFinding(f),
       memory: {
         weight: f.weight?.value ?? 0,
         confidence: f.weight?.confidence ?? 0,

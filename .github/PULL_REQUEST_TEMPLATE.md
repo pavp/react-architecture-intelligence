@@ -1,6 +1,6 @@
-## Linked Issue
+## Main Branch Policy
 
-Closes #
+All app changes must land through a PR before reaching `main`. Do not commit directly to `main`.
 
 ## PR Type
 
@@ -48,7 +48,7 @@ Chain context, if applicable:
 
 ## Contributor Checklist
 
-- [ ] Linked an approved issue with `Closes #N`, `Fixes #N`, or `Resolves #N`
+- [ ] Confirmed this app change is landing through a PR, not directly on `main`
 - [ ] Added exactly one `type:*` label
 - [ ] Kept changes within stated scope
 - [ ] Updated specs/docs if behavior changed

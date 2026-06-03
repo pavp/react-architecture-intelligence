@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { createSession } from "./tools.js";
 import { DEFAULT_CONFIG } from "../config/resolve.js";
 import type { Analyzer } from "../analyzers/analyzer.js";
-import type { AdapterMetricEvidence, Finding } from "../types.js";
+import type { AdapterMetricEvidence, Finding, PresentedFinding } from "../types.js";
 import type { ApplyWorkspace } from "../codemod/apply-pipeline.js";
 import { AnalyzerRegistry } from "../analyzers/registry.js";
 
@@ -211,6 +211,7 @@ test("rawGraphQuery returns bounded graph rows with truncation", () => {
   const r = s.rawGraphQuery({ cypherLike: "MATCH edges", limit: 1 });
 
   expect(r.status).toBe("ok");
+  if (r.status !== "ok") throw new Error("expected raw graph query to succeed");
   expect(r.rows).toHaveLength(1);
   expect(r.truncated).toBe(true);
 });
@@ -385,6 +386,51 @@ test("explain_finding returns additive explanation beside unchanged evidence and
     glossary: expect.arrayContaining([expect.objectContaining({ term: "cosine", known: true })]),
   });
   expect(e.explanation.limits).toContain("Do not assume shared ownership, intent, or safe remediation from this finding alone.");
+});
+
+test("explain_finding uses analyzer-owned human explanation when available", () => {
+  const evidence: AdapterMetricEvidence = {
+    kind: "adapter-metric",
+    adapterId: "test-adapter",
+    ruleId: "test/human-output",
+    subject: { id: "pair", name: "Alpha -> Beta", file: "Alpha.tsx", span: { file: "Alpha.tsx", start: 0, end: 10, kind: "component", astPath: "module>component" }, fingerprint: "subject-fp" },
+    roles: [{ role: "source-role", variant: "Alpha", file: "Alpha.tsx" }],
+    metrics: { measuredThings: 1 },
+    thresholds: { measuredThings: 0 },
+    topology: { directChildIds: ["Beta"], reachableNodeIds: ["Alpha", "Beta"], exceeded: ["measuredThings"] },
+  };
+  const customAnalyzer: Analyzer = {
+    ruleId: "test/human-output",
+    framework: "test",
+    analyze: () => [{ ...makeFinding("test/human-output"), evidence }],
+    explain: (finding: PresentedFinding) => ({
+      summary: `Human summary for ${finding.ruleId}`,
+      whyItMatters: "This is owned by the analyzer, not generic core wording.",
+      inspectFirst: ["Alpha -> Beta in Alpha.tsx"],
+      limits: ["No intent or remediation is inferred."],
+      groundingFields: Object.keys(finding.evidence).sort(),
+      glossary: [],
+    }),
+  };
+  const s = createSession({
+    config: DEFAULT_CONFIG,
+    registryFactory: () => {
+      const registry = new AnalyzerRegistry();
+      registry.register(customAnalyzer);
+      return registry;
+    },
+  });
+
+  const a = s.analyzeRepo({ files: [{ file: "Alpha.tsx", source: "export function Alpha() { return <div />; }" }], asOf: 0, commitSha: "c1" });
+  const fp = a.topFingerprints[0]!;
+  const result = s.explainFinding({ fingerprint: fp });
+
+  expect(result.evidence).toEqual(evidence);
+  expect(result.explanation).toMatchObject({
+    summary: "Human summary for test/human-output",
+    whyItMatters: "This is owned by the analyzer, not generic core wording.",
+    inspectFirst: ["Alpha -> Beta in Alpha.tsx"],
+  });
 });
 
 test("explain_finding refuses an unknown fingerprint without synthesizing an explanation", () => {

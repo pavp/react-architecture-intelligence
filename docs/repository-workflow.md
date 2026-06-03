@@ -5,7 +5,7 @@ RAI uses a simple trunk workflow: `main` is the principal trunk/default branch t
 ## Quick path
 
 1. Branch from `main` for one reviewable work unit using documented branch examples: feat/p8-release-policy, fix/release-check, docs/repository-workflow, chore/release-config, test/release-validator.
-2. Open a PR to `main` with an approved issue, exactly one `type:*` label, passing CI, reviewable diff, repository PR template, and Conventional Commit squash merge title.
+2. Open a PR to `main` for app changes before they reach `main`, with exactly one `type:*` label when labels are used, passing CI, reviewable diff, repository PR template, and Conventional Commit squash merge title.
 3. Let CI validate the PR title with commitlint; optional local checks may use `pnpm lint:pr-title --edit <file>` before opening or editing a PR.
 4. Release publishing runs only from validated `v*` tags on `main`; manual dispatch without confirmation remains read-only preflight.
 
@@ -28,16 +28,16 @@ Use naming to tell reviewers what changed before they read the diff.
 | Branches | Use short-lived `<type>/<kebab-case-scope>` names. Preferred types are `feat`, `fix`, `docs`, `chore`, and `test`. | `feat/p8-release-policy`, `fix/release-check`, `docs/repository-workflow`, `chore/release-config`, `test/release-validator` |
 | Commit messages | Use Conventional Commit commit messages. CI-enforceable naming uses commitlint conventional defaults. | `docs(workflow): document repository naming policy`, `test(release): require workflow automation deferral` |
 | PR titles | Use Conventional Commit PR titles because squash merge should preserve release-readable history. PR-title CI validates the squash-title candidate on pull_request events. | `docs(workflow): document repository naming policy` |
-| PR body | Preserve the repository PR template and fill issue, type, verification, and scope fields. | Link approved issue, select exactly one `type:*` label, list tests run, and state out-of-scope work. |
+| PR body | Preserve the repository PR template and fill type, verification, and scope fields. | Confirm app changes land through a PR before `main`, select exactly one `type:*` label when labels are used, list tests run, and state out-of-scope work. |
 
 Allowed/recommended scopes: `workflow`, `release`, `launcher`, `install`, `doctor`, `mcp`, `adapter-next`, `core`, `cli`, `docs`, `test`, and `openspec`. Prefer the narrowest scope reviewers can verify. Commitlint intentionally keeps flexible scopes and does not enforce a fixed package-scope list.
 
 ## PR gates
 
-Every PR to trunk needs:
+Every app change to trunk needs:
 
-- approved issue
-- exactly one type:* label
+- pull request before reaching `main`
+- exactly one type:* label when labels are used
 - passing CI
 - PR-title CI check passing
 - reviewable diff

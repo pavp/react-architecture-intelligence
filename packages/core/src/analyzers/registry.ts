@@ -16,6 +16,10 @@ export class AnalyzerRegistry {
   list(): Analyzer[] {
     return [...this.analyzers.values()];
   }
+
+  get(ruleId: string): Analyzer | undefined {
+    return this.analyzers.get(ruleId);
+  }
 }
 
 export function createDefaultAnalyzerRegistry(): AnalyzerRegistry {

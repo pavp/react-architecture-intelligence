@@ -4,7 +4,7 @@
 
 ### Requirement: Naming Policy
 
-P8-S3c MUST document branch naming, commit naming, PR title, and PR template policy. Branches SHOULD use short-lived `feat/`, `fix/`, `docs/`, `chore/`, or `test/` prefixes plus kebab-case scope. Commit messages and PR titles MUST use Conventional Commit form and MUST be enforceable by CI checks. PR descriptions MUST preserve the repository template and fill issue, type, verification, and scope fields. Conventional Commit scopes SHOULD remain flexible and MUST NOT require a fixed package-scope list.
+P8-S3c MUST document branch naming, commit naming, PR title, and PR template policy. Branches SHOULD use short-lived `feat/`, `fix/`, `docs/`, `chore/`, or `test/` prefixes plus kebab-case scope. Commit messages and PR titles MUST use Conventional Commit form and MUST be enforceable by CI checks. PR descriptions MUST preserve the repository template and fill type, verification, and scope fields. Conventional Commit scopes SHOULD remain flexible and MUST NOT require a fixed package-scope list.
 (Previously: P8-S3a documented naming policy without CI-enforceable commit or PR-title checks.)
 
 #### Scenario: Naming policy is explicit
@@ -23,13 +23,13 @@ P8-S3c MUST document branch naming, commit naming, PR title, and PR template pol
 
 ### Requirement: PR and Chained Review Policy
 
-Changes MUST enter trunk through PRs that link approved issue, have exactly one `type:*` label, complete the repository PR template, pass CI, and use Conventional Commit squash merge. Oversized work MUST split into chained/stacked units unless maintainers approve `size:exception`. PR-title CI MUST run on `pull_request` events and validate the squash-title candidate before merge.
+Application changes MUST enter trunk through PRs before reaching `main`, have exactly one `type:*` label when labels are used, complete the repository PR template, pass CI, and use Conventional Commit squash merge. Direct commits to `main` are not allowed except for explicit maintainer recovery. Oversized work MUST split into chained/stacked units unless maintainers approve `size:exception`. PR-title CI MUST run on `pull_request` events and validate the squash-title candidate before merge.
 (Previously: PR policy required Conventional Commit squash titles but not PR-title CI validation.)
 
 #### Scenario: PR meets gates
 
 - GIVEN a PR targets trunk
-- WHEN it links approved issue, has one `type:*` label, completes the template, passes CI, and is reviewable
+- WHEN it reaches `main` through a PR, has one `type:*` label when labels are used, completes the template, passes CI, and is reviewable
 - THEN it MAY be squash-merged with a Conventional Commit title
 
 #### Scenario: PR title fails governance check
