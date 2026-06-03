@@ -14,7 +14,8 @@ OpenCode should use `CLAUDE.md` as the canonical repo handoff. This file exists 
 - Main working branch: `main`.
 - GitHub repo: `https://github.com/pavp/react-architecture-intelligence`.
 - Use squash merge unless user says otherwise.
-- Every PR must link an approved issue and have exactly one `type:*` label.
+- All app changes must land through a PR before reaching `main`; do not commit directly to `main`.
+- Keep exactly one `type:*` label on PRs when labels are used.
 - Keep PRs reviewable; split work above 400 changed lines.
 - Do not add `Co-Authored-By` or AI attribution.
 - Do not touch unrelated local files unless user explicitly asks.

@@ -1,6 +1,6 @@
 # RAI Roadmap
 
-This is the canonical roadmap after P11-S1. Older roadmap notes in `docs/superpowers/`,
+This is the canonical roadmap after P9-S2 and P11-S2. Older roadmap notes in `docs/superpowers/`,
 `docs/gaps.md`, and `docs/future-ideas.md` are historical inputs unless this file links
 them as active work.
 
@@ -10,9 +10,9 @@ them as active work.
 |-------|------|--------------|
 | P7 | Distribution + install | Complete: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
 | P8 | Single-binary distribution | Complete: P8-S1 local Go launcher prototype, P8-S2 release shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, release activation, and first installable `v0.1.3` release. |
-| P9 | Explainability | Complete: deterministic human output, glossary for evidence terms, additive `explain_finding`, `rai explain <file>`, and README onboarding. |
+| P9 | Explainability | Complete through P9-S2: deterministic human output, glossary for evidence terms, additive `explain_finding`, `rai explain <file>`, README onboarding, and analyzer-owned human explanation hooks. Next: P9-S3 Human Output Coverage Audit. |
 | P10 | React Pattern Intelligence Foundation | Complete: generic pattern fact extraction for imports, exports, calls, hooks, JSX structure, static members, file roles, and a React catalog scaffold outside core. |
-| P11 | React Pattern Analyzers + Pattern Drift | In progress. P11-S1 complete: `react/compound-component-api-drift` analyzer in `@rai/adapter-react`. Remaining slices detect more repo-derived patterns and divergences: container/presenter, controlled/uncontrolled, provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
+| P11 | React Pattern Analyzers + Pattern Drift | In progress. P11-S1 complete: `react/compound-component-api-drift`; P11-S2 complete: `react/container-presenter-role-drift`, both in `@rai/adapter-react`. Remaining slices detect more repo-derived patterns and divergences: provider/context, controlled/uncontrolled, forms, data fetching, design-system usage, overlays, and API conventions. |
 | P12 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
 | P13 | Calibration | Reduces noise per repo: `rai calibrate`, threshold suggestions from feedback, and no automatic config changes. |
 | P14 | Deeper graph | Expands structural intelligence: `passes` edges, prop drilling, import/call topology, and `exportKind` use in analyzers/codemods. |
@@ -58,7 +58,7 @@ P8 is verified and archived. `v0.1.3` is the first successful installable releas
 
 Rule: Go may wrap distribution, but RAI facts and analyzer behavior stay governed by the existing engine contracts unless a future design changes them.
 
-## P9 scope notes — complete
+## P9 scope notes — complete through P9-S2; P9-S3 planned
 
 P9 makes RAI outputs usable by developers who are not familiar with internal terms.
 
@@ -68,9 +68,13 @@ Delivered capabilities:
 - Glossary for `cosine`, `propOverlap`, `hookOverlap`, `sharedSurface`, `groundingFields`, `span`, `diagnostic`, and related graph/topology terms.
 - Grounded summaries that explain what RAI found, why it matters, what to inspect first, and what not to assume.
 - `rai explain <file>` for finding inspection without an agent session.
+- Analyzer-owned explanation hooks so adapters can provide high-quality human wording without moving adapter semantics into `@rai/core`.
+- P9-S2 applies this to `react/container-presenter-role-drift` and adds the human-facing output quality rule.
 - README quick start that explains what RAI does, install path, first commands, how to read findings, current limitations, and next step.
 
-Rule: core facts stay structured; UX explains facts without inventing intent.
+Rule: core facts stay structured; human-facing UX explains facts without inventing intent; machine-facing JSON/raw evidence stays stable and structured.
+
+Next slice: P9-S3 Human Output Coverage Audit. It should inventory remaining human-facing RAI outputs (`rai explain` fallback cases, other analyzers, `doctor`, `install`, `backfill`, CLI errors, MCP explanation text, README examples), upgrade them to the same evidence-first human quality bar, and preserve machine-facing JSON/MCP contracts.
 
 ## P10 scope notes — complete
 
@@ -89,9 +93,10 @@ Rule: P10 facts are syntax observations only. They must not infer React intent, 
 
 P11 turns P10 syntax facts into concrete React pattern detection and drift, one family per slice.
 
-Delivered in P11-S1:
+Delivered so far:
 
-- `react/compound-component-api-drift` analyzer in `@rai/adapter-react`, detecting compound-component API divergence from grounded pattern-fact evidence.
+- P11-S1: `react/compound-component-api-drift` analyzer in `@rai/adapter-react`, detecting compound-component API divergence from grounded pattern-fact evidence.
+- P11-S2: `react/container-presenter-role-drift` analyzer in `@rai/adapter-react`, detecting observed current-source container/presenter role-name and syntax divergence from existing component names, file/path role seeds, direct render edges, and high-signal presenter hook calls.
 - Pure deterministic adapter-owned execution with stable fingerprints and no side effects.
 - CLI/MCP adapter composition through the same registry factory as the Next adapter, with no new MCP drift tool.
 - Distinct drift terminology: repo-local divergence for current source; historical wording only in existing `get_drift` snapshot results.
@@ -99,7 +104,7 @@ Delivered in P11-S1:
 
 Deferred to later P11 slices (specified/implemented by future approved changes, no findings yet):
 
-- provider/context, controlled/uncontrolled, forms, data fetching, design-system usage, overlays beyond compound primitives, container/presenter, and broad API conventions.
+- provider/context, controlled/uncontrolled, forms, data fetching, design-system usage, overlays beyond compound primitives, and broad API conventions.
 - Optional non-blocking follow-ups: snapshot/`get_drift` parity coverage and `rai explain <file>` / file-ref parity coverage.
 
 Rule: P11 analyzers stay adapter-owned and grounded. They explain syntax-derived divergence; they must not assert intended API, semantic symbol resolution, root cause, or required remediation.

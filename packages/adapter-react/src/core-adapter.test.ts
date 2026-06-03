@@ -8,6 +8,7 @@ import {
 	type SourceFile,
 } from "@rai/core";
 import { COMPOUND_COMPONENT_API_DRIFT_RULE_ID } from "./compound-component-api-drift.js";
+import { CONTAINER_PRESENTER_ROLE_DRIFT_RULE_ID } from "./container-presenter-role-drift.js";
 import { createReactCoreAnalyzers } from "./core-adapter.js";
 
 describe("React core analyzer adapter", () => {
@@ -21,6 +22,7 @@ describe("React core analyzer adapter", () => {
 			})),
 		).toEqual([
 			{ ruleId: COMPOUND_COMPONENT_API_DRIFT_RULE_ID, framework: "react" },
+			{ ruleId: CONTAINER_PRESENTER_ROLE_DRIFT_RULE_ID, framework: "react" },
 		]);
 	});
 
@@ -50,6 +52,68 @@ describe("React core analyzer adapter", () => {
 			ruleId: COMPOUND_COMPONENT_API_DRIFT_RULE_ID,
 			severity: "info",
 		});
+	});
+
+	test("emits container/presenter role divergence through the normal analysis path", () => {
+		const files: SourceFile[] = [
+			{
+				file: "src/users.tsx",
+				source:
+					"export function UserContainer() { return <UserView />; }\nexport function UserView() { const [open] = useState(false); return <div>{String(open)}</div>; }\n",
+			},
+		];
+		const session = createReactSession(files);
+
+		const result = session.analyzeRepo({
+			files,
+			asOf: 0,
+			runId: "react-container-presenter",
+			commitSha: "sha",
+		});
+		const findings = session.findSharedOpportunities({
+			includeSuppressed: false,
+		}).opportunities;
+
+		expect(result.counts.byType.opportunity).toBe(1);
+		expect(findings.map((finding) => finding.ruleId)).toEqual([
+			CONTAINER_PRESENTER_ROLE_DRIFT_RULE_ID,
+		]);
+		expect(findings[0]).toMatchObject({
+			ruleId: CONTAINER_PRESENTER_ROLE_DRIFT_RULE_ID,
+			severity: "info",
+			evidence: {
+				kind: "adapter-metric",
+				subject: { name: "UserContainer -> UserView", file: "src/users.tsx" },
+			},
+		});
+	});
+
+	test("healthy container/presenter pairs remain silent through parse and analyze", () => {
+		const files: SourceFile[] = [
+			{
+				file: "src/users.tsx",
+				source:
+					"export function UserContainer() { return <UserView />; }\nexport function UserView() { return <div>User</div>; }\n",
+			},
+		];
+		const session = createReactSession(files);
+
+		const result = session.analyzeRepo({
+			files,
+			asOf: 0,
+			runId: "react-container-presenter-healthy",
+			commitSha: "sha",
+		});
+		const findings = session.findSharedOpportunities({
+			includeSuppressed: false,
+		}).opportunities;
+
+		expect(result.counts.byType.opportunity).toBe(0);
+		expect(
+			findings.filter(
+				(finding) => finding.ruleId === CONTAINER_PRESENTER_ROLE_DRIFT_RULE_ID,
+			),
+		).toEqual([]);
 	});
 
 	test("fixture-level healthy compound primitives remain silent through parse and analyze", () => {
