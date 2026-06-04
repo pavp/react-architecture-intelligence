@@ -1,6 +1,7 @@
 import type { Analyzer, SourceFile } from "@rai/core";
 import { createCompoundComponentApiDriftAnalyzer } from "./compound-component-api-drift.js";
 import { createContainerPresenterRoleDriftAnalyzer } from "./container-presenter-role-drift.js";
+import { createControlledUncontrolledPropSurfaceDriftAnalyzer } from "./controlled-uncontrolled-prop-surface-drift.js";
 
 export interface ReactCoreAnalyzerInput {
 	rootDir: string;
@@ -13,5 +14,6 @@ export function createReactCoreAnalyzers(
 	return [
 		createCompoundComponentApiDriftAnalyzer(),
 		createContainerPresenterRoleDriftAnalyzer(),
+		createControlledUncontrolledPropSurfaceDriftAnalyzer(),
 	];
 }

@@ -1,6 +1,6 @@
 # RAI Status
 
-This is the canonical project status after P9-S3 and P11-S2. Historical status in
+This is the canonical project status after P9-S3 and P11-S3. Historical status in
 `docs/superpowers/STATUS.md` remains useful for archaeology, but new sessions should start here.
 
 ## Current state
@@ -9,8 +9,8 @@ This is the canonical project status after P9-S3 and P11-S2. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P10 complete plus P9-S3, P11-S1, and P11-S2; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P11-S3 React pattern analyzers |
+| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S3; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P11-S4 React pattern analyzers |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -59,6 +59,7 @@ Latest MCP compatibility fix:
 | P10 | Complete | React Pattern Intelligence Foundation: generic syntax facts, React catalog scaffold outside core, compound primitive fixtures, and OpenSpec specs. |
 | P11-S1 | Complete | First React pattern analyzer slice: `react/compound-component-api-drift` in `@rai/adapter-react`, CLI/MCP adapter composition, drift terminology, and OpenSpec specs `react-pattern-analyzers`, `pattern-drift`, `cli-adapter-loading`. |
 | P11-S2 | Complete | Container/presenter role-name divergence slice: `react/container-presenter-role-drift` in `@rai/adapter-react`, grounded in existing component names, file paths, direct render edges, and high-signal presenter hook calls. |
+| P11-S3 | Complete | Controlled/uncontrolled prop-surface slice: `react/controlled-uncontrolled-prop-surface-drift` in `@rai/adapter-react`, grounded in observed component prop names with adapter-owned explanation. |
 
 ## P7 distribution + install
 
@@ -97,11 +98,36 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: start P11-S3, the next React pattern analyzer family (for example provider/context or controlled/uncontrolled). Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+Immediate next work: choose P11-S4, the next React pattern analyzer family (for example provider/context, forms, data fetching, design-system usage, overlays, or API conventions). Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
 
 ## P11 React Pattern Analyzers + Pattern Drift
 
-P11 now has two concrete React pattern analyzer slices on top of P10 pattern facts, without changing the `@rai/core` boundary.
+P11 now has three concrete React pattern analyzer slices on top of P10 pattern facts, without changing the `@rai/core` boundary.
+
+### P11-S3 Controlled/Uncontrolled Prop-Surface Drift
+
+P11-S3 adds the third adapter-owned React analyzer:
+
+- `@rai/adapter-react` now also ships `react/controlled-uncontrolled-prop-surface-drift`.
+- The analyzer reports only observed current-source prop-surface drift: a component exposes approved controlled/default prop-name pairs for the same state slot.
+- Initial approved pairs are `value/defaultValue`, `checked/defaultChecked`, and `open/defaultOpen`.
+- Evidence is grounded in existing graph facts: component `propNames`, optional handler props, optional `useState`/`useReducer` hook calls, component file/span, and stable SHA fingerprints.
+- Finding and explanation language remain bounded to observed prop names. They do not claim runtime controlled behavior, React warnings, bugs, team intent, root cause, user impact, or required remediation.
+- Implementation stays in `packages/adapter-react`; `@rai/core` remains framework-agnostic and no provider/context, forms, data-fetching, design-system, overlay, or broad API-convention findings are emitted.
+
+Latest P11-S3 verification:
+
+```bash
+pnpm test packages/adapter-react/src/controlled-uncontrolled-prop-surface-drift.test.ts packages/adapter-react/src/core-adapter.test.ts  # 2 files / 15 tests
+pnpm test packages/adapter-react/src/compound-component-api-drift.test.ts packages/adapter-react/src/container-presenter-role-drift.test.ts packages/adapter-react/src/controlled-uncontrolled-prop-surface-drift.test.ts packages/adapter-react/src/core-adapter.test.ts  # 4 files / 35 tests
+pnpm test && pnpm test:launcher  # 61 Vitest files / 396 tests plus Go launcher tests
+pnpm typecheck
+pnpm build
+rtk proxy pnpm lint
+./scripts/smoke.sh --build  # 19 checks
+
+git diff --check
+```
 
 ### P11-S2 Container/Presenter Role Divergence
 

@@ -9,6 +9,7 @@ import {
 } from "@rai/core";
 import { COMPOUND_COMPONENT_API_DRIFT_RULE_ID } from "./compound-component-api-drift.js";
 import { CONTAINER_PRESENTER_ROLE_DRIFT_RULE_ID } from "./container-presenter-role-drift.js";
+import { CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID } from "./controlled-uncontrolled-prop-surface-drift.js";
 import { createReactCoreAnalyzers } from "./core-adapter.js";
 
 describe("React core analyzer adapter", () => {
@@ -23,6 +24,10 @@ describe("React core analyzer adapter", () => {
 		).toEqual([
 			{ ruleId: COMPOUND_COMPONENT_API_DRIFT_RULE_ID, framework: "react" },
 			{ ruleId: CONTAINER_PRESENTER_ROLE_DRIFT_RULE_ID, framework: "react" },
+			{
+				ruleId: CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID,
+				framework: "react",
+			},
 		]);
 	});
 
@@ -86,6 +91,50 @@ describe("React core analyzer adapter", () => {
 				subject: { name: "UserContainer -> UserView", file: "src/users.tsx" },
 			},
 		});
+	});
+
+	test("emits controlled/uncontrolled prop-surface drift through the normal analysis path", () => {
+		const files: SourceFile[] = [
+			{
+				file: "src/Input.tsx",
+				source:
+					"export function Input({ value, defaultValue, onChange }) { const [draft] = useState(defaultValue); return <input />; }\n",
+			},
+		];
+		const session = createReactSession(files);
+
+		const result = session.analyzeRepo({
+			files,
+			asOf: 0,
+			runId: "react-controlled-uncontrolled",
+			commitSha: "sha",
+		});
+		const findings = session.findSharedOpportunities({
+			includeSuppressed: false,
+		}).opportunities;
+
+		expect(result.counts.byType.opportunity).toBe(1);
+		expect(findings.map((finding) => finding.ruleId)).toEqual([
+			CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID,
+		]);
+		expect(findings[0]).toMatchObject({
+			ruleId: CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID,
+			severity: "info",
+			evidence: {
+				kind: "adapter-metric",
+				subject: { name: "Input", file: "src/Input.tsx" },
+				metrics: { mixedPropPairs: 1, handlerProps: 1, stateHookCalls: 1 },
+			},
+		});
+
+		const analyzer = createReactCoreAnalyzers({ rootDir: ".", files }).find(
+			(candidate) =>
+				candidate.ruleId === CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID,
+		);
+		const explanation = analyzer?.explain?.(findings[0]!);
+		expect(explanation?.summary).toBe(
+			"Input exposes both value and defaultValue prop names in the same component prop surface.",
+		);
 	});
 
 	test("healthy container/presenter pairs remain silent through parse and analyze", () => {
