@@ -16,5 +16,9 @@ export {
 	CONTAINER_PRESENTER_ROLE_DRIFT_RULE_ID,
 	createContainerPresenterRoleDriftAnalyzer,
 } from "./container-presenter-role-drift.js";
+export {
+	CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID,
+	createControlledUncontrolledPropSurfaceDriftAnalyzer,
+} from "./controlled-uncontrolled-prop-surface-drift.js";
 export { createReactCoreAnalyzers } from "./core-adapter.js";
 export type { ReactCoreAnalyzerInput } from "./core-adapter.js";
