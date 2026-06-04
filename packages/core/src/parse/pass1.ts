@@ -1,5 +1,5 @@
 import { parseSync } from "oxc-parser";
-import type { ComponentNode, HookNode, PatternFact, PatternImportSpecifierFact, Span } from "../types.js";
+import type { ComponentNode, HookNode, PatternCallArgumentFact, PatternFact, PatternImportSpecifierFact, PatternJsxAttributeFact, Span } from "../types.js";
 
 export interface Pass1Result {
   file: string;
@@ -154,9 +154,38 @@ function collectPatternFacts(file: string, source: string, program: any): Patter
       node.forEach((child, idx) => visit(child, `${astPath}[${idx}]`, jsxParentTag));
       return;
     }
+    if (node.type === "VariableDeclaration") {
+      (node.declarations ?? []).forEach((declaration: any, idx: number) => {
+        const callee = expressionText(declaration.init?.callee);
+        if (declaration.id?.type === "Identifier" && declaration.init?.type === "CallExpression" && callee) {
+          push({
+            kind: "call-binding",
+            file,
+            span: span(declaration, "call-binding", `${astPath}>declarations[${idx}]`),
+            local: declaration.id.name,
+            callee,
+            declarationKind: declarationKind(node.kind),
+          });
+        }
+      });
+    }
     if (node.type === "CallExpression") {
       const callee = expressionText(node.callee);
       if (callee) push({ kind: "call", file, span: span(node, "call", astPath), callee });
+      if (callee) {
+        (node.arguments ?? []).forEach((argument: any, idx: number) => {
+          const detail = callArgumentDetail(argument);
+          push({
+            kind: "call-argument",
+            file,
+            span: span(node, "call-argument", `${astPath}>arguments[${idx}]`),
+            callee,
+            argumentIndex: idx,
+            argument: detail.argument,
+            argumentKind: detail.argumentKind,
+          });
+        });
+      }
       if (node.callee?.type === "Identifier" && HOOK_NAME.test(node.callee.name)) {
         push({ kind: "hook-call", file, span: span(node, "hook-call", astPath), name: node.callee.name });
       }
@@ -164,6 +193,22 @@ function collectPatternFacts(file: string, source: string, program: any): Patter
     if (node.type === "JSXElement") {
       const tag = jsxNameText(node.openingElement?.name) ?? "";
       if (tag) push({ kind: "jsx", file, span: span(node.openingElement, "jsx", `${astPath}>opening`), tag, parentTag: jsxParentTag });
+      if (tag) {
+        (node.openingElement?.attributes ?? []).forEach((attribute: any, idx: number) => {
+          const detail = jsxAttributeDetail(attribute);
+          if (!detail) return;
+          push({
+            kind: "jsx-attribute",
+            file,
+            span: span(attribute, "jsx-attribute", `${astPath}>opening>attribute[${idx}]`),
+            tag,
+            parentTag: jsxParentTag,
+            name: detail.name,
+            value: detail.value,
+            valueKind: detail.valueKind,
+          });
+        });
+      }
       (node.children ?? []).forEach((child: any, idx: number) => visit(child, `${astPath}>child[${idx}]`, tag || jsxParentTag));
       return;
     }
@@ -225,6 +270,47 @@ function staticMemberParts(node: any): { object: string; property: string } | nu
   const property = node.property?.name ?? stringValue(node.property);
   if (!object || !property) return null;
   return { object, property };
+}
+
+function declarationKind(value: unknown): "const" | "let" | "var" {
+  return value === "let" || value === "var" ? value : "const";
+}
+
+function callArgumentDetail(node: any): Pick<PatternCallArgumentFact, "argument" | "argumentKind"> {
+  if (!node) return { argument: "", argumentKind: "unknown" };
+  if (node.type === "Identifier") return { argument: node.name, argumentKind: "identifier" };
+  if (node.type === "StaticMemberExpression" || node.type === "MemberExpression") return { argument: expressionText(node), argumentKind: "member" };
+  if (isLiteralNode(node)) return { argument: literalText(node), argumentKind: "literal" };
+  if (node.type === "CallExpression") return { argument: expressionText(node.callee), argumentKind: "call" };
+  if (node.type === "SpreadElement") return { argument: expressionText(node.argument), argumentKind: "unknown" };
+  return { argument: expressionText(node), argumentKind: "unknown" };
+}
+
+function jsxAttributeDetail(attribute: any): Pick<PatternJsxAttributeFact, "name" | "value" | "valueKind"> | null {
+  if (!attribute) return null;
+  if (attribute.type === "JSXSpreadAttribute") {
+    const value = expressionText(attribute.argument);
+    return { name: value, value, valueKind: "spread" };
+  }
+  if (attribute.type !== "JSXAttribute") return null;
+  const name = jsxNameText(attribute.name) ?? stringValue(attribute.name);
+  if (!name) return null;
+  if (!attribute.value) return { name, value: "", valueKind: "absent" };
+  if (isLiteralNode(attribute.value)) return { name, value: literalText(attribute.value), valueKind: "literal" };
+  if (attribute.value.type === "JSXExpressionContainer") {
+    const value = expressionText(attribute.value.expression);
+    return { name, value, valueKind: value ? "expression" : "unknown" };
+  }
+  return { name, value: expressionText(attribute.value), valueKind: "unknown" };
+}
+
+function isLiteralNode(node: any): boolean {
+  return ["StringLiteral", "NumericLiteral", "BooleanLiteral", "NullLiteral", "Literal"].includes(node?.type);
+}
+
+function literalText(node: any): string {
+  if (node?.type === "NullLiteral") return "null";
+  return String(node?.value ?? "");
 }
 
 function expressionText(node: any): string {

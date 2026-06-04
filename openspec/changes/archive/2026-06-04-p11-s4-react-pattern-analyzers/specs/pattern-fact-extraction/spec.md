@@ -1,27 +1,6 @@
-# Pattern Fact Extraction Specification
+# Delta for Pattern Fact Extraction
 
-## Purpose
-
-Define framework-neutral source syntax facts that future pattern analyzers can consume without moving framework intent into `@rai/core`.
-
-## Requirements
-
-### Requirement: Framework-neutral fact coverage
-
-Core MUST extract deterministic syntax facts for imports, exports, call expressions, call bindings, call arguments, JSX parent/child structure, JSX attributes, hook-like names, static/member assignments, and file-role seeds. Facts MUST describe observed source syntax only and MUST NOT include React-specific pattern names, intent, catalog rules, findings, remediation, or framework roles.
-
-#### Scenario: Generic facts are extracted
-
-- GIVEN a source file with imports, exports, calls, call bindings, call arguments, JSX children, JSX attributes, hook-like calls, and member assignments
-- WHEN analysis builds the core graph
-- THEN graph facts include those source-observed facts with file identity and evidence spans
-- AND facts do not claim architectural pattern intent.
-
-#### Scenario: Core remains framework-agnostic
-
-- GIVEN core fact types, parser tests, and graph output are inspected
-- WHEN P11-S4 fact expansion is implemented
-- THEN they MUST NOT contain React catalog names, React rule IDs, React pattern labels, provider/context semantics, form semantics, overlay semantics, controlled/uncontrolled semantics, or remediation language.
+## ADDED Requirements
 
 ### Requirement: Call Binding Syntax Facts
 
@@ -80,20 +59,19 @@ Core MUST extract deterministic `jsx-attribute` pattern facts for JSX opening el
 
 ## MODIFIED Requirements
 
-### Requirement: Deterministic graph persistence
+### Requirement: Framework-neutral fact coverage
 
-Pattern facts carried by `RepoGraph` MUST be sorted, deduped, JSON-safe, and frozen with the graph. Repeated analysis of identical input MUST produce equivalent fact order, values, and spans.
+Core MUST extract deterministic syntax facts for imports, exports, call expressions, call bindings, call arguments, JSX parent/child structure, JSX attributes, hook-like names, static/member assignments, and file-role seeds. Facts MUST describe observed source syntax only and MUST NOT include React-specific pattern names, intent, catalog rules, findings, remediation, or framework roles.
 
-#### Scenario: Facts are stable and immutable
+#### Scenario: Generic facts are extracted
 
-- GIVEN identical project input is analyzed twice
-- WHEN callers compare graph fact collections
-- THEN fact values and order are equivalent
-- AND mutation attempts cannot change frozen graph facts
+- GIVEN a source file with imports, exports, calls, call bindings, call arguments, JSX children, JSX attributes, hook-like calls, and member assignments
+- WHEN analysis builds the core graph
+- THEN graph facts include those source-observed facts with file identity and evidence spans
+- AND facts do not claim architectural pattern intent.
 
-#### Scenario: Ambiguous syntax stays raw
+#### Scenario: Core remains framework-agnostic
 
-- GIVEN an alias, namespace import, re-export, or static member assignment has unclear semantic meaning
-- WHEN facts are extracted
-- THEN the fact records observed syntax and names only
-- AND MUST NOT infer symbol resolution or component pattern membership
+- GIVEN core fact types, parser tests, and graph output are inspected
+- WHEN P11-S4 fact expansion is implemented
+- THEN they MUST NOT contain React catalog names, React rule IDs, React pattern labels, provider/context semantics, form semantics, overlay semantics, controlled/uncontrolled semantics, or remediation language.

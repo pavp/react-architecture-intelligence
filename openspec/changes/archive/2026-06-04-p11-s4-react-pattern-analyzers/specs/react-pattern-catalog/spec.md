@@ -1,10 +1,6 @@
-# React Pattern Catalog Specification
+# Delta for React Pattern Catalog
 
-## Purpose
-
-Define React catalog scaffolding and fixtures outside `packages/core` so later analyzers can interpret generic facts without changing core truth.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Adapter-owned React catalog scaffolding
 
@@ -23,21 +19,3 @@ React pattern catalog data MUST live outside `packages/core` and consume only co
 - WHEN catalog scaffolding references expanded generic facts
 - THEN `packages/core` MUST NOT import React catalog modules
 - AND React-specific names remain outside core contracts.
-
-### Requirement: Compound primitive fixtures
-
-P10 MUST provide deterministic Modal and Popover fixture examples outside core tests. Fixtures SHOULD cover namespace usage, static member assignment, dot-member JSX, trigger/content children, and re-export or alias forms where useful.
-
-#### Scenario: Modal and Popover fixture evidence exists
-
-- GIVEN fixture analysis runs
-- WHEN generic facts are inspected
-- THEN facts include Modal and Popover imports, static members, JSX child/member usage, and calls where present
-- AND fixture expectations remain syntax-based, not finding-based
-
-#### Scenario: Fixture scope remains foundation-only
-
-- GIVEN later analyzer ideas are reviewed during P10
-- WHEN a broad compound-component, provider, form, or data-fetching finding is proposed
-- THEN that work MUST be deferred beyond P10
-- AND catalog fixtures remain evidence scaffolding only
