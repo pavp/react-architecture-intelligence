@@ -1,6 +1,6 @@
 # RAI Status
 
-This is the canonical project status after P9-S2 and P11-S2. Historical status in
+This is the canonical project status after P9-S3 and P11-S2. Historical status in
 `docs/superpowers/STATUS.md` remains useful for archaeology, but new sessions should start here.
 
 ## Current state
@@ -9,8 +9,8 @@ This is the canonical project status after P9-S2 and P11-S2. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P10 complete plus P9-S2, P11-S1, and P11-S2; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P9-S3 Human Output Coverage Audit, then P11-S3 React pattern analyzers |
+| Product state | P0–P10 complete plus P9-S3, P11-S1, and P11-S2; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P11-S3 React pattern analyzers |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -97,7 +97,7 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: start P9-S3 Human Output Coverage Audit to upgrade remaining human-facing RAI outputs while preserving machine-facing JSON/MCP contracts. After P9-S3, continue P11-S3, the next React pattern analyzer family (for example provider/context or controlled/uncontrolled). Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+Immediate next work: start P11-S3, the next React pattern analyzer family (for example provider/context or controlled/uncontrolled). Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
 
 ## P11 React Pattern Analyzers + Pattern Drift
 
@@ -177,19 +177,20 @@ P9 makes existing RAI facts easier to understand without changing analyzer truth
 - MCP `explain_finding` returns raw finding data plus an additive `explanation` envelope.
 - CLI `rai explain <file>` shows relevant findings for a file in human-readable output, with JSON support following existing CLI conventions.
 - P9-S2 adds an analyzer-owned explanation hook so adapters can provide high-quality human wording without moving adapter semantics into `@rai/core`.
-- `react/container-presenter-role-drift` now explains the concrete observation in human language: a container-like component renders a presenter-like component, and the presenter-like side has high-signal hook evidence.
-- Next explainability slice: P9-S3 Human Output Coverage Audit for remaining human-facing RAI outputs, including other analyzers and CLI UX surfaces.
+- P9-S3 upgrades current analyzer explanations across `rai explain` and MCP `explain_finding`: known core evidence kinds now lead with observed code facts, and adapter-owned hooks cover `react/compound-component-api-drift`, `react/container-presenter-role-drift`, `next/client-boundary-bloat`, and `next/route-coupling`.
+- Deferred explainability cleanup: broad `doctor`, `install`, `backfill`, CLI usage/error, MCP tool description, and README copy audits.
 - Root `README.md` gives new users a quick path: install, doctor, analyze, explain, reading guide, glossary, limits, and next step.
 - Guardrail: human-facing presentation explains facts; machine-facing JSON/raw evidence stays stable and structured; presentation does not infer intent, ownership, root cause, or remediation not present in evidence.
 
 Latest P9/P11 explainability verification:
 
 ```bash
-pnpm test       # 56 files / 344 tests
+pnpm test       # 60 files / 386 tests
 pnpm test:launcher
 pnpm typecheck
 pnpm build
-pnpm lint
+rtk proxy pnpm lint
+./scripts/smoke.sh --build
 git diff --check
 ```
 

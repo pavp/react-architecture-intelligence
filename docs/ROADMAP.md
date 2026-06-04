@@ -1,6 +1,6 @@
 # RAI Roadmap
 
-This is the canonical roadmap after P9-S2 and P11-S2. Older roadmap notes in `docs/superpowers/`,
+This is the canonical roadmap after P9-S3 and P11-S2. Older roadmap notes in `docs/superpowers/`,
 `docs/gaps.md`, and `docs/future-ideas.md` are historical inputs unless this file links
 them as active work.
 
@@ -10,7 +10,7 @@ them as active work.
 |-------|------|--------------|
 | P7 | Distribution + install | Complete: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
 | P8 | Single-binary distribution | Complete: P8-S1 local Go launcher prototype, P8-S2 release shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, release activation, and first installable `v0.1.3` release. |
-| P9 | Explainability | Complete through P9-S2: deterministic human output, glossary for evidence terms, additive `explain_finding`, `rai explain <file>`, README onboarding, and analyzer-owned human explanation hooks. Next: P9-S3 Human Output Coverage Audit. |
+| P9 | Explainability | Complete through P9-S3: deterministic human output, glossary for evidence terms, additive `explain_finding`, `rai explain <file>`, README onboarding, analyzer-owned human explanation hooks, and current analyzer human explanation coverage. |
 | P10 | React Pattern Intelligence Foundation | Complete: generic pattern fact extraction for imports, exports, calls, hooks, JSX structure, static members, file roles, and a React catalog scaffold outside core. |
 | P11 | React Pattern Analyzers + Pattern Drift | In progress. P11-S1 complete: `react/compound-component-api-drift`; P11-S2 complete: `react/container-presenter-role-drift`, both in `@rai/adapter-react`. Remaining slices detect more repo-derived patterns and divergences: provider/context, controlled/uncontrolled, forms, data fetching, design-system usage, overlays, and API conventions. |
 | P12 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
@@ -58,7 +58,7 @@ P8 is verified and archived. `v0.1.3` is the first successful installable releas
 
 Rule: Go may wrap distribution, but RAI facts and analyzer behavior stay governed by the existing engine contracts unless a future design changes them.
 
-## P9 scope notes — complete through P9-S2; P9-S3 planned
+## P9 scope notes — complete through P9-S3
 
 P9 makes RAI outputs usable by developers who are not familiar with internal terms.
 
@@ -70,11 +70,12 @@ Delivered capabilities:
 - `rai explain <file>` for finding inspection without an agent session.
 - Analyzer-owned explanation hooks so adapters can provide high-quality human wording without moving adapter semantics into `@rai/core`.
 - P9-S2 applies this to `react/container-presenter-role-drift` and adds the human-facing output quality rule.
+- P9-S3 extends current analyzer explanation coverage so known core evidence kinds and current React/Next adapter findings lead with observed code facts instead of generic evidence-kind wording.
 - README quick start that explains what RAI does, install path, first commands, how to read findings, current limitations, and next step.
 
 Rule: core facts stay structured; human-facing UX explains facts without inventing intent; machine-facing JSON/raw evidence stays stable and structured.
 
-Next slice: P9-S3 Human Output Coverage Audit. It should inventory remaining human-facing RAI outputs (`rai explain` fallback cases, other analyzers, `doctor`, `install`, `backfill`, CLI errors, MCP explanation text, README examples), upgrade them to the same evidence-first human quality bar, and preserve machine-facing JSON/MCP contracts.
+Deferred explainability cleanup: a later slice can audit broad human-facing command copy for `doctor`, `install`, `backfill`, CLI usage/errors, MCP tool descriptions, and README examples.
 
 ## P10 scope notes — complete
 

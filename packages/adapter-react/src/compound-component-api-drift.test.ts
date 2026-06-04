@@ -5,6 +5,7 @@ import {
 	type AnalyzerResult,
 	type Finding,
 	type PatternFact,
+	type PresentedFinding,
 	type Span,
 } from "@rai/core";
 import {
@@ -150,6 +151,45 @@ describe("compound component API drift analyzer", () => {
 		expect(findings).toHaveLength(1);
 		expect(JSON.stringify(facts)).toBe(before);
 	});
+
+	test("explains JSX-used compound parts without generic adapter-metric wording", () => {
+		const analyzer = createCompoundComponentApiDriftAnalyzer();
+		const [finding] = runFacts([
+			assignment("a1", "Modal", "Trigger", "src/Modal.tsx", 1, 8),
+			jsx("u1", "Modal.Trigger", "src/ModalExample.tsx", 10, 25),
+			jsx("u2", "Modal.Footer", "src/ModalExample.tsx", 30, 44),
+		]);
+
+		const explanation = analyzer.explain?.(presented(finding!));
+
+		expect(explanation).toMatchObject({
+			summary:
+				"Modal.Footer is used in JSX, but no matching Modal.Footer static member declaration was observed.",
+			whyItMatters:
+				"This is worth checking because observed compound part declarations and JSX member usage describe different part sets.",
+			inspectFirst: [
+				"Modal usage in src/ModalExample.tsx",
+				"missing declaration observed: Modal.Footer used in src/ModalExample.tsx",
+				"declared parts observed: Trigger",
+				"used parts observed: Footer and Trigger",
+				"missing declarations observed: 1 (limit: 0)",
+				"observed counts: 1 declared, 2 used, 1 missing, 0 unused",
+			],
+		});
+		expect(explanation?.limits.join("\n")).toContain(
+			"This does not prove intended public API, type resolution, runtime export behavior, or required remediation.",
+		);
+		const serialized = JSON.stringify(explanation);
+		expect(serialized).not.toMatch(
+			/^RAI found .* evidence for |\badapter:\s|\brule:\s|\bmetric [A-Za-z0-9_]+:|\bthreshold [A-Za-z0-9_]+:|\bexceeded topology:/i,
+		);
+		expect(explanation?.limits.join("\n")).toContain(
+			"RAI does not infer team intent, ownership, root cause, historical change, or user impact from this finding alone.",
+		);
+		expect(serialized).not.toMatch(
+			/intended public API is|root cause is|historical change shows|user impact is|must refactor/i,
+		);
+	});
 });
 
 function runFacts(
@@ -193,6 +233,15 @@ function normalize(findings: Finding[]): Finding[] {
 		id: "<run-specific>",
 		producingRunId: "<run-specific>",
 	}));
+}
+
+function presented(finding: Finding): PresentedFinding {
+	return {
+		...finding,
+		severity: finding.severityRaw,
+		status: "active",
+		weight: null,
+	};
 }
 
 function assignment(
