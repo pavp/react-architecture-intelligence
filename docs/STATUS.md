@@ -1,6 +1,6 @@
 # RAI Status
 
-This is the canonical project status after P9-S3 and P11-S3. Historical status in
+This is the canonical project status after P9-S3 and P11-S4. Historical status in
 `docs/superpowers/STATUS.md` remains useful for archaeology, but new sessions should start here.
 
 ## Current state
@@ -9,8 +9,8 @@ This is the canonical project status after P9-S3 and P11-S3. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S3; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P11-S4 React pattern analyzers |
+| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S4; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P11-S5 React pattern analyzers |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -60,6 +60,7 @@ Latest MCP compatibility fix:
 | P11-S1 | Complete | First React pattern analyzer slice: `react/compound-component-api-drift` in `@rai/adapter-react`, CLI/MCP adapter composition, drift terminology, and OpenSpec specs `react-pattern-analyzers`, `pattern-drift`, `cli-adapter-loading`. |
 | P11-S2 | Complete | Container/presenter role-name divergence slice: `react/container-presenter-role-drift` in `@rai/adapter-react`, grounded in existing component names, file paths, direct render edges, and high-signal presenter hook calls. |
 | P11-S3 | Complete | Controlled/uncontrolled prop-surface slice: `react/controlled-uncontrolled-prop-surface-drift` in `@rai/adapter-react`, grounded in observed component prop names with adapter-owned explanation. |
+| P11-S4 | Complete | Framework-neutral pattern fact expansion: `call-binding`, `call-argument`, and `jsx-attribute` facts in `@rai/core`, with no new findings or React semantics in core. |
 
 ## P7 distribution + install
 
@@ -98,11 +99,34 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: choose P11-S4, the next React pattern analyzer family (for example provider/context, forms, data fetching, design-system usage, overlays, or API conventions). Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+Immediate next work: choose P11-S5, the first React analyzer slice that consumes P11-S4 expanded facts (for example provider/context, forms, overlays, data fetching, design-system usage, or API conventions). Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
 
 ## P11 React Pattern Analyzers + Pattern Drift
 
-P11 now has three concrete React pattern analyzer slices on top of P10 pattern facts, without changing the `@rai/core` boundary.
+P11 now has three concrete React pattern analyzer slices plus one framework-neutral fact-expansion slice on top of P10 pattern facts, without moving React semantics into `@rai/core`.
+
+### P11-S4 Framework-Neutral Pattern Fact Expansion
+
+P11-S4 expands generic pattern facts for future adapter-owned analyzers:
+
+- `@rai/core` now records `call-binding`, `call-argument`, and `jsx-attribute` facts in `RepoGraph.patternFacts`.
+- The facts are syntax-only: local call bindings, call arguments, and JSX attributes with bounded value/argument kinds.
+- P11-S4 emits no new findings, adds no new React rule id, and does not change evidence, fingerprint, MCP, persistence, snapshot, feedback, or memory contracts.
+- React interpretation remains adapter-owned; provider/context, forms, overlays, data-fetching, design-system usage, and API-convention findings remain deferred to later P11 slices.
+- The expanded facts unlock stronger future grounding for provider/context (`createContext`, `useContext`, provider `value`), forms (`onSubmit`, `method`, `value`), overlays (`open`, `onOpenChange`), and data/API calls.
+
+Latest P11-S4 verification:
+
+```bash
+pnpm test packages/core/src/parse/pass1.test.ts packages/core/src/parse/graph-build.test.ts packages/adapter-react/src/catalog.test.ts  # 3 files / 29 tests
+pnpm test packages/adapter-react/src/compound-component-api-drift.test.ts packages/adapter-react/src/container-presenter-role-drift.test.ts packages/adapter-react/src/controlled-uncontrolled-prop-surface-drift.test.ts packages/adapter-react/src/core-adapter.test.ts  # 4 files / 35 tests
+pnpm test && pnpm test:launcher  # 61 Vitest files / 399 tests plus Go launcher tests
+pnpm typecheck
+pnpm build
+rtk proxy pnpm lint
+./scripts/smoke.sh --build  # 19 checks
+git diff --check
+```
 
 ### P11-S3 Controlled/Uncontrolled Prop-Surface Drift
 

@@ -20,7 +20,7 @@ export interface CatalogEvidenceSummary {
   syntaxOnly: true;
 }
 
-const FACT_KINDS: readonly PatternFactKind[] = ["import", "export", "call", "jsx", "hook-call", "member-assignment", "file-role-seed"];
+const FACT_KINDS: readonly PatternFactKind[] = ["import", "export", "call", "call-binding", "call-argument", "jsx", "jsx-attribute", "hook-call", "member-assignment", "file-role-seed"];
 
 export const REACT_PATTERN_CATALOG: ReactPatternCatalog = Object.freeze({
   id: "react-pattern-catalog",

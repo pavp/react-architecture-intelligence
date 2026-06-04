@@ -8,7 +8,7 @@ export interface Span {
 }
 
 // ── Pattern syntax facts (framework-neutral source observations) ───────────
-export type PatternFactKind = "import" | "export" | "call" | "jsx" | "hook-call" | "member-assignment" | "file-role-seed";
+export type PatternFactKind = "import" | "export" | "call" | "call-binding" | "call-argument" | "jsx" | "jsx-attribute" | "hook-call" | "member-assignment" | "file-role-seed";
 
 export interface PatternImportSpecifierFact {
   imported: string;
@@ -42,10 +42,34 @@ export interface PatternCallFact extends PatternFactBase {
   callee: string;
 }
 
+export interface PatternCallBindingFact extends PatternFactBase {
+  kind: "call-binding";
+  local: string;
+  callee: string;
+  declarationKind: "const" | "let" | "var";
+}
+
+export interface PatternCallArgumentFact extends PatternFactBase {
+  kind: "call-argument";
+  callee: string;
+  argumentIndex: number;
+  argument: string;
+  argumentKind: "identifier" | "member" | "literal" | "call" | "unknown";
+}
+
 export interface PatternJsxFact extends PatternFactBase {
   kind: "jsx";
   tag: string;
   parentTag: string;
+}
+
+export interface PatternJsxAttributeFact extends PatternFactBase {
+  kind: "jsx-attribute";
+  tag: string;
+  parentTag: string;
+  name: string;
+  value: string;
+  valueKind: "absent" | "literal" | "expression" | "spread" | "unknown";
 }
 
 export interface PatternHookCallFact extends PatternFactBase {
@@ -70,7 +94,10 @@ export type PatternFact =
   | PatternImportFact
   | PatternExportFact
   | PatternCallFact
+  | PatternCallBindingFact
+  | PatternCallArgumentFact
   | PatternJsxFact
+  | PatternJsxAttributeFact
   | PatternHookCallFact
   | PatternMemberAssignmentFact
   | PatternFileRoleSeedFact;
