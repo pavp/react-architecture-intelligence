@@ -17,6 +17,10 @@ export {
 	createContainerPresenterRoleDriftAnalyzer,
 } from "./container-presenter-role-drift.js";
 export {
+	CONTEXT_PROVIDER_VALUE_SURFACE_DRIFT_RULE_ID,
+	createContextProviderValueSurfaceDriftAnalyzer,
+} from "./context-provider-value-surface-drift.js";
+export {
 	CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID,
 	createControlledUncontrolledPropSurfaceDriftAnalyzer,
 } from "./controlled-uncontrolled-prop-surface-drift.js";
