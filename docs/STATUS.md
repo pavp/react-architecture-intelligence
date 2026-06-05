@@ -9,8 +9,8 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S4; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P11-S5 React pattern analyzers |
+| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S5 (P11-S5 implemented, pending release); first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P11-S6 React pattern analyzers (next deferred family: forms, overlays, data-fetching, or design-system usage) |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -61,6 +61,7 @@ Latest MCP compatibility fix:
 | P11-S2 | Complete | Container/presenter role-name divergence slice: `react/container-presenter-role-drift` in `@rai/adapter-react`, grounded in existing component names, file paths, direct render edges, and high-signal presenter hook calls. |
 | P11-S3 | Complete | Controlled/uncontrolled prop-surface slice: `react/controlled-uncontrolled-prop-surface-drift` in `@rai/adapter-react`, grounded in observed component prop names with adapter-owned explanation. |
 | P11-S4 | Complete | Framework-neutral pattern fact expansion: `call-binding`, `call-argument`, and `jsx-attribute` facts in `@rai/core`, with no new findings or React semantics in core. |
+| P11-S5 | Implemented | Context provider value-surface drift slice: `react/context-provider-value-surface-drift` in `@rai/adapter-react`, the first analyzer to consume P11-S4 facts (`call-binding`, `call-argument`, `jsx`, `jsx-attribute`), correlating same-file `createContext` bindings with `<Local.Provider>` value surfaces; no React semantics added to `@rai/core`. |
 
 ## P7 distribution + install
 
@@ -99,11 +100,34 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: choose P11-S5, the first React analyzer slice that consumes P11-S4 expanded facts (for example provider/context, forms, overlays, data fetching, design-system usage, or API conventions). Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+Immediate next work: P11-S5 (`react/context-provider-value-surface-drift`) is implemented; pick the next deferred React family (forms, overlays, data fetching, design-system usage, or API conventions) as an adapter-owned slice that consumes P11-S4 expanded facts. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
 
 ## P11 React Pattern Analyzers + Pattern Drift
 
-P11 now has three concrete React pattern analyzer slices plus one framework-neutral fact-expansion slice on top of P10 pattern facts, without moving React semantics into `@rai/core`.
+P11 now has four concrete React pattern analyzer slices plus one framework-neutral fact-expansion slice on top of P10 pattern facts, without moving React semantics into `@rai/core`.
+
+### P11-S5 Context Provider Value-Surface Drift
+
+P11-S5 adds `react/context-provider-value-surface-drift` in `@rai/adapter-react`, the first analyzer slice to consume the P11-S4 framework-neutral facts:
+
+- Correlates same-file local `createContext`/`*.createContext` `call-binding` facts with `<Local.Provider>` `jsx` occurrences by `(file, localName)` only — no cross-file or import/type resolution.
+- Classifies each provider value-attribute surface as `direct-value`, `direct-value-with-spread`, `spread-ambiguous`, or `missing-direct-value` from observed `jsx-attribute` facts; `value` with `valueKind: "absent"` still counts as a direct surface.
+- Emits `type: "opportunity"` findings only on observed same-file value-surface divergence: missing direct value with no observed `createContext` default argument, mixed provider direct-value presence, and/or spread-ambiguous value surfaces.
+- `useContext(...)`/`use(...)` evidence is optional corroboration only and never changes emission/suppression.
+- Stays silent for no-provider bindings, cross-file name matches, consistent direct-value surfaces, and same-file `(file, localName)` binding collisions (lexical scope cannot be disambiguated from current facts).
+- Deterministic `info`/`warn` severity by divergence-count, stable SHA fingerprints, sorted evidence, adapter-owned explanation with bounded current-source limits; no new MCP tool and no `@rai/core` React semantics.
+
+Latest P11-S5 verification:
+
+```bash
+pnpm test packages/adapter-react/src/context-provider-value-surface-drift.test.ts packages/adapter-react/src/core-adapter.test.ts packages/adapter-react/src/catalog.test.ts  # 3 files / 26 tests
+pnpm test       # 62 Vitest files / 416 tests
+pnpm test:launcher  # Go launcher tests ok
+pnpm typecheck  # all packages Done
+pnpm build      # all packages Done
+pnpm lint       # core framework-free guard pass
+git diff --check  # clean
+```
 
 ### P11-S4 Framework-Neutral Pattern Fact Expansion
 

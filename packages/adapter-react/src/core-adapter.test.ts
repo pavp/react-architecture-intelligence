@@ -9,6 +9,7 @@ import {
 } from "@rai/core";
 import { COMPOUND_COMPONENT_API_DRIFT_RULE_ID } from "./compound-component-api-drift.js";
 import { CONTAINER_PRESENTER_ROLE_DRIFT_RULE_ID } from "./container-presenter-role-drift.js";
+import { CONTEXT_PROVIDER_VALUE_SURFACE_DRIFT_RULE_ID } from "./context-provider-value-surface-drift.js";
 import { CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID } from "./controlled-uncontrolled-prop-surface-drift.js";
 import { createReactCoreAnalyzers } from "./core-adapter.js";
 
@@ -28,7 +29,46 @@ describe("React core analyzer adapter", () => {
 				ruleId: CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID,
 				framework: "react",
 			},
+			{
+				ruleId: CONTEXT_PROVIDER_VALUE_SURFACE_DRIFT_RULE_ID,
+				framework: "react",
+			},
 		]);
+	});
+
+	test("emits context provider value-surface drift through the normal analysis path", () => {
+		const files: SourceFile[] = [
+			{
+				file: "src/auth.tsx",
+				source:
+					"const AuthContext = createContext();\nexport function AuthProvider({ children }) { return <AuthContext.Provider>{children}</AuthContext.Provider>; }\n",
+			},
+		];
+		const session = createReactSession(files);
+
+		const result = session.analyzeRepo({
+			files,
+			asOf: 0,
+			runId: "react-context-provider",
+			commitSha: "sha",
+		});
+		const findings = session.findSharedOpportunities({
+			includeSuppressed: false,
+		}).opportunities;
+
+		expect(result.counts.byType.opportunity).toBe(1);
+		expect(findings.map((finding) => finding.ruleId)).toEqual([
+			CONTEXT_PROVIDER_VALUE_SURFACE_DRIFT_RULE_ID,
+		]);
+		expect(findings[0]).toMatchObject({
+			ruleId: CONTEXT_PROVIDER_VALUE_SURFACE_DRIFT_RULE_ID,
+			severity: "info",
+			evidence: {
+				kind: "adapter-metric",
+				subject: { name: "AuthContext", file: "src/auth.tsx" },
+				metrics: { providers: 1, providersWithoutDirectValue: 1 },
+			},
+		});
 	});
 
 	test("registered React analyzers emit findings through the normal analysis path", () => {

@@ -12,7 +12,7 @@ them as active work.
 | P8 | Single-binary distribution | Complete: P8-S1 local Go launcher prototype, P8-S2 release shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, release activation, and first installable `v0.1.3` release. |
 | P9 | Explainability | Complete through P9-S3: deterministic human output, glossary for evidence terms, additive `explain_finding`, `rai explain <file>`, README onboarding, analyzer-owned human explanation hooks, and current analyzer human explanation coverage. |
 | P10 | React Pattern Intelligence Foundation | Complete: generic pattern fact extraction for imports, exports, calls, hooks, JSX structure, static members, file roles, and a React catalog scaffold outside core. |
-| P11 | React Pattern Analyzers + Pattern Drift | In progress. P11-S1 complete: `react/compound-component-api-drift`; P11-S2 complete: `react/container-presenter-role-drift`; P11-S3 complete: `react/controlled-uncontrolled-prop-surface-drift`; P11-S4 complete: framework-neutral `call-binding`, `call-argument`, and `jsx-attribute` facts. Remaining slices use those facts for more repo-derived adapter-owned patterns: provider/context, forms, data fetching, design-system usage, overlays, and API conventions. |
+| P11 | React Pattern Analyzers + Pattern Drift | In progress. P11-S1 complete: `react/compound-component-api-drift`; P11-S2 complete: `react/container-presenter-role-drift`; P11-S3 complete: `react/controlled-uncontrolled-prop-surface-drift`; P11-S4 complete: framework-neutral `call-binding`, `call-argument`, and `jsx-attribute` facts; P11-S5 implemented: `react/context-provider-value-surface-drift`, the first analyzer consuming P11-S4 facts. Remaining slices use those facts for more repo-derived adapter-owned patterns: forms, data fetching, design-system usage, overlays, and API conventions. |
 | P12 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
 | P13 | Calibration | Reduces noise per repo: `rai calibrate`, threshold suggestions from feedback, and no automatic config changes. |
 | P14 | Deeper graph | Expands structural intelligence: `passes` edges, prop drilling, import/call topology, and `exportKind` use in analyzers/codemods. |
@@ -100,6 +100,7 @@ Delivered so far:
 - P11-S2: `react/container-presenter-role-drift` analyzer in `@rai/adapter-react`, detecting observed current-source container/presenter role-name and syntax divergence from existing component names, file/path role seeds, direct render edges, and high-signal presenter hook calls.
 - P11-S3: `react/controlled-uncontrolled-prop-surface-drift` analyzer in `@rai/adapter-react`, detecting observed controlled/default prop-name pairs (`value/defaultValue`, `checked/defaultChecked`, `open/defaultOpen`) from existing component `propNames` plus optional handler/hook evidence.
 - P11-S4: framework-neutral fact expansion in `@rai/core`, adding syntax-only `call-binding`, `call-argument`, and `jsx-attribute` pattern facts without adding findings or React semantics to core.
+- P11-S5: `react/context-provider-value-surface-drift` analyzer in `@rai/adapter-react`, the first slice consuming P11-S4 facts — correlating same-file `createContext`/`*.createContext` bindings with `<Local.Provider>` value surfaces and reporting observed same-file value-surface divergence (missing direct value without observed default, mixed direct-value presence, spread ambiguity) with optional `useContext`/`use` corroboration.
 - Pure deterministic adapter-owned execution with stable fingerprints and no side effects.
 - CLI/MCP adapter composition through the same registry factory as the Next adapter, with no new MCP drift tool.
 - Distinct drift terminology: repo-local divergence for current source; historical wording only in existing `get_drift` snapshot results.
@@ -107,8 +108,8 @@ Delivered so far:
 
 Deferred to later P11 slices (specified/implemented by future approved changes, no findings yet):
 
-- provider/context, forms, data fetching, design-system usage, overlays beyond compound primitives, and broad API conventions.
-- P11-S5 should be the first analyzer slice that consumes P11-S4 expanded facts, unless another fact gap appears during SDD explore.
+- forms, data fetching, design-system usage, overlays beyond compound primitives, and broad API conventions.
+- P11-S5 delivered the first analyzer slice consuming P11-S4 expanded facts (`react/context-provider-value-surface-drift`); later slices follow the same adapter-owned pattern.
 - Optional non-blocking follow-ups: snapshot/`get_drift` parity coverage and `rai explain <file>` / file-ref parity coverage.
 
 Rule: P11 analyzers stay adapter-owned and grounded. They explain syntax-derived divergence; they must not assert intended API, semantic symbol resolution, root cause, or required remediation.
