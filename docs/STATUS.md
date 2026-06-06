@@ -9,8 +9,8 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S7 (P11-S7 implemented, pending release); first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P11-S8 React pattern analyzers (next deferred family: overlays / design-system / API conventions) |
+| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S8 (P11-S8 implemented, pending release); first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P11-S9 React pattern analyzers (next deferred family: design-system usage / API conventions) |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -64,6 +64,7 @@ Latest MCP compatibility fix:
 | P11-S5 | Implemented | Context provider value-surface drift slice: `react/context-provider-value-surface-drift` in `@rai/adapter-react`, the first analyzer to consume P11-S4 facts (`call-binding`, `call-argument`, `jsx`, `jsx-attribute`), correlating same-file `createContext` bindings with `<Local.Provider>` value surfaces; no React semantics added to `@rai/core`. |
 | P11-S6 | Implemented | Form control surface drift slice: `react/form-control-surface-drift` in `@rai/adapter-react`, detecting same-file form submit-surface divergence (onSubmit + declarative action/method co-presence) and control-binding divergence (mixed controlled/uncontrolled attr pairs on same-type native elements); no `@rai/core` changes. |
 | P11-S7 | Implemented | Data-fetching surface drift slice: `react/data-fetching-surface-drift` in `@rai/adapter-react`, detecting same-file co-presence of a raw-fetch `call` callee family (fetch/window.fetch/globalThis.fetch) and a query-hook `hook-call` family (useQuery/useSWR/useMutation and 8 more); query-hook discriminator is hook-call only (ADR-4); no `@rai/core` changes. |
+| P11-S8 | Implemented | Overlay control surface drift slice: `react/overlay-control-surface-drift` in `@rai/adapter-react`, detecting same-file JSX-usage-site open-state divergence (open/defaultOpen on distinct overlay elements, Gate A cross-element via spanContains) and handler-name divergence (onOpenChange/onClose/onDismiss across distinct overlay elements, Gate B); reads only jsx/jsx-attribute facts; NEVER reads ctx.graph.components (non-overlap boundary with P11-S3); capitalized OVERLAY_TAGS allow-set (Dialog/Modal/Popover/Drawer/Sheet/Tooltip/AlertDialog/HoverCard/DropdownMenu/ContextMenu/Combobox/Select); no `@rai/core` changes. |
 
 ## P7 distribution + install
 
