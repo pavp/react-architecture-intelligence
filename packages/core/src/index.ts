@@ -2,6 +2,14 @@ export const RAI_VERSION = "0.0.0";
 
 export * from "./types.js";
 export { resolveConfig, DEFAULT_CONFIG } from "./config/resolve.js";
+export { ConfigSchema } from "./config/schema.js";
+export type { RaiConfig, RaiConfigInput } from "./config/schema.js";
+export { aggregateFeedback } from "./memory/feedback-aggregate.js";
+export type { RuleFeedbackStats } from "./memory/feedback-aggregate.js";
+export { openDb } from "./db/db.js";
+export type { Db } from "./db/db.js";
+export { computeSuggestions, CALIBRATABLE_RULES, MIN_EVENTS, MIN_NEGATIVE_RATE } from "./calibration/suggest.js";
+export type { CalibrationSuggestion } from "./calibration/suggest.js";
 export { analyzeRepo } from "./engine/pipeline.js";
 export { runBackfill } from "./engine/backfill.js";
 export type { BackfillAnalyzeResult, BackfillCommitResult, BackfillInput, BackfillResult } from "./engine/backfill.js";

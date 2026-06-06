@@ -9,8 +9,8 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P11 complete plus P9-S3; P11 shipped 9 React pattern analyzer slices (S1–S9), all merged to `main`; P11-S10 (API conventions) deferred as ungroundable on syntax-only facts; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P13 Calibration (`rai calibrate`, threshold suggestions from feedback) — first under the trust-first reprioritization (see `docs/ROADMAP.md`). P12 CI/PR moved to last; P12-S1 planning parked. |
+| Product state | P0–P11 complete plus P9-S3; P11 shipped 9 React pattern analyzer slices (S1–S9), all merged to `main`; P11-S10 (API conventions) deferred as ungroundable on syntax-only facts; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. P13-S1 (`rai calibrate` suggest-only) implemented. |
+| Next phase | P13-S2 Evidence-correlated suggestions (observed+1 instead of current+1). P12 CI/PR moved to last. |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -66,6 +66,31 @@ Latest MCP compatibility fix:
 | P11-S7 | Implemented | Data-fetching surface drift slice: `react/data-fetching-surface-drift` in `@rai/adapter-react`, detecting same-file co-presence of a raw-fetch `call` callee family (fetch/window.fetch/globalThis.fetch) and a query-hook `hook-call` family (useQuery/useSWR/useMutation and 8 more); query-hook discriminator is hook-call only (ADR-4); no `@rai/core` changes. |
 | P11-S8 | Implemented | Overlay control surface drift slice: `react/overlay-control-surface-drift` in `@rai/adapter-react`, detecting same-file JSX-usage-site open-state divergence (open/defaultOpen on distinct overlay elements, Gate A cross-element via spanContains) and handler-name divergence (onOpenChange/onClose/onDismiss across distinct overlay elements, Gate B); reads only jsx/jsx-attribute facts; NEVER reads ctx.graph.components (non-overlap boundary with P11-S3); capitalized OVERLAY_TAGS allow-set (Dialog/Modal/Popover/Drawer/Sheet/Tooltip/AlertDialog/HoverCard/DropdownMenu/ContextMenu/Combobox/Select); no `@rai/core` changes. |
 | P11-S9 | Implemented | Design-system usage surface drift slice: `react/design-system-usage-surface-drift` in `@rai/adapter-react`, detecting same-file JSX-usage-site styling-prop surface divergence across distinct usages of the same capitalized non-dotted tag — some usages carry variant-family props (VARIANT_PROPS: variant/size/color/tone/intent/appearance) and other usages carry raw-style props (RAW_STYLE_PROPS: className/style); per-tag cross-usage gate (>=2 usages, some hasVariant AND some hasRaw AND >=1 variant-only OR >=1 raw-only); reads only jsx/jsx-attribute facts; NEVER reads ctx.graph.components (non-overlap boundary with P11-S3); bare variant (valueKind absent) counts as present (OQ3); no `@rai/core` changes. |
+| P13-S1 | Implemented | `rai calibrate` suggest-only command: `aggregateFeedback` (SELECT-only over T4 feedback_event), `computeSuggestions` (pure deterministic fn, CALIBRATABLE_RULES allowlist of 4 core rules), `loadProjectConfig` (reads `rai.config.json`, absent→{}, malformed→ProjectConfigError exit 2), config wired into 5 cli.ts resolveConfig({}) sites (analyze/explain/mcp/backfill/buildCliMcpServer); SUGGEST-ONLY guardrail (no config/T4 write); 48 new tests (8+18+8+14 across 4 test files). |
+
+### P13-S1 `rai calibrate` Suggest-Only
+
+P13-S1 closes the noise-feedback loop:
+
+- `rai calibrate [dir] [--json] [--db <path>]` aggregates T4 `feedback_event` rows per rule, computes threshold-raise or severity-downgrade suggestions, prints a stats table + copy-paste JSON patch block.
+- SUGGEST-ONLY: never writes `rai.config.json`, never inserts/updates/deletes feedback rows.
+- Project config loading: place `rai.config.json` at project root to override thresholds; 5 cli.ts `resolveConfig({})` sites now load it (analyze/explain/mcp/backfill/buildCliMcpServer). Doctor's synthetic health probes intentionally excluded (D6).
+- `rai.config.json` convention: valid `ConfigSchema.partial()` JSON at project root; absent → uses all defaults (backward-compatible).
+- New exports from `@rai/core`: `ConfigSchema`, `RaiConfig`, `RaiConfigInput`, `aggregateFeedback`, `RuleFeedbackStats`, `computeSuggestions`, `CalibrationSuggestion`, `CALIBRATABLE_RULES`, `MIN_EVENTS`, `MIN_NEGATIVE_RATE`, `openDb`, `Db`.
+
+Latest P13-S1 verification:
+
+```bash
+pnpm test       # 70 files / 564 tests
+pnpm test:launcher  # Go launcher tests ok
+pnpm typecheck  # all packages Done
+pnpm build      # all packages Done
+node scripts/check-core-framework-free.mjs  # exit 0 (feedback-aggregate + suggest: zero framework/fs imports)
+git diff --check  # clean
+# New files: feedback-aggregate.ts, suggest.ts (core), project-config.ts, cli.calibrate.test.ts (cli)
+# Modified: cli.ts, index.ts
+# No changes: analyzers, config schema, db schema, doctor.ts
+```
 
 ### P11-S9 Design-System Usage Surface Drift
 
