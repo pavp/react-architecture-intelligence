@@ -6,6 +6,7 @@ import { createControlledUncontrolledPropSurfaceDriftAnalyzer } from "./controll
 import { createFormControlSurfaceDriftAnalyzer } from "./form-control-surface-drift.js";
 import { createDataFetchingSurfaceDriftAnalyzer } from "./data-fetching-surface-drift.js"; // P11-S7
 import { createOverlayControlSurfaceDriftAnalyzer } from "./overlay-control-surface-drift.js"; // P11-S8
+import { createDesignSystemUsageSurfaceDriftAnalyzer } from "./design-system-usage-surface-drift.js"; // P11-S9
 
 export interface ReactCoreAnalyzerInput {
 	rootDir: string;
@@ -23,5 +24,6 @@ export function createReactCoreAnalyzers(
 		createFormControlSurfaceDriftAnalyzer(),
 		createDataFetchingSurfaceDriftAnalyzer(), // P11-S7
 		createOverlayControlSurfaceDriftAnalyzer(), // P11-S8
+		createDesignSystemUsageSurfaceDriftAnalyzer(), // P11-S9
 	];
 }

@@ -36,5 +36,9 @@ export {
 	OVERLAY_CONTROL_SURFACE_DRIFT_RULE_ID,
 	createOverlayControlSurfaceDriftAnalyzer,
 } from "./overlay-control-surface-drift.js";
+export {
+	DESIGN_SYSTEM_USAGE_SURFACE_DRIFT_RULE_ID,
+	createDesignSystemUsageSurfaceDriftAnalyzer,
+} from "./design-system-usage-surface-drift.js";
 export { createReactCoreAnalyzers } from "./core-adapter.js";
 export type { ReactCoreAnalyzerInput } from "./core-adapter.js";

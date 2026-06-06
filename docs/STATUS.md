@@ -9,8 +9,8 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S8 (P11-S8 implemented, pending release); first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P11-S9 React pattern analyzers (next deferred family: design-system usage / API conventions) |
+| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S9 (P11-S9 implemented, pending release); first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P11-S10 React pattern analyzers (next deferred family: API conventions) |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -65,6 +65,32 @@ Latest MCP compatibility fix:
 | P11-S6 | Implemented | Form control surface drift slice: `react/form-control-surface-drift` in `@rai/adapter-react`, detecting same-file form submit-surface divergence (onSubmit + declarative action/method co-presence) and control-binding divergence (mixed controlled/uncontrolled attr pairs on same-type native elements); no `@rai/core` changes. |
 | P11-S7 | Implemented | Data-fetching surface drift slice: `react/data-fetching-surface-drift` in `@rai/adapter-react`, detecting same-file co-presence of a raw-fetch `call` callee family (fetch/window.fetch/globalThis.fetch) and a query-hook `hook-call` family (useQuery/useSWR/useMutation and 8 more); query-hook discriminator is hook-call only (ADR-4); no `@rai/core` changes. |
 | P11-S8 | Implemented | Overlay control surface drift slice: `react/overlay-control-surface-drift` in `@rai/adapter-react`, detecting same-file JSX-usage-site open-state divergence (open/defaultOpen on distinct overlay elements, Gate A cross-element via spanContains) and handler-name divergence (onOpenChange/onClose/onDismiss across distinct overlay elements, Gate B); reads only jsx/jsx-attribute facts; NEVER reads ctx.graph.components (non-overlap boundary with P11-S3); capitalized OVERLAY_TAGS allow-set (Dialog/Modal/Popover/Drawer/Sheet/Tooltip/AlertDialog/HoverCard/DropdownMenu/ContextMenu/Combobox/Select); no `@rai/core` changes. |
+| P11-S9 | Implemented | Design-system usage surface drift slice: `react/design-system-usage-surface-drift` in `@rai/adapter-react`, detecting same-file JSX-usage-site styling-prop surface divergence across distinct usages of the same capitalized non-dotted tag — some usages carry variant-family props (VARIANT_PROPS: variant/size/color/tone/intent/appearance) and other usages carry raw-style props (RAW_STYLE_PROPS: className/style); per-tag cross-usage gate (>=2 usages, some hasVariant AND some hasRaw AND >=1 variant-only OR >=1 raw-only); reads only jsx/jsx-attribute facts; NEVER reads ctx.graph.components (non-overlap boundary with P11-S3); bare variant (valueKind absent) counts as present (OQ3); no `@rai/core` changes. |
+
+### P11-S9 Design-System Usage Surface Drift
+
+P11-S9 adds `react/design-system-usage-surface-drift` in `@rai/adapter-react`, the fifth analyzer slice to consume P11-S4 framework-neutral jsx/jsx-attribute facts:
+
+- Detects same-file JSX-usage-site styling prop surface divergence across distinct usages of the same capitalized non-dotted tag: some usages carry variant-family prop names (`VARIANT_PROPS`: variant, size, color, tone, intent, appearance) and other usages carry raw-style prop names (`RAW_STYLE_PROPS`: className, style).
+- Per-tag cross-usage gate: requires >=2 distinct JSX usages of the same tag; fires when some usage hasVariant AND some usage hasRaw AND (>=1 variant-only usage OR >=1 raw-only usage). A single element with both, or all elements with both, is SILENT.
+- Tag guard (case-sensitive): first char uppercase letter AND `!tag.includes(".")`. Lowercase native tags (button/div) NOT matched (S6 domain). Dotted member tags (Modal.Trigger) NOT matched (S1 domain).
+- Bare variant prop (valueKind absent) counts as present (OQ3) — consistent with S8 bare-open precedent.
+- Token per divergent tag: `stylingVariantSurfaceDrift:{tag}:{file}`. Prop-set additions require future calibration (OQ4).
+- Reads ONLY jsx/jsx-attribute patternFacts. NEVER reads ctx.graph.components (non-overlap boundary with P11-S3 enforced by no ComponentNode import and no graph.components access).
+- `info`/`warn` severity by divergence count (1 tag → info; >1 tags → warn), stable SHA fingerprints (structural/nominal/positional), sorted+frozen evidence, adapter-owned bounded explanation hook; no new MCP tool and no `@rai/core` changes.
+
+Latest P11-S9 verification:
+
+```bash
+pnpm test packages/adapter-react/src/design-system-usage-surface-drift.test.ts packages/adapter-react/src/core-adapter.test.ts  # 2 files / 33 tests
+pnpm test       # 66 Vitest files / 516 tests
+pnpm test:launcher  # Go launcher tests ok
+pnpm typecheck  # all packages Done
+pnpm build      # all packages Done
+node scripts/check-core-framework-free.mjs  # core framework-free guard pass (exit 0)
+git diff --check  # clean
+git diff --stat packages/core  # empty (zero core changes)
+```
 
 ## P7 distribution + install
 
