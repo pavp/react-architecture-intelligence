@@ -24,5 +24,9 @@ export {
 	CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID,
 	createControlledUncontrolledPropSurfaceDriftAnalyzer,
 } from "./controlled-uncontrolled-prop-surface-drift.js";
+export {
+	FORM_CONTROL_SURFACE_DRIFT_RULE_ID,
+	createFormControlSurfaceDriftAnalyzer,
+} from "./form-control-surface-drift.js";
 export { createReactCoreAnalyzers } from "./core-adapter.js";
 export type { ReactCoreAnalyzerInput } from "./core-adapter.js";

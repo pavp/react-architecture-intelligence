@@ -11,6 +11,7 @@ import { COMPOUND_COMPONENT_API_DRIFT_RULE_ID } from "./compound-component-api-d
 import { CONTAINER_PRESENTER_ROLE_DRIFT_RULE_ID } from "./container-presenter-role-drift.js";
 import { CONTEXT_PROVIDER_VALUE_SURFACE_DRIFT_RULE_ID } from "./context-provider-value-surface-drift.js";
 import { CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID } from "./controlled-uncontrolled-prop-surface-drift.js";
+import { FORM_CONTROL_SURFACE_DRIFT_RULE_ID } from "./form-control-surface-drift.js";
 import { createReactCoreAnalyzers } from "./core-adapter.js";
 
 describe("React core analyzer adapter", () => {
@@ -31,6 +32,10 @@ describe("React core analyzer adapter", () => {
 			},
 			{
 				ruleId: CONTEXT_PROVIDER_VALUE_SURFACE_DRIFT_RULE_ID,
+				framework: "react",
+			},
+			{
+				ruleId: FORM_CONTROL_SURFACE_DRIFT_RULE_ID,
 				framework: "react",
 			},
 		]);
