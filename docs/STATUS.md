@@ -9,8 +9,8 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S5 (P11-S5 implemented, pending release); first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P11-S6 React pattern analyzers (next deferred family: forms, overlays, data-fetching, or design-system usage) |
+| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S6 (P11-S6 implemented, pending release); first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P11-S7 React pattern analyzers (next deferred family: overlays, data-fetching, or design-system usage) |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -62,6 +62,7 @@ Latest MCP compatibility fix:
 | P11-S3 | Complete | Controlled/uncontrolled prop-surface slice: `react/controlled-uncontrolled-prop-surface-drift` in `@rai/adapter-react`, grounded in observed component prop names with adapter-owned explanation. |
 | P11-S4 | Complete | Framework-neutral pattern fact expansion: `call-binding`, `call-argument`, and `jsx-attribute` facts in `@rai/core`, with no new findings or React semantics in core. |
 | P11-S5 | Implemented | Context provider value-surface drift slice: `react/context-provider-value-surface-drift` in `@rai/adapter-react`, the first analyzer to consume P11-S4 facts (`call-binding`, `call-argument`, `jsx`, `jsx-attribute`), correlating same-file `createContext` bindings with `<Local.Provider>` value surfaces; no React semantics added to `@rai/core`. |
+| P11-S6 | Implemented | Form control surface drift slice: `react/form-control-surface-drift` in `@rai/adapter-react`, detecting same-file form submit-surface divergence (onSubmit + declarative action/method co-presence) and control-binding divergence (mixed controlled/uncontrolled attr pairs on same-type native elements); no `@rai/core` changes. |
 
 ## P7 distribution + install
 
@@ -100,11 +101,33 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: P11-S5 (`react/context-provider-value-surface-drift`) is implemented; pick the next deferred React family (forms, overlays, data fetching, design-system usage, or API conventions) as an adapter-owned slice that consumes P11-S4 expanded facts. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+Immediate next work: P11-S6 (`react/form-control-surface-drift`) is implemented; pick the next deferred React family (overlays, data fetching, design-system usage, or API conventions) as an adapter-owned slice that consumes P11-S4 expanded facts. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
 
 ## P11 React Pattern Analyzers + Pattern Drift
 
-P11 now has four concrete React pattern analyzer slices plus one framework-neutral fact-expansion slice on top of P10 pattern facts, without moving React semantics into `@rai/core`.
+P11 now has five concrete React pattern analyzer slices plus one framework-neutral fact-expansion slice on top of P10 pattern facts, without moving React semantics into `@rai/core`.
+
+### P11-S6 Form Control Surface Drift
+
+P11-S6 adds `react/form-control-surface-drift` in `@rai/adapter-react`, the second analyzer slice to consume P11-S4 framework-neutral facts:
+
+- Detects two signal families in the same file: (1) form submit-surface divergence — a `<form>` with `onSubmit` (non-absent valueKind) and any `<form>` with `action` or `method` co-present across the file; (2) control-binding divergence — same-type native elements (`input`, `select`, `textarea`) using both a controlled attr (`value`/`checked`) and its matching uncontrolled counterpart (`defaultValue`/`defaultChecked`).
+- Native lowercase tags only (`form`, `input`, `select`, `textarea`); capitalized custom component tags are excluded.
+- `CONTROL_BINDING_PAIRS` carries a per-pair tags allow-set so HTML-impossible pairings (e.g. `select:checked`) are not reported.
+- `type=hidden`/`type=submit` are not excluded (OQ4 deferred, documented in limits); all `action` attr occurrences count as one submit surface regardless of valueKind including React 19 `action={fn}` (OQ5, documented).
+- `info`/`warn` severity by divergence count, stable SHA fingerprints (structural/nominal/positional), sorted+frozen evidence, adapter-owned bounded explanation hook; no new MCP tool and no `@rai/core` changes.
+
+Latest P11-S6 verification:
+
+```bash
+pnpm test packages/adapter-react/src/form-control-surface-drift.test.ts packages/adapter-react/src/core-adapter.test.ts  # 2 files / 30 tests
+pnpm test       # 63 Vitest files / 438 tests
+pnpm test:launcher  # Go launcher tests ok
+pnpm typecheck  # all packages Done
+pnpm build      # all packages Done
+node scripts/check-core-framework-free.mjs  # core framework-free guard pass (exit 0)
+git diff --check  # clean
+```
 
 ### P11-S5 Context Provider Value-Surface Drift
 
