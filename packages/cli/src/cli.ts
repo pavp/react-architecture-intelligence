@@ -1,12 +1,14 @@
-import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope } from "@rai/core";
+import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, aggregateFeedback, computeSuggestions, openDb, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope, type CalibrationSuggestion, type RuleFeedbackStats } from "@rai/core";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { loadInstalledAdapters } from "./adapters.js";
 import { formatDoctorReport, runDoctor } from "./doctor.js";
 import { buildInstallPlan } from "./install/plan.js";
 import { applyInstallPlan } from "./install/writers.js";
+import { loadProjectConfig, ProjectConfigError } from "./project-config.js";
 
-export type Command = "analyze" | "explain" | "mcp" | "backfill" | "install" | "doctor" | "help";
+export type Command = "analyze" | "explain" | "mcp" | "backfill" | "install" | "doctor" | "calibrate" | "help";
 export interface ParsedArgs {
   cmd: Command;
   dir: string;
@@ -56,12 +58,21 @@ export function parseArgs(argv: string[]): ParsedArgs {
       dbPath: flag(argv, "--db") ?? ".git/rai.sqlite",
     };
   }
+  if (cmd === "calibrate") {
+    const calibrateDir = dir && !dir.startsWith("--") ? dir : ".";
+    return {
+      cmd: "calibrate",
+      dir: calibrateDir,
+      json: argv.includes("--json"),
+      dbPath: flag(argv, "--db") ?? ".git/rai.sqlite",
+    };
+  }
   return { cmd: "help", dir: dir ?? "." };
 }
 
 /** Walk a repo, run one analysis pass, return the §5.2 counts envelope. */
 export async function runAnalyze(dir: string) {
-  const config = resolveConfig({});
+  const config = resolveConfig(loadProjectConfig(dir));
   const adapters = await loadInstalledAdapters({ rootDir: dir });
   const session = createSession({ config, registryFactory: adapters.registryFactory });
   const files = readSources(dir);
@@ -69,7 +80,7 @@ export async function runAnalyze(dir: string) {
 }
 
 export async function runBackfillCommand(input: { dir: string; from: string; to: string; dbPath: string }) {
-  const config = resolveConfig({});
+  const config = resolveConfig(loadProjectConfig(input.dir));
   const adapters = await loadInstalledAdapters({ rootDir: input.dir });
   let session: ReturnType<typeof createSession> | null = null;
   const getSession = () => {
@@ -98,7 +109,7 @@ export async function runBackfillCommand(input: { dir: string; from: string; to:
 }
 
 export async function runExplainCommand(input: { dir: string; file: string }) {
-  const config = resolveConfig({});
+  const config = resolveConfig(loadProjectConfig(input.dir));
   const adapters = await loadInstalledAdapters({ rootDir: input.dir });
   const session = createSession({ config, registryFactory: adapters.registryFactory });
   const files = readSources(input.dir);
@@ -133,9 +144,89 @@ export async function runInstallCommand(input: { dir: string; platforms?: string
 }
 
 export async function buildCliMcpServer(dir: string) {
-  const config = resolveConfig({});
+  const config = resolveConfig(loadProjectConfig(dir));
   const adapters = await loadInstalledAdapters({ rootDir: dir });
   return buildMcpServer({ config, rootDir: dir, registryFactory: ({ files }) => adapters.registryFactory({ files: files.length > 0 ? files : readSources(dir) }) });
+}
+
+export interface CalibrateResult {
+  rules: RuleFeedbackStats[];
+  suggestions: CalibrationSuggestion[];
+  currentConfig: ReturnType<typeof resolveConfig>;
+  configFile: string | null;
+}
+
+export async function runCalibrateCommand(input: { dir: string; dbPath: string }): Promise<{ code: number; result: CalibrateResult; message?: string }> {
+  const absDir = isAbsolute(input.dir) ? input.dir : join(process.cwd(), input.dir);
+  const absDbPath = resolveDbPath(absDir, input.dbPath);
+
+  // D5: check db presence BEFORE openDb (openDb CREATEs the file)
+  if (!existsSync(absDbPath)) {
+    const currentConfig = resolveConfig(loadProjectConfig(absDir));
+    return {
+      code: 0,
+      result: { rules: [], suggestions: [], currentConfig, configFile: null },
+      message: "No feedback database found. Run rai analyze first to populate feedback.",
+    };
+  }
+
+  const db = openDb(absDbPath);
+  try {
+    const rules = aggregateFeedback(db);
+    const currentConfig = resolveConfig(loadProjectConfig(absDir));
+    const suggestions = computeSuggestions(rules, currentConfig);
+    const configPath = join(absDir, "rai.config.json");
+    const configFile = existsSync(configPath) ? configPath : null;
+    return { code: 0, result: { rules, suggestions, currentConfig, configFile } };
+  } finally {
+    db.close();
+  }
+}
+
+export function formatCalibrateReport(result: CalibrateResult, message?: string): string {
+  const lines: string[] = ["RAI calibrate — suggest-only (read-only over feedback history)", ""];
+
+  if (message) {
+    lines.push(message);
+    return `${lines.join("\n")}\n`;
+  }
+
+  if (result.rules.length === 0) {
+    lines.push("No feedback recorded yet. Run analysis and record some feedback first.");
+    return `${lines.join("\n")}\n`;
+  }
+
+  // Stats table
+  lines.push("Per-rule feedback summary:");
+  lines.push(
+    `${"Rule".padEnd(50)} ${"Total".padStart(6)} ${"Neg%".padStart(6)} ${"Suggest".padStart(8)}`,
+  );
+  lines.push("-".repeat(74));
+  for (const stat of result.rules) {
+    const hasSuggestion = result.suggestions.some((s) => s.ruleId === stat.ruleId);
+    lines.push(
+      `${stat.ruleId.padEnd(50)} ${String(stat.totalEvents).padStart(6)} ${(stat.negativeRate * 100).toFixed(0).padStart(5)}% ${hasSuggestion ? "YES".padStart(8) : "".padStart(8)}`,
+    );
+  }
+  lines.push("");
+
+  if (result.suggestions.length === 0) {
+    lines.push("No calibration suggestions — feedback thresholds not met.");
+    return `${lines.join("\n")}\n`;
+  }
+
+  lines.push("Suggestions (copy-paste the JSON patch into rai.config.json):");
+  lines.push("");
+  for (const sug of result.suggestions) {
+    lines.push(`  ${sug.ruleId}: ${sug.reason}`);
+    lines.push(`  Patch: ${JSON.stringify(sug.patch)}`);
+    lines.push("");
+  }
+
+  lines.push("NOTE: rai calibrate is suggest-only. Apply patches manually.");
+  lines.push(`Config file: ${result.configFile ?? "(none — create rai.config.json at project root)"}`);
+
+  return `${lines.join("\n")}\n`;
 }
 
 const USAGE = `rai — React Architecture Intelligence
@@ -145,6 +236,7 @@ Usage:
   rai explain <file> [--json]   Explain findings for one file (default dir: .)
   rai explain [dir] <file> [--json]
   rai backfill [dir] --from <sha> --to <sha> --db <path>
+  rai calibrate [dir] [--json] [--db <path>]   Suggest config calibration from feedback history
   rai install [dir] [--platform <id[,id]>] [--dry-run] [--yes] [--no-instructions]
   rai doctor [dir] [--json]
   rai mcp [dir]       Serve the MCP stdio server over the repo (default dir: .)
@@ -152,6 +244,18 @@ Usage:
 
 /** Run the CLI. Returns the process exit code; serves indefinitely for mcp. */
 export async function run(argv: string[]): Promise<number> {
+  try {
+    return await runInner(argv);
+  } catch (err) {
+    if (err instanceof ProjectConfigError) {
+      process.stderr.write(`rai: config error: ${err.message}\n`);
+      return 2;
+    }
+    throw err;
+  }
+}
+
+async function runInner(argv: string[]): Promise<number> {
   const { cmd, dir, file, from, to, dbPath, platforms, dryRun, yes, includeInstructions, json } = parseArgs(argv);
   switch (cmd) {
     case "analyze": {
@@ -170,7 +274,7 @@ export async function run(argv: string[]): Promise<number> {
     }
     case "mcp": {
       const adapters = await loadInstalledAdapters({ rootDir: dir });
-      await serveStdio({ config: resolveConfig({}), rootDir: dir, registryFactory: adapters.registryFactory });
+      await serveStdio({ config: resolveConfig(loadProjectConfig(dir)), rootDir: dir, registryFactory: adapters.registryFactory });
       return 0; // serveStdio resolves only when the transport closes
     }
     case "backfill": {
@@ -188,6 +292,15 @@ export async function run(argv: string[]): Promise<number> {
       const report = await runDoctor({ projectRoot, homeDir: homedir(), configDir: process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config") });
       process.stdout.write(json ? `${JSON.stringify(report, null, 2)}\n` : formatDoctorReport(report));
       return report.status === "fail" ? 1 : 0;
+    }
+    case "calibrate": {
+      const { code, result, message } = await runCalibrateCommand({ dir, dbPath: dbPath ?? ".git/rai.sqlite" });
+      if (json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+      } else {
+        process.stdout.write(formatCalibrateReport(result, message));
+      }
+      return code;
     }
     default:
       process.stderr.write(USAGE);
