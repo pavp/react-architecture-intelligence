@@ -32,5 +32,9 @@ export {
 	DATA_FETCHING_SURFACE_DRIFT_RULE_ID,
 	createDataFetchingSurfaceDriftAnalyzer,
 } from "./data-fetching-surface-drift.js";
+export {
+	OVERLAY_CONTROL_SURFACE_DRIFT_RULE_ID,
+	createOverlayControlSurfaceDriftAnalyzer,
+} from "./overlay-control-surface-drift.js";
 export { createReactCoreAnalyzers } from "./core-adapter.js";
 export type { ReactCoreAnalyzerInput } from "./core-adapter.js";

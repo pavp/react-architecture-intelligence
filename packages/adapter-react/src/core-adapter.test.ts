@@ -13,6 +13,7 @@ import { CONTEXT_PROVIDER_VALUE_SURFACE_DRIFT_RULE_ID } from "./context-provider
 import { CONTROLLED_UNCONTROLLED_PROP_SURFACE_DRIFT_RULE_ID } from "./controlled-uncontrolled-prop-surface-drift.js";
 import { FORM_CONTROL_SURFACE_DRIFT_RULE_ID } from "./form-control-surface-drift.js";
 import { DATA_FETCHING_SURFACE_DRIFT_RULE_ID } from "./data-fetching-surface-drift.js";
+import { OVERLAY_CONTROL_SURFACE_DRIFT_RULE_ID } from "./overlay-control-surface-drift.js";
 import { createReactCoreAnalyzers } from "./core-adapter.js";
 
 describe("React core analyzer adapter", () => {
@@ -41,6 +42,10 @@ describe("React core analyzer adapter", () => {
 			},
 			{
 				ruleId: DATA_FETCHING_SURFACE_DRIFT_RULE_ID,
+				framework: "react",
+			},
+			{
+				ruleId: OVERLAY_CONTROL_SURFACE_DRIFT_RULE_ID,
 				framework: "react",
 			},
 		]);
