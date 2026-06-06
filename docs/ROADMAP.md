@@ -4,24 +4,41 @@ This is the canonical roadmap after P9-S3 and P11-S4. Older roadmap notes in `do
 `docs/gaps.md`, and `docs/future-ideas.md` are historical inputs unless this file links
 them as active work.
 
-## Current priority order
+## Active priority order
 
-| Phase | Name | What it adds |
-|-------|------|--------------|
+Reprioritized 2026-06-07 on a **trust-first** principle: a findings engine lives or dies on
+signal-to-noise, and every downstream surface (proposals, reporting, CI) inherits the quality of the
+findings it sits on. So calibration leads, the graph substrate comes next, then acting on findings,
+then scaling/presenting them. CI/PR integration is intentionally LAST — it has high reach but only
+*broadcasts* whatever quality the findings already have; broadcasting noise erodes trust faster than
+not broadcasting at all. The phase numbers (P12–P20) are stable identifiers; the rows below are listed
+in execution priority, not numeric order.
+
+| Order | Phase | Name | What it adds | Why here |
+|-------|-------|------|--------------|----------|
+| 1 | P13 | Calibration | Reduces noise per repo: `rai calibrate`, threshold suggestions from feedback, no automatic config changes. | Trust. Kills noise first; every later phase inherits this quality. |
+| 2 | P14 | Deeper graph | Expands structural intelligence: `passes` edges, prop drilling, import/call topology, and `exportKind` use in analyzers/codemods. | Substrate. Richer model that more/better analyses and proposals stand on. |
+| 3 | P16 | Safe code proposals | Patch previews for high-evidence mechanical refactors, with explicit apply, preflight hashes, verification, and rollback. | Actionability — findings→fixes, the biggest user leap. Safe only on calibrated findings (P13) + deeper graph (P14). |
+| 4 | P15 | Team memory | Shares decisions across developers: committable/importable T4/T5 feedback and “already decided” UX. | Multiplier on calibration — turns one dev's tuning into shared team memory. Needs P13 feedback to be valuable. |
+| 5 | P17 | Always-fresh analysis | Keeps findings current without manual `rai analyze`: watch mode, hooks, and incremental local analysis. | Convenience/freshness layer over existing intelligence. Non-blocking. |
+| 6 | P18 | Architecture reporting | Leadership/reporting views: sprint digest, architecture changelog, and onboarding reports. | Presentation for leads/onboarding. Value depends on findings being trustworthy (P13) and rich (P14). |
+| 7 | P12 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. | Reach, but it amplifies whatever quality exists — deferred to last so it broadcasts trusted signal, not debt. Planning for P12-S1 (`rai check --diff`) is parked (see note below). |
+| 8 | P19 | Go Runtime / Engine Parity | Migrating runtime/storage/intelligence pieces to Go only behind golden parity, so results stay identical before any engine replacement. | Pure infrastructure — zero new user value, high risk. Only when scale demands it. |
+| 9 | P20 | Advanced intelligence | Longer-term: learned embeddings, consequence-aware prioritization, and cross-repo architectural memory. | Research/frontier. Speculative; depends on everything below being mature. |
+
+### Completed phases
+
+| Phase | Name | What it added |
+|-------|------|---------------|
 | P7 | Distribution + install | Complete: `rai install`, platform auto-detect, MCP config, agent instructions, `rai doctor`, and native dependency / Go CLI distribution decision. |
 | P8 | Single-binary distribution | Complete: P8-S1 local Go launcher prototype, P8-S2 release shape, P8-S3a repository workflow/tag/naming policy, P8-S3c governance automation, P8-S3b safe publish gates, release activation, and first installable `v0.1.3` release. |
 | P9 | Explainability | Complete through P9-S3: deterministic human output, glossary for evidence terms, additive `explain_finding`, `rai explain <file>`, README onboarding, analyzer-owned human explanation hooks, and current analyzer human explanation coverage. |
 | P10 | React Pattern Intelligence Foundation | Complete: generic pattern fact extraction for imports, exports, calls, hooks, JSX structure, static members, file roles, and a React catalog scaffold outside core. |
-| P11 | React Pattern Analyzers + Pattern Drift | Complete (9 slices shipped). P11-S1: `react/compound-component-api-drift`; P11-S2: `react/container-presenter-role-drift`; P11-S3: `react/controlled-uncontrolled-prop-surface-drift`; P11-S4: framework-neutral `call-binding`, `call-argument`, and `jsx-attribute` facts; P11-S5: `react/context-provider-value-surface-drift`; P11-S6: `react/form-control-surface-drift` (form submit-surface + control-binding divergence); P11-S7: `react/data-fetching-surface-drift` (same-file co-presence of fetch-family call + query-hook hook-call; hook-call-only discriminator per ADR-4); P11-S8: `react/overlay-control-surface-drift` (same-file JSX-usage-site open-state cross-element divergence + handler-name divergence across capitalized OVERLAY_TAGS; reads only jsx/jsx-attribute facts, never ctx.graph.components); P11-S9: `react/design-system-usage-surface-drift` (same-file JSX-usage-site styling-prop surface divergence across distinct usages of capitalized non-dotted tags; VARIANT_PROPS vs RAW_STYLE_PROPS cross-usage gate; reads only jsx/jsx-attribute facts, never ctx.graph.components). P11-S10 (broad API conventions) DEFERRED — kill-switch exploration found no signal meeting the S6-S9 groundability bar (convention divergence needs a reference convention = semantic/import knowledge unavailable from syntax-only facts; no closed token vocabulary). The groundable React API divergence surface is fully covered by S1–S9. Revisit only if a stable closed-vocabulary signal emerges. |
-| P12 | CI/PR integration | Brings RAI into review: `rai check --diff`, GitHub PR comments, and net-new findings only. |
-| P13 | Calibration | Reduces noise per repo: `rai calibrate`, threshold suggestions from feedback, and no automatic config changes. |
-| P14 | Deeper graph | Expands structural intelligence: `passes` edges, prop drilling, import/call topology, and `exportKind` use in analyzers/codemods. |
-| P15 | Team memory | Shares decisions across developers: committable/importable T4/T5 feedback and “already decided” UX. |
-| P16 | Safe code proposals | Lets RAI propose patch previews for high-evidence mechanical refactors, with explicit apply, preflight hashes, verification, and rollback. |
-| P17 | Always-fresh analysis | Keeps findings current without manual `rai analyze`: watch mode, hooks, and incremental local analysis. |
-| P18 | Architecture reporting | Adds leadership/reporting views: sprint digest, architecture changelog, and onboarding reports. |
-| P19 | Go Runtime / Engine Parity | Evaluates migrating runtime/storage/intelligence pieces to Go only behind golden parity, so results stay identical before any engine replacement. |
-| P20 | Advanced intelligence | Explores longer-term ideas: learned embeddings, consequence-aware prioritization, and cross-repo architectural memory. |
+| P11 | React Pattern Analyzers + Pattern Drift | Complete (9 slices shipped). P11-S1: `react/compound-component-api-drift`; P11-S2: `react/container-presenter-role-drift`; P11-S3: `react/controlled-uncontrolled-prop-surface-drift`; P11-S4: framework-neutral `call-binding`, `call-argument`, and `jsx-attribute` facts; P11-S5: `react/context-provider-value-surface-drift`; P11-S6: `react/form-control-surface-drift`; P11-S7: `react/data-fetching-surface-drift`; P11-S8: `react/overlay-control-surface-drift`; P11-S9: `react/design-system-usage-surface-drift`. P11-S10 (broad API conventions) DEFERRED — kill-switch exploration found no signal meeting the S6-S9 groundability bar (convention divergence needs a reference convention = semantic/import knowledge unavailable from syntax-only facts; no closed token vocabulary). The groundable React API divergence surface is fully covered by S1–S9. Revisit only if a stable closed-vocabulary signal emerges. |
+
+### Parked work
+
+- **P12-S1 (`rai check --diff`)** — full SDD planning (explore → proposal → spec → design → tasks) is complete and persisted under `openspec/changes/p12-s1-rai-check-diff/` and Engram (`sdd/p12-s1-rai-check-diff/*`). Apply has NOT run; no code written. Parked because P12 is now last in priority. The plan is reusable as-is when P12 comes up; re-verify it against the codebase at that time (it may have drifted).
 
 ## P7 scope notes — complete
 

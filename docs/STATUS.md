@@ -10,7 +10,7 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
 | Product state | P0–P11 complete plus P9-S3; P11 shipped 9 React pattern analyzer slices (S1–S9), all merged to `main`; P11-S10 (API conventions) deferred as ungroundable on syntax-only facts; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P12 CI/PR integration (`rai check --diff`, GitHub PR comments, net-new findings only) |
+| Next phase | P13 Calibration (`rai calibrate`, threshold suggestions from feedback) — first under the trust-first reprioritization (see `docs/ROADMAP.md`). P12 CI/PR moved to last; P12-S1 planning parked. |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
