@@ -9,8 +9,8 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S6 (P11-S6 implemented, pending release); first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
-| Next phase | P11-S7 React pattern analyzers (next deferred family: overlays, data-fetching, or design-system usage) |
+| Product state | P0–P10 complete plus P9-S3 and P11-S1 through P11-S7 (P11-S7 implemented, pending release); first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. |
+| Next phase | P11-S8 React pattern analyzers (next deferred family: overlays / design-system / API conventions) |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -63,6 +63,7 @@ Latest MCP compatibility fix:
 | P11-S4 | Complete | Framework-neutral pattern fact expansion: `call-binding`, `call-argument`, and `jsx-attribute` facts in `@rai/core`, with no new findings or React semantics in core. |
 | P11-S5 | Implemented | Context provider value-surface drift slice: `react/context-provider-value-surface-drift` in `@rai/adapter-react`, the first analyzer to consume P11-S4 facts (`call-binding`, `call-argument`, `jsx`, `jsx-attribute`), correlating same-file `createContext` bindings with `<Local.Provider>` value surfaces; no React semantics added to `@rai/core`. |
 | P11-S6 | Implemented | Form control surface drift slice: `react/form-control-surface-drift` in `@rai/adapter-react`, detecting same-file form submit-surface divergence (onSubmit + declarative action/method co-presence) and control-binding divergence (mixed controlled/uncontrolled attr pairs on same-type native elements); no `@rai/core` changes. |
+| P11-S7 | Implemented | Data-fetching surface drift slice: `react/data-fetching-surface-drift` in `@rai/adapter-react`, detecting same-file co-presence of a raw-fetch `call` callee family (fetch/window.fetch/globalThis.fetch) and a query-hook `hook-call` family (useQuery/useSWR/useMutation and 8 more); query-hook discriminator is hook-call only (ADR-4); no `@rai/core` changes. |
 
 ## P7 distribution + install
 
@@ -101,11 +102,34 @@ This validated:
 
 See [`docs/ROADMAP.md`](./ROADMAP.md).
 
-Immediate next work: P11-S6 (`react/form-control-surface-drift`) is implemented; pick the next deferred React family (overlays, data fetching, design-system usage, or API conventions) as an adapter-owned slice that consumes P11-S4 expanded facts. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
+Immediate next work: P11-S7 (`react/data-fetching-surface-drift`) is implemented; pick the next deferred React family (overlays, design-system usage, or API conventions) as an adapter-owned slice that consumes P11-S4 expanded facts. Release publishing remains manual: create a new `vX.Y.Z`/`vX.Y.Z-rc.N` tag from `main` only after checks and maintainer approval.
 
 ## P11 React Pattern Analyzers + Pattern Drift
 
-P11 now has five concrete React pattern analyzer slices plus one framework-neutral fact-expansion slice on top of P10 pattern facts, without moving React semantics into `@rai/core`.
+P11 now has six concrete React pattern analyzer slices plus one framework-neutral fact-expansion slice on top of P10 pattern facts, without moving React semantics into `@rai/core`.
+
+### P11-S7 Data-Fetching Surface Drift
+
+P11-S7 adds `react/data-fetching-surface-drift` in `@rai/adapter-react`, the third analyzer slice to consume P11-S4 framework-neutral facts:
+
+- Detects same-file co-presence of a raw-fetch `call` callee family (`fetch`, `window.fetch`, `globalThis.fetch`) and a query-hook `hook-call` family (11 names: `useQuery`, `useLazyQuery`, `useSuspenseQuery`, `useInfiniteQuery`, `useMutation`, `useSWR`, `useInfiniteSWR`, `useSWRInfinite`, `useSWRMutation`, `useApolloQuery`, `useLazyApolloQuery`).
+- Query-hook discriminator is `hook-call` only (ADR-4): `const { data } = useQuery()` produces a `hook-call` but NOT a `call-binding` (ObjectPattern); the analyzer detects it correctly via the hook-call signal alone.
+- `axios.get` and other non-fetch callees are excluded; `useEffect`/`useState` are not in `QUERY_HOOK_NAMES` and are silent.
+- Per-file co-presence gate; cross-file co-presence is silent. One finding per qualifying file, severity always `info`, divergenceCount always 1.
+- `info`/`warn` severity by divergence count (always `info`), stable SHA fingerprints (structural/nominal/positional), sorted+frozen evidence, adapter-owned bounded explanation hook; no new MCP tool and no `@rai/core` changes.
+
+Latest P11-S7 verification:
+
+```bash
+pnpm test packages/adapter-react/src/data-fetching-surface-drift.test.ts packages/adapter-react/src/core-adapter.test.ts  # 2 files / 27 tests
+pnpm test       # 64 Vitest files / 465 tests
+pnpm test:launcher  # Go launcher tests ok
+pnpm typecheck  # all packages Done
+pnpm build      # all packages Done
+node scripts/check-core-framework-free.mjs  # core framework-free guard pass (exit 0)
+git diff --check  # clean
+git diff --stat packages/core  # empty (zero core changes)
+```
 
 ### P11-S6 Form Control Surface Drift
 

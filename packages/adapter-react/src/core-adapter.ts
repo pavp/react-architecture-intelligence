@@ -4,6 +4,7 @@ import { createContainerPresenterRoleDriftAnalyzer } from "./container-presenter
 import { createContextProviderValueSurfaceDriftAnalyzer } from "./context-provider-value-surface-drift.js";
 import { createControlledUncontrolledPropSurfaceDriftAnalyzer } from "./controlled-uncontrolled-prop-surface-drift.js";
 import { createFormControlSurfaceDriftAnalyzer } from "./form-control-surface-drift.js";
+import { createDataFetchingSurfaceDriftAnalyzer } from "./data-fetching-surface-drift.js"; // P11-S7
 
 export interface ReactCoreAnalyzerInput {
 	rootDir: string;
@@ -19,5 +20,6 @@ export function createReactCoreAnalyzers(
 		createControlledUncontrolledPropSurfaceDriftAnalyzer(),
 		createContextProviderValueSurfaceDriftAnalyzer(),
 		createFormControlSurfaceDriftAnalyzer(),
+		createDataFetchingSurfaceDriftAnalyzer(), // P11-S7
 	];
 }
