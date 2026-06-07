@@ -1,11 +1,11 @@
-import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, aggregateFeedback, computeSuggestionsWithEvidence, lookupRejectedEvidence, CALIBRATABLE_RULES, openDb, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope, type CalibrationSuggestion, type RuleFeedbackStats } from "@rai/core";
-import { existsSync } from "node:fs";
+import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, aggregateFeedback, computeSuggestionsWithEvidence, lookupRejectedEvidence, CALIBRATABLE_RULES, openDb, mergeSuggestionsIntoConfig, ConfigSchema, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope, type CalibrationSuggestion, type RuleFeedbackStats, type RaiConfigInput } from "@rai/core";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { loadInstalledAdapters } from "./adapters.js";
 import { formatDoctorReport, runDoctor } from "./doctor.js";
 import { buildInstallPlan } from "./install/plan.js";
-import { applyInstallPlan } from "./install/writers.js";
+import { applyInstallPlan, atomicWrite } from "./install/writers.js";
 import { loadProjectConfig, ProjectConfigError } from "./project-config.js";
 
 export type Command = "analyze" | "explain" | "mcp" | "backfill" | "install" | "doctor" | "calibrate" | "help";
@@ -19,6 +19,7 @@ export interface ParsedArgs {
   platforms?: string[] | undefined;
   dryRun?: boolean | undefined;
   yes?: boolean | undefined;
+  apply?: boolean | undefined;
   includeInstructions?: boolean | undefined;
   json?: boolean | undefined;
 }
@@ -65,6 +66,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
       dir: calibrateDir,
       json: argv.includes("--json"),
       dbPath: flag(argv, "--db") ?? ".git/rai.sqlite",
+      apply: argv.includes("--apply"),
+      yes: argv.includes("--yes"),
     };
   }
   return { cmd: "help", dir: dir ?? "." };
@@ -154,11 +157,15 @@ export interface CalibrateResult {
   suggestions: CalibrationSuggestion[];
   currentConfig: ReturnType<typeof resolveConfig>;
   configFile: string | null;
+  merged?: RaiConfigInput;
+  applied?: "preview" | "written" | "noop" | "idempotent";
 }
 
-export async function runCalibrateCommand(input: { dir: string; dbPath: string }): Promise<{ code: number; result: CalibrateResult; message?: string }> {
+export async function runCalibrateCommand(input: { dir: string; dbPath: string; apply?: boolean; yes?: boolean }): Promise<{ code: number; result: CalibrateResult; message?: string }> {
   const absDir = isAbsolute(input.dir) ? input.dir : join(process.cwd(), input.dir);
   const absDbPath = resolveDbPath(absDir, input.dbPath);
+  const apply = input.apply ?? false;
+  const yes = input.yes ?? false;
 
   // D5: check db presence BEFORE openDb (openDb CREATEs the file)
   if (!existsSync(absDbPath)) {
@@ -173,7 +180,9 @@ export async function runCalibrateCommand(input: { dir: string; dbPath: string }
   const db = openDb(absDbPath);
   try {
     const rules = aggregateFeedback(db);
-    const currentConfig = resolveConfig(loadProjectConfig(absDir));
+    // D6: single load — capture rawInput (merge base) AND fail-fast on malformed
+    const rawInput = loadProjectConfig(absDir);
+    const currentConfig = resolveConfig(rawInput);
 
     // Build evidence map: for each calibratable rule past trigger, look up rejected finding metrics
     const evidenceByRule = new Map<string, number[]>();
@@ -188,14 +197,62 @@ export async function runCalibrateCommand(input: { dir: string; dbPath: string }
     const suggestions = computeSuggestionsWithEvidence(rules, currentConfig, evidenceByRule);
     const configPath = join(absDir, "rai.config.json");
     const configFile = existsSync(configPath) ? configPath : null;
-    return { code: 0, result: { rules, suggestions, currentConfig, configFile } };
+
+    // D3: suggest-only guard — apply defaults to false
+    if (!apply) {
+      return { code: 0, result: { rules, suggestions, currentConfig, configFile } };
+    }
+
+    // Apply sub-flow (ADR D3/D6 data flow)
+
+    // Zero suggestions → noop
+    if (suggestions.length === 0) {
+      return { code: 0, result: { rules, suggestions, currentConfig, configFile, applied: "noop" } };
+    }
+
+    // Merge suggestions onto raw input (CRITICAL #1: rawInput is the merge base, NOT resolved config)
+    const merged = mergeSuggestionsIntoConfig(rawInput, suggestions);
+
+    // Validate merged via ConfigSchema.partial()
+    const validation = ConfigSchema.partial().safeParse(merged);
+    if (!validation.success) {
+      const issues = validation.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+      throw new Error(`Merged config failed validation: ${issues}`);
+    }
+
+    const canonical = JSON.stringify(merged, null, 2);
+
+    // Idempotence check (CRITICAL #3: canonical-serialized equality)
+    if (existsSync(configPath)) {
+      const onDiskRaw = readFileSync(configPath, "utf8");
+      const onDiskCanonical = JSON.stringify(JSON.parse(onDiskRaw), null, 2);
+      if (canonical === onDiskCanonical) {
+        return { code: 0, result: { rules, suggestions, currentConfig, configFile, merged, applied: "idempotent" } };
+      }
+    }
+
+    // Preview (dry-run: --apply without --yes)
+    if (!yes) {
+      return { code: 0, result: { rules, suggestions, currentConfig, configFile, merged, applied: "preview" } };
+    }
+
+    // Write atomically
+    await atomicWrite(configPath, canonical + "\n");
+    return { code: 0, result: { rules, suggestions, currentConfig, configFile: configPath, merged, applied: "written" } };
   } finally {
     db.close();
   }
 }
 
 export function formatCalibrateReport(result: CalibrateResult, message?: string): string {
-  const lines: string[] = ["RAI calibrate — suggest-only (read-only over feedback history)", ""];
+  // D5: single conditional on result.applied swaps banner and suppresses suggest-only NOTE
+  const isApplyMode = result.applied !== undefined;
+  const lines: string[] = [
+    isApplyMode
+      ? "RAI calibrate — apply mode"
+      : "RAI calibrate — suggest-only (read-only over feedback history)",
+    "",
+  ];
 
   if (message) {
     lines.push(message);
@@ -226,16 +283,34 @@ export function formatCalibrateReport(result: CalibrateResult, message?: string)
     return `${lines.join("\n")}\n`;
   }
 
-  lines.push("Suggestions (copy-paste the JSON patch into rai.config.json):");
-  lines.push("");
-  for (const sug of result.suggestions) {
-    lines.push(`  ${sug.ruleId}: ${sug.reason}`);
-    lines.push(`  Patch: ${JSON.stringify(sug.patch)}`);
+  if (isApplyMode) {
+    // Apply mode output lines (D4)
+    if (result.applied === "noop") {
+      lines.push("Nothing to apply — no calibration suggestions.");
+    } else if (result.applied === "idempotent") {
+      lines.push("already calibrated — rai.config.json unchanged");
+    } else if (result.applied === "preview") {
+      lines.push("DRY-RUN — would write rai.config.json:");
+      lines.push("");
+      lines.push(JSON.stringify(result.merged, null, 2));
+      lines.push("");
+      lines.push("Re-run with --apply --yes to write.");
+    } else if (result.applied === "written") {
+      lines.push(`Wrote rai.config.json`);
+      lines.push(`Config file: ${result.configFile ?? "(none)"}`);
+    }
+  } else {
+    lines.push("Suggestions (copy-paste the JSON patch into rai.config.json):");
     lines.push("");
-  }
+    for (const sug of result.suggestions) {
+      lines.push(`  ${sug.ruleId}: ${sug.reason}`);
+      lines.push(`  Patch: ${JSON.stringify(sug.patch)}`);
+      lines.push("");
+    }
 
-  lines.push("NOTE: rai calibrate is suggest-only. Apply patches manually.");
-  lines.push(`Config file: ${result.configFile ?? "(none — create rai.config.json at project root)"}`);
+    lines.push("NOTE: rai calibrate is suggest-only. Apply patches manually.");
+    lines.push(`Config file: ${result.configFile ?? "(none — create rai.config.json at project root)"}`);
+  }
 
   return `${lines.join("\n")}\n`;
 }
@@ -267,7 +342,7 @@ export async function run(argv: string[]): Promise<number> {
 }
 
 async function runInner(argv: string[]): Promise<number> {
-  const { cmd, dir, file, from, to, dbPath, platforms, dryRun, yes, includeInstructions, json } = parseArgs(argv);
+  const { cmd, dir, file, from, to, dbPath, platforms, dryRun, yes, apply, includeInstructions, json } = parseArgs(argv);
   switch (cmd) {
     case "analyze": {
       const r = await runAnalyze(dir);
@@ -305,7 +380,7 @@ async function runInner(argv: string[]): Promise<number> {
       return report.status === "fail" ? 1 : 0;
     }
     case "calibrate": {
-      const { code, result, message } = await runCalibrateCommand({ dir, dbPath: dbPath ?? ".git/rai.sqlite" });
+      const { code, result, message } = await runCalibrateCommand({ dir, dbPath: dbPath ?? ".git/rai.sqlite", apply: apply ?? false, yes: yes ?? false });
       if (json) {
         process.stdout.write(JSON.stringify(result, null, 2) + "\n");
       } else {
