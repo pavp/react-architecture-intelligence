@@ -524,6 +524,46 @@ test("evidence-correlated: human stdout also shows correlated suggestion", async
   }
 });
 
+// ── IDEMPOTENCE: calibratable rule — apply --yes twice must converge ─────────
+// This is the KEY missing test that was masked by D1f using a non-calibratable rule.
+// Calibratable rules triggered the current+1 fallback on 2nd run: 12→13→14…
+// After the fix (computeApplicableSuggestions), the 2nd run must report "already calibrated".
+
+test("idempotent(calibratable): --apply --yes twice with render-coupling evidence → 2nd run reports idempotent, no rewrite", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  const configPath = join(dir, "rai.config.json");
+
+  // Seed 5 reject feedback events for render-coupling (fingerprints FP0..FP4)
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  // Seed matching T3 finding rows with fanIn values producing max=12
+  const fanIns = [6, 7, 9, 12, 8];
+  for (let i = 0; i < 5; i++) {
+    seedFinding(dbPath, "react/render-coupling", `FP${i}`, { kind: "render-coupling", fanIn: fanIns[i] });
+  }
+
+  // First run: should write {renderCoupling:{maxFanIn:12}}
+  const { code: code1, result: result1 } = await runCalibrateCommand({ dir, dbPath, apply: true, yes: true });
+  expect(code1).toBe(0);
+  expect(result1.applied).toBe("written");
+  const onDisk1 = JSON.parse(readFileSync(configPath, "utf8"));
+  expect(onDisk1).toEqual({ renderCoupling: { maxFanIn: 12 } });
+  const stat1 = statSync(configPath);
+
+  // Second run: config already has maxFanIn=12; evidence max=12 → no genuine headroom
+  // → computeApplicableSuggestions emits NO suggestion → merged == current config → idempotent
+  const { code: code2, result: result2 } = await runCalibrateCommand({ dir, dbPath, apply: true, yes: true });
+  expect(code2).toBe(0);
+  expect(result2.applied).toBe("idempotent");
+
+  // File content must not change (no 12→13 divergence)
+  const onDisk2 = JSON.parse(readFileSync(configPath, "utf8"));
+  expect(onDisk2).toEqual({ renderCoupling: { maxFanIn: 12 } });
+  // mtime must not change
+  const stat2 = statSync(configPath);
+  expect(stat2.mtimeMs).toBe(stat1.mtimeMs);
+});
+
 // ── E1: GUARDRAIL extended for evidence path (T3+T4 → zero writes) ───────────
 
 test("GUARDRAIL: evidence path — calibrate does NOT create rai.config.json when T3+T4 seeded", async () => {

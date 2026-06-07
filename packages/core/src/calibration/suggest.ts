@@ -136,6 +136,39 @@ export function computeSuggestions(
 }
 
 /**
+ * Shared correlated-evidence computation for a calibratable rule.
+ * Returns the correlated CalibrationSuggestion if newValue > current, or null if not.
+ * Does NOT fall back to generic: caller decides what to do when null is returned.
+ */
+function buildCorrelatedSuggestion(
+  stat: RuleFeedbackStats,
+  calibratable: (typeof CALIBRATABLE_RULES)[number],
+  values: number[],
+  currentConfig: RaiConfig,
+): CalibrationSuggestion | null {
+  if (!values || values.length === 0) return null;
+
+  const maxObserved = Math.max(...values);
+  const isFloor = FLOOR_RULE_IDS.has(stat.ruleId);
+  const newValue = isFloor
+    ? Math.min(maxObserved + 1, calibratable.maxCap)
+    : Math.min(maxObserved, calibratable.maxCap);
+
+  const current = calibratable.currentValue(currentConfig);
+  if (newValue <= current) return null;
+
+  const patch = calibratable.buildPatch(newValue);
+  const validated = ConfigSchema.partial().safeParse(patch);
+  if (!validated.success) return null;
+
+  return {
+    ruleId: stat.ruleId,
+    reason: `High negative feedback rate (${(stat.negativeRate * 100).toFixed(0)}%) — observed max ${calibratable.metricLabel}: ${maxObserved} across ${values.length} rejected findings — suggest ${calibratable.knob}: ${newValue} to clear all rejected findings`,
+    patch,
+  };
+}
+
+/**
  * Evidence-correlated calibration suggestions (S2).
  * Pure deterministic function: given aggregated stats, current config, and a pre-fetched
  * map of rejected evidence metrics (from lookupRejectedEvidence), returns calibration
@@ -164,35 +197,59 @@ export function computeSuggestionsWithEvidence(
 
     if (calibratable) {
       const values = evidenceByRule.get(stat.ruleId);
-
-      if (values && values.length > 0) {
-        const maxObserved = Math.max(...values);
-        const isFloor = FLOOR_RULE_IDS.has(stat.ruleId);
-        const newValue = isFloor
-          ? Math.min(maxObserved + 1, calibratable.maxCap)
-          : Math.min(maxObserved, calibratable.maxCap);
-
-        const current = calibratable.currentValue(currentConfig);
-
-        if (newValue > current) {
-          // Correlated suggestion: use observed evidence to set the new threshold
-          const patch = calibratable.buildPatch(newValue);
-          const validated = ConfigSchema.partial().safeParse(patch);
-          if (validated.success) {
-            suggestions.push({
-              ruleId: stat.ruleId,
-              reason: `High negative feedback rate (${(stat.negativeRate * 100).toFixed(0)}%) — observed max ${calibratable.metricLabel}: ${maxObserved} across ${values.length} rejected findings — suggest ${calibratable.knob}: ${newValue} to clear all rejected findings`,
-              patch,
-            });
-            continue;
-          }
-        }
+      const correlated = buildCorrelatedSuggestion(stat, calibratable, values ?? [], currentConfig);
+      if (correlated) {
+        suggestions.push(correlated);
+        continue;
       }
-
       // Fallback: absent/empty evidence, or newValue <= current → generic current+1
       suggestions.push(buildGenericSuggestion(stat, currentConfig));
     } else {
       // Non-calibratable (adapter/unknown) → severity downgrade; evidence path not entered
+      suggestions.push(buildGenericSuggestion(stat, currentConfig));
+    }
+  }
+
+  // Sort by ruleId (byte order)
+  return suggestions.sort((a, b) =>
+    a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0,
+  );
+}
+
+/**
+ * Apply-safe evidence-correlated suggestions (idempotent --apply fix).
+ * Pure deterministic function with the same signature as computeSuggestionsWithEvidence.
+ *
+ * Behavioural difference: for calibratable rules, NEVER falls back to generic current+1.
+ * When evidence is absent, empty, or newValue <= current, emits NO suggestion for that rule.
+ * This makes --apply --yes idempotent: once the config already covers the evidence,
+ * there is nothing genuine to apply and the suggestion is suppressed entirely.
+ *
+ * Non-calibratable (adapter/unknown) rules → severity downgrade (idempotent: applying
+ * the same severityMap patch twice is a byte-level no-op, so these never diverge).
+ */
+export function computeApplicableSuggestions(
+  stats: RuleFeedbackStats[],
+  currentConfig: RaiConfig,
+  evidenceByRule: Map<string, number[]>,
+): CalibrationSuggestion[] {
+  const suggestions: CalibrationSuggestion[] = [];
+
+  for (const stat of stats) {
+    // Trigger check (both conditions, both inclusive)
+    if (stat.totalEvents < MIN_EVENTS || stat.negativeRate < MIN_NEGATIVE_RATE) continue;
+
+    const calibratable = CALIBRATABLE_RULES.find((r) => r.ruleId === stat.ruleId);
+
+    if (calibratable) {
+      const values = evidenceByRule.get(stat.ruleId);
+      const correlated = buildCorrelatedSuggestion(stat, calibratable, values ?? [], currentConfig);
+      if (correlated) {
+        suggestions.push(correlated);
+      }
+      // No fallback: if no genuine headroom, emit nothing for this calibratable rule.
+    } else {
+      // Non-calibratable (adapter/unknown) → severity downgrade (idempotent)
       suggestions.push(buildGenericSuggestion(stat, currentConfig));
     }
   }
