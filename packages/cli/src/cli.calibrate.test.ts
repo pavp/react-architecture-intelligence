@@ -97,6 +97,28 @@ test("parseArgs calibrate handles --db flag", () => {
   });
 });
 
+// ── P13-S3: parseArgs --apply / --yes flags ───────────────────────────────────
+
+test("parseArgs calibrate: --apply --yes → apply:true, yes:true", () => {
+  expect(parseArgs(["calibrate", ".", "--apply", "--yes"])).toMatchObject({
+    cmd: "calibrate",
+    apply: true,
+    yes: true,
+  });
+});
+
+test("parseArgs calibrate: --apply alone → apply:true, yes:false", () => {
+  const result = parseArgs(["calibrate", ".", "--apply"]);
+  expect(result).toMatchObject({ cmd: "calibrate", apply: true });
+  expect(result.yes).toBeFalsy();
+});
+
+test("parseArgs calibrate: no --apply → apply:false", () => {
+  const result = parseArgs(["calibrate", "."]);
+  expect(result.apply).toBeFalsy();
+  expect(result.yes).toBeFalsy();
+});
+
 // ── absent db → graceful exit 0 ──────────────────────────────────────────────
 
 test("runCalibrateCommand returns code 0 and message when no db exists", async () => {
@@ -206,6 +228,200 @@ test("human output includes stats table and suggestion block", async () => {
     process.chdir(originalCwd);
     process.stdout.write = originalWrite;
   }
+});
+
+// ── P13-S3: apply path tests (RED before GREEN) ──────────────────────────────
+
+test("apply(D1a): --apply without --yes → no file written, exit 0, applied='preview'", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  seedFinding(dbPath, "react/render-coupling", "FP0", { kind: "render-coupling", fanIn: 12 });
+
+  const { code, result } = await runCalibrateCommand({ dir, dbPath, apply: true, yes: false });
+  expect(code).toBe(0);
+  expect(result.applied).toBe("preview");
+  expect(existsSync(join(dir, "rai.config.json"))).toBe(false);
+});
+
+test("apply(D1b): --apply --yes → file written, exit 0, applied='written', on-disk == merged", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  seedFinding(dbPath, "react/render-coupling", "FP0", { kind: "render-coupling", fanIn: 12 });
+
+  const { code, result } = await runCalibrateCommand({ dir, dbPath, apply: true, yes: true });
+  expect(code).toBe(0);
+  expect(result.applied).toBe("written");
+  const onDisk = JSON.parse(readFileSync(join(dir, "rai.config.json"), "utf8"));
+  expect(onDisk).toEqual(result.merged);
+});
+
+test("apply(D1c): unrelated keys survive write", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  const configPath = join(dir, "rai.config.json");
+  writeFileSync(configPath, JSON.stringify({
+    excludeGlobs: ["**/*.test.*", "**/vendor/**"],
+    boundaries: [{ from: "a", to: "b", reason: "test" }],
+  }));
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  seedFinding(dbPath, "react/render-coupling", "FP0", { kind: "render-coupling", fanIn: 12 });
+
+  const { code, result } = await runCalibrateCommand({ dir, dbPath, apply: true, yes: true });
+  expect(code).toBe(0);
+  expect(result.applied).toBe("written");
+  const onDisk = JSON.parse(readFileSync(configPath, "utf8"));
+  expect(onDisk.excludeGlobs).toEqual(["**/*.test.*", "**/vendor/**"]);
+  expect(onDisk.boundaries).toEqual([{ from: "a", to: "b", reason: "test" }]);
+  expect(onDisk.renderCoupling?.maxFanIn).toBe(12);
+});
+
+test("apply(D1d): empty config → writes ONLY suggested groups, no default tree (CRITICAL #1)", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  seedFinding(dbPath, "react/render-coupling", "FP0", { kind: "render-coupling", fanIn: 12 });
+
+  const { code, result } = await runCalibrateCommand({ dir, dbPath, apply: true, yes: true });
+  expect(code).toBe(0);
+  expect(result.applied).toBe("written");
+
+  const onDisk = JSON.parse(readFileSync(join(dir, "rai.config.json"), "utf8"));
+  // MUST have only the suggested group
+  expect(onDisk).toEqual({ renderCoupling: { maxFanIn: 12 } });
+  // MUST NOT have default tree (no shared, hookTopology, etc.)
+  expect(onDisk.shared).toBeUndefined();
+  expect(onDisk.overAbstraction).toBeUndefined();
+  expect(onDisk.hookTopology).toBeUndefined();
+});
+
+test("apply(D1e): zero suggestions → applied='noop', no write, exit 0", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  // Seed only 1 event (below MIN_EVENTS=3 → no suggestions)
+  seedFeedback(dbPath, "react/render-coupling", "reject", 1);
+
+  const { code, result } = await runCalibrateCommand({ dir, dbPath, apply: true, yes: true });
+  expect(code).toBe(0);
+  expect(result.applied).toBe("noop");
+  expect(existsSync(join(dir, "rai.config.json"))).toBe(false);
+});
+
+test("apply(D1f): idempotent — pre-seed canonical config → applied='idempotent', no rewrite, exit 0", async () => {
+  // Use a non-calibratable rule so the suggestion (severity downgrade patch) is stable
+  // and does not depend on current config value — ensuring true idempotence.
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  // "adapter/custom-rule" is not in CALIBRATABLE_RULES → always produces severity downgrade patch
+  seedFeedback(dbPath, "adapter/custom-rule", "reject", 5);
+
+  // First write: get the canonical merged output
+  const { result: firstResult } = await runCalibrateCommand({ dir, dbPath, apply: true, yes: true });
+  expect(firstResult.applied).toBe("written");
+  const canonicalContent = readFileSync(join(dir, "rai.config.json"), "utf8");
+  const statAfterFirst = statSync(join(dir, "rai.config.json"));
+
+  // Second run with identical feedback → merged output is identical → idempotent
+  const { code, result } = await runCalibrateCommand({ dir, dbPath, apply: true, yes: true });
+  expect(code).toBe(0);
+  expect(result.applied).toBe("idempotent");
+
+  // File content must not change
+  const afterContent = readFileSync(join(dir, "rai.config.json"), "utf8");
+  expect(afterContent).toBe(canonicalContent);
+  // mtime must not change (no rewrite)
+  const statAfterSecond = statSync(join(dir, "rai.config.json"));
+  expect(statAfterSecond.mtimeMs).toBe(statAfterFirst.mtimeMs);
+});
+
+test("apply(D1g): malformed config → exit 2, file bytes byte-identical", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  const configPath = join(dir, "rai.config.json");
+  const malformedContent = '{"shared": {"minInstances": "not-a-number"}}';
+  writeFileSync(configPath, malformedContent);
+
+  const code = await run(["calibrate", dir, "--db", dbPath, "--apply", "--yes"]);
+  expect(code).toBe(2);
+  const afterBytes = readFileSync(configPath, "utf8");
+  expect(afterBytes).toBe(malformedContent);
+});
+
+// ── P13-S3: --json + apply ─────────────────────────────────────────────────────
+
+test("--json --apply (dry-run): stdout valid JSON with merged+applied='preview', no write", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  seedFinding(dbPath, "react/render-coupling", "FP0", { kind: "render-coupling", fanIn: 12 });
+
+  let stdout = "";
+  const originalWrite = process.stdout.write;
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+    return true;
+  }) as typeof process.stdout.write;
+  let code: number;
+  try {
+    code = await run(["calibrate", dir, "--db", dbPath, "--apply", "--json"]);
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+  expect(code!).toBe(0);
+  const parsed = JSON.parse(stdout);
+  expect(parsed.applied).toBe("preview");
+  expect(parsed.merged).toBeDefined();
+  expect(existsSync(join(dir, "rai.config.json"))).toBe(false);
+});
+
+test("--json --apply --yes: JSON has applied='written', on-disk matches merged", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  seedFinding(dbPath, "react/render-coupling", "FP0", { kind: "render-coupling", fanIn: 12 });
+
+  let stdout = "";
+  const originalWrite = process.stdout.write;
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+    return true;
+  }) as typeof process.stdout.write;
+  let code: number;
+  try {
+    code = await run(["calibrate", dir, "--db", dbPath, "--apply", "--yes", "--json"]);
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+  expect(code!).toBe(0);
+  const parsed = JSON.parse(stdout);
+  expect(parsed.applied).toBe("written");
+  expect(parsed.merged).toBeDefined();
+  const onDisk = JSON.parse(readFileSync(join(dir, "rai.config.json"), "utf8"));
+  expect(onDisk).toEqual(parsed.merged);
+});
+
+// ── P13-S3: apply banner in human output ──────────────────────────────────────
+
+test("human banner becomes 'apply mode' and suggest-only NOTE suppressed when applied is set", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  seedFinding(dbPath, "react/render-coupling", "FP0", { kind: "render-coupling", fanIn: 12 });
+
+  let stdout = "";
+  const originalWrite = process.stdout.write;
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+    return true;
+  }) as typeof process.stdout.write;
+  try {
+    await run(["calibrate", dir, "--db", dbPath, "--apply", "--yes"]);
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+  expect(stdout).toMatch(/apply mode/i);
+  expect(stdout).not.toMatch(/NOTE: rai calibrate is suggest-only/);
 });
 
 // ── CENTRAL GUARDRAIL: SUGGEST-ONLY (INV-1 + INV-2) ─────────────────────────

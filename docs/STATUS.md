@@ -9,8 +9,8 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P11 complete plus P9-S3; P11 shipped 9 React pattern analyzer slices (S1–S9), all merged to `main`; P11-S10 (API conventions) deferred as ungroundable on syntax-only facts; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. P13-S1 (`rai calibrate` suggest-only) implemented. P13-S2 (evidence-correlated suggestions) implemented. |
-| Next phase | P13-S3 `--apply` flag, or P13-S2.x secondary knobs. P12 CI/PR moved to last. |
+| Product state | P0–P11 complete plus P9-S3; P11 shipped 9 React pattern analyzer slices (S1–S9), all merged to `main`; P11-S10 (API conventions) deferred as ungroundable on syntax-only facts; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. P13-S1 (`rai calibrate` suggest-only) implemented. P13-S2 (evidence-correlated suggestions) implemented. P13-S3 (`rai calibrate --apply` guarded write) implemented. |
+| Next phase | P13-S2.x secondary knobs or P14 deeper graph. P12 CI/PR moved to last. |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -68,6 +68,7 @@ Latest MCP compatibility fix:
 | P11-S9 | Implemented | Design-system usage surface drift slice: `react/design-system-usage-surface-drift` in `@rai/adapter-react`, detecting same-file JSX-usage-site styling-prop surface divergence across distinct usages of the same capitalized non-dotted tag — some usages carry variant-family props (VARIANT_PROPS: variant/size/color/tone/intent/appearance) and other usages carry raw-style props (RAW_STYLE_PROPS: className/style); per-tag cross-usage gate (>=2 usages, some hasVariant AND some hasRaw AND >=1 variant-only OR >=1 raw-only); reads only jsx/jsx-attribute facts; NEVER reads ctx.graph.components (non-overlap boundary with P11-S3); bare variant (valueKind absent) counts as present (OQ3); no `@rai/core` changes. |
 | P13-S1 | Implemented | `rai calibrate` suggest-only command: `aggregateFeedback` (SELECT-only over T4 feedback_event), `computeSuggestions` (pure deterministic fn, CALIBRATABLE_RULES allowlist of 4 core rules), `loadProjectConfig` (reads `rai.config.json`, absent→{}, malformed→ProjectConfigError exit 2), config wired into 5 cli.ts resolveConfig({}) sites (analyze/explain/mcp/backfill/buildCliMcpServer); SUGGEST-ONLY guardrail (no config/T4 write); 48 new tests (8+18+8+14 across 4 test files). |
 | P13-S2 | Implemented | Evidence-correlated calibration suggestions: `lookupRejectedEvidence(db, ruleId)` (T4→T3 join, SELECT-only), `computeSuggestionsWithEvidence` (pure fn, ceiling/floor arithmetic over observed breach metrics), CLI wiring in `runCalibrateCommand`; zero schema change, zero analyzer change; SUGGEST-ONLY + zero-write guardrail extended to cover T3 finding rows; 26 new tests (9+17 unit + CLI correlated + guardrail). |
+| P13-S3 | Implemented | `rai calibrate --apply [--yes]` guarded write: `mergeSuggestionsIntoConfig` pure core helper (fs-free), `atomicWrite` exported from writers.ts, apply sub-flow in `runCalibrateCommand` (preview/noop/idempotent/written), `CalibrateResult.merged`+`.applied` fields, apply-mode banner in `formatCalibrateReport`; CRITICAL guards enforced (merge base = raw input, apply/yes default false, idempotence via canonical-serialized equality); 19 new tests (3 parseArgs + 7 apply scenarios + 2 json + 1 banner + existing 6 GUARDRAIL tests unchanged). Phase-G gate: 73 files / 615 tests. |
 
 ### P13-S2 Evidence-Correlated Calibration Suggestions
 
@@ -79,6 +80,32 @@ P13-S2 replaces the blind `current+1` formula with values derived from the actua
 - SUGGEST-ONLY invariant maintained: zero writes; guardrail extended to assert `finding` row count unchanged after calibrate with T3+T4 seeded.
 - New exports: `lookupRejectedEvidence`, `computeSuggestionsWithEvidence`.
 - Zero schema change, zero analyzer change.
+
+### P13-S3 `rai calibrate --apply` Guarded Write
+
+P13-S3 adds the guarded opt-in write path to the calibrate command:
+
+- `rai calibrate --apply` — dry-run: computes merged config, prints preview of what would be written, exits 0, writes nothing.
+- `rai calibrate --apply --yes` — atomically writes merged `rai.config.json` via temp-file+rename. Validates merged via `ConfigSchema.partial()`. Idempotent: skips write if canonical-serialized equality already holds.
+- `mergeSuggestionsIntoConfig(existing, suggestions)` — pure core helper in `packages/core/src/calibration/merge.ts`. Merge base is raw `RaiConfigInput` (NOT the defaulted config). Exported via `packages/core/src/index.ts`. Zero fs/React imports.
+- `atomicWrite` exported from `packages/cli/src/install/writers.ts` (one-word change).
+- `CalibrateResult` gains `merged?: RaiConfigInput` and `applied?: "preview"|"written"|"noop"|"idempotent"`.
+- Apply/yes flags default to `false` — CRITICAL: preserves suggest-only guardrail for default no-flag path.
+- 6 existing GUARDRAIL tests unchanged.
+- Zero schema change, zero analyzer change.
+
+Latest P13-S3 verification:
+
+```bash
+pnpm test       # 73 files / 615 tests (all green)
+pnpm typecheck  # all packages Done
+pnpm build      # all packages Done
+node scripts/check-core-framework-free.mjs  # exit 0 (merge.ts: zero react/fs imports)
+git diff --check  # clean
+# New files: merge.ts, merge.test.ts (core)
+# Modified: cli.ts, cli.calibrate.test.ts, index.ts, writers.ts (export atomicWrite), docs
+# No changes: config/schema.ts, analyzers, db schema, doctor.ts
+```
 
 Latest P13-S2 verification:
 

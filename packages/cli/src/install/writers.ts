@@ -118,7 +118,7 @@ async function readOptional(path: string): Promise<string | null> {
   }
 }
 
-async function atomicWrite(path: string, content: string): Promise<void> {
+export async function atomicWrite(path: string, content: string): Promise<void> {
   const parent = dirname(path);
   await mkdir(parent, { recursive: true });
   const tempPath = `${path}.tmp-${process.pid}-${randomUUID()}`;

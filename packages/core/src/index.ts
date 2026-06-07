@@ -10,6 +10,7 @@ export { openDb } from "./db/db.js";
 export type { Db } from "./db/db.js";
 export { computeSuggestions, computeSuggestionsWithEvidence, CALIBRATABLE_RULES, MIN_EVENTS, MIN_NEGATIVE_RATE } from "./calibration/suggest.js";
 export type { CalibrationSuggestion } from "./calibration/suggest.js";
+export { mergeSuggestionsIntoConfig } from "./calibration/merge.js";
 export { lookupRejectedEvidence } from "./calibration/evidence-lookup.js";
 export { analyzeRepo } from "./engine/pipeline.js";
 export { runBackfill } from "./engine/backfill.js";
