@@ -2,6 +2,10 @@ import { ConfigSchema } from "../config/schema.js";
 import type { RaiConfig, RaiConfigInput } from "../config/schema.js";
 import type { RuleFeedbackStats } from "../memory/feedback-aggregate.js";
 
+// Floor rule (raise to max+1 so the threshold clears all observed clusters).
+// All other calibratable rules are ceiling rules (raise to max of observed breach values).
+const FLOOR_RULE_IDS = new Set(["react/shared-extraction"]);
+
 // Named constants for trigger thresholds
 export const MIN_EVENTS = 3;
 export const MIN_NEGATIVE_RATE = 0.5;
@@ -15,6 +19,8 @@ export const CALIBRATABLE_RULES: Array<{
   currentValue: (config: RaiConfig) => number;
   maxCap: number;
   buildPatch: (newValue: number) => Partial<RaiConfigInput>;
+  /** Name of the observed breach metric this rule's evidence reports, used in the rationale. */
+  metricLabel: string;
 }> = [
   {
     ruleId: "react/shared-extraction",
@@ -23,6 +29,7 @@ export const CALIBRATABLE_RULES: Array<{
     currentValue: (cfg) => cfg.shared.minInstances,
     maxCap: 50,
     buildPatch: (v) => ({ shared: { minInstances: v } }),
+    metricLabel: "instances",
   },
   {
     ruleId: "react/render-coupling",
@@ -31,6 +38,7 @@ export const CALIBRATABLE_RULES: Array<{
     currentValue: (cfg) => cfg.renderCoupling.maxFanIn,
     maxCap: 50,
     buildPatch: (v) => ({ renderCoupling: { maxFanIn: v } }),
+    metricLabel: "fanIn",
   },
   {
     ruleId: "react/over-abstraction",
@@ -39,6 +47,7 @@ export const CALIBRATABLE_RULES: Array<{
     currentValue: (cfg) => cfg.overAbstraction.maxProps,
     maxCap: 50,
     buildPatch: (v) => ({ overAbstraction: { maxProps: v } }),
+    metricLabel: "propCount",
   },
   {
     ruleId: "react/hook-topology",
@@ -47,6 +56,7 @@ export const CALIBRATABLE_RULES: Array<{
     currentValue: (cfg) => cfg.hookTopology.maxFanIn,
     maxCap: 50,
     buildPatch: (v) => ({ hookTopology: { maxFanIn: v } }),
+    metricLabel: "fanIn",
   },
 ];
 
@@ -62,6 +72,47 @@ const SEVERITY_DOWNGRADE_PATCH: Partial<RaiConfigInput> = {
 };
 
 /**
+ * Private helper: build the generic (S1) suggestion for a calibratable rule —
+ * raises threshold by 1 if below cap, otherwise severity downgrade.
+ * Also handles non-calibratable rules (severity downgrade).
+ * Extracted to be shared between computeSuggestions (S1) and computeSuggestionsWithEvidence (S2).
+ */
+function buildGenericSuggestion(
+  stat: RuleFeedbackStats,
+  currentConfig: RaiConfig,
+): CalibrationSuggestion {
+  const calibratable = CALIBRATABLE_RULES.find((r) => r.ruleId === stat.ruleId);
+
+  if (calibratable) {
+    const current = calibratable.currentValue(currentConfig);
+    if (current < calibratable.maxCap) {
+      const patch = calibratable.buildPatch(current + 1);
+      const validated = ConfigSchema.partial().safeParse(patch);
+      if (validated.success) {
+        return {
+          ruleId: stat.ruleId,
+          reason: `High negative feedback rate (${(stat.negativeRate * 100).toFixed(0)}%) over ${stat.totalEvents} events — raise threshold to reduce noise`,
+          patch,
+        };
+      }
+    }
+    // At cap or invalid — severity downgrade
+    return {
+      ruleId: stat.ruleId,
+      reason: `High negative feedback rate (${(stat.negativeRate * 100).toFixed(0)}%) — threshold is at cap, suggest severity downgrade to reduce noise`,
+      patch: SEVERITY_DOWNGRADE_PATCH,
+    };
+  }
+
+  // Adapter or unknown rule — not threshold-calibratable
+  return {
+    ruleId: stat.ruleId,
+    reason: `High negative feedback rate (${(stat.negativeRate * 100).toFixed(0)}%) over ${stat.totalEvents} events — suggest severity downgrade (rule is not threshold-calibratable)`,
+    patch: SEVERITY_DOWNGRADE_PATCH,
+  };
+}
+
+/**
  * Pure deterministic function: given per-rule aggregated stats and the current resolved config,
  * return a list of CalibrationSuggestion sorted by ruleId (byte order).
  * No IO, no clock, no randomness. PURE.
@@ -75,39 +126,74 @@ export function computeSuggestions(
   for (const stat of stats) {
     // Trigger check (both conditions, both inclusive)
     if (stat.totalEvents < MIN_EVENTS || stat.negativeRate < MIN_NEGATIVE_RATE) continue;
+    suggestions.push(buildGenericSuggestion(stat, currentConfig));
+  }
 
-    // Check if this is a calibratable core rule
+  // Sort by ruleId (byte order)
+  return suggestions.sort((a, b) =>
+    a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0,
+  );
+}
+
+/**
+ * Evidence-correlated calibration suggestions (S2).
+ * Pure deterministic function: given aggregated stats, current config, and a pre-fetched
+ * map of rejected evidence metrics (from lookupRejectedEvidence), returns calibration
+ * suggestions that use observed breach values instead of the blind current+1 formula.
+ *
+ * For calibratable rules with evidence:
+ *   - Ceiling rules (render-coupling, over-abstraction, hook-topology): newValue = min(max(values), 50)
+ *   - Floor rule (shared-extraction): newValue = min(max(values)+1, 50)
+ *   - If newValue > current → correlated suggestion with rationale citing observed max + count
+ *   - Otherwise (newValue <= current, or no/empty evidence) → generic current+1 fallback
+ *
+ * Non-calibratable (adapter/unknown) rules → severity downgrade (evidence not entered).
+ */
+export function computeSuggestionsWithEvidence(
+  stats: RuleFeedbackStats[],
+  currentConfig: RaiConfig,
+  evidenceByRule: Map<string, number[]>,
+): CalibrationSuggestion[] {
+  const suggestions: CalibrationSuggestion[] = [];
+
+  for (const stat of stats) {
+    // Trigger check (both conditions, both inclusive)
+    if (stat.totalEvents < MIN_EVENTS || stat.negativeRate < MIN_NEGATIVE_RATE) continue;
+
     const calibratable = CALIBRATABLE_RULES.find((r) => r.ruleId === stat.ruleId);
 
     if (calibratable) {
-      const current = calibratable.currentValue(currentConfig);
-      if (current < calibratable.maxCap) {
-        // Raise threshold by 1 (least-disruptive)
-        const patch = calibratable.buildPatch(current + 1);
-        // Validate patch is schema-valid (hard gate)
-        const validated = ConfigSchema.partial().safeParse(patch);
-        if (validated.success) {
-          suggestions.push({
-            ruleId: stat.ruleId,
-            reason: `High negative feedback rate (${(stat.negativeRate * 100).toFixed(0)}%) over ${stat.totalEvents} events — raise threshold to reduce noise`,
-            patch,
-          });
-          continue;
+      const values = evidenceByRule.get(stat.ruleId);
+
+      if (values && values.length > 0) {
+        const maxObserved = Math.max(...values);
+        const isFloor = FLOOR_RULE_IDS.has(stat.ruleId);
+        const newValue = isFloor
+          ? Math.min(maxObserved + 1, calibratable.maxCap)
+          : Math.min(maxObserved, calibratable.maxCap);
+
+        const current = calibratable.currentValue(currentConfig);
+
+        if (newValue > current) {
+          // Correlated suggestion: use observed evidence to set the new threshold
+          const patch = calibratable.buildPatch(newValue);
+          const validated = ConfigSchema.partial().safeParse(patch);
+          if (validated.success) {
+            suggestions.push({
+              ruleId: stat.ruleId,
+              reason: `High negative feedback rate (${(stat.negativeRate * 100).toFixed(0)}%) — observed max ${calibratable.metricLabel}: ${maxObserved} across ${values.length} rejected findings — suggest ${calibratable.knob}: ${newValue} to clear all rejected findings`,
+              patch,
+            });
+            continue;
+          }
         }
       }
-      // At cap or invalid — fall through to severity downgrade
-      suggestions.push({
-        ruleId: stat.ruleId,
-        reason: `High negative feedback rate (${(stat.negativeRate * 100).toFixed(0)}%) — threshold is at cap, suggest severity downgrade to reduce noise`,
-        patch: SEVERITY_DOWNGRADE_PATCH,
-      });
+
+      // Fallback: absent/empty evidence, or newValue <= current → generic current+1
+      suggestions.push(buildGenericSuggestion(stat, currentConfig));
     } else {
-      // Adapter or unknown rule — not threshold-calibratable, suggest severity downgrade
-      suggestions.push({
-        ruleId: stat.ruleId,
-        reason: `High negative feedback rate (${(stat.negativeRate * 100).toFixed(0)}%) over ${stat.totalEvents} events — suggest severity downgrade (rule is not threshold-calibratable)`,
-        patch: SEVERITY_DOWNGRADE_PATCH,
-      });
+      // Non-calibratable (adapter/unknown) → severity downgrade; evidence path not entered
+      suggestions.push(buildGenericSuggestion(stat, currentConfig));
     }
   }
 
