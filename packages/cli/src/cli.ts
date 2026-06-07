@@ -1,4 +1,4 @@
-import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, aggregateFeedback, computeSuggestionsWithEvidence, lookupRejectedEvidence, CALIBRATABLE_RULES, openDb, mergeSuggestionsIntoConfig, ConfigSchema, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope, type CalibrationSuggestion, type RuleFeedbackStats, type RaiConfigInput } from "@rai/core";
+import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, aggregateFeedback, computeSuggestionsWithEvidence, computeApplicableSuggestions, lookupRejectedEvidence, CALIBRATABLE_RULES, openDb, mergeSuggestionsIntoConfig, ConfigSchema, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope, type CalibrationSuggestion, type RuleFeedbackStats, type RaiConfigInput } from "@rai/core";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
@@ -194,6 +194,7 @@ export async function runCalibrateCommand(input: { dir: string; dbPath: string; 
       }
     }
 
+    // suggest-only path: use computeSuggestionsWithEvidence (may include current+1 nudges for display)
     const suggestions = computeSuggestionsWithEvidence(rules, currentConfig, evidenceByRule);
     const configPath = join(absDir, "rai.config.json");
     const configFile = existsSync(configPath) ? configPath : null;
@@ -203,15 +204,23 @@ export async function runCalibrateCommand(input: { dir: string; dbPath: string; 
       return { code: 0, result: { rules, suggestions, currentConfig, configFile } };
     }
 
-    // Apply sub-flow (ADR D3/D6 data flow)
+    // Apply sub-flow: use computeApplicableSuggestions — suppresses current+1 fallback for
+    // calibratable rules, making --apply --yes idempotent (fix for non-convergence bug).
+    // preview (--apply no --yes) uses the same set so preview == what would be written.
+    const applicableSuggestions = computeApplicableSuggestions(rules, currentConfig, evidenceByRule);
 
-    // Zero suggestions → noop
-    if (suggestions.length === 0) {
+    // Zero applicable suggestions: nothing genuine to apply.
+    // If a config file already exists → "already calibrated" (idempotent).
+    // If no config file → noop (nothing to write, nothing existed).
+    if (applicableSuggestions.length === 0) {
+      if (existsSync(configPath)) {
+        return { code: 0, result: { rules, suggestions, currentConfig, configFile, applied: "idempotent" } };
+      }
       return { code: 0, result: { rules, suggestions, currentConfig, configFile, applied: "noop" } };
     }
 
-    // Merge suggestions onto raw input (CRITICAL #1: rawInput is the merge base, NOT resolved config)
-    const merged = mergeSuggestionsIntoConfig(rawInput, suggestions);
+    // Merge applicable suggestions onto raw input (CRITICAL #1: rawInput is merge base, NOT resolved config)
+    const merged = mergeSuggestionsIntoConfig(rawInput, applicableSuggestions);
 
     // Validate merged via ConfigSchema.partial()
     const validation = ConfigSchema.partial().safeParse(merged);
