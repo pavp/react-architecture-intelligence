@@ -71,7 +71,7 @@ Chain strategy: size-exception
 
 ## Phase I: Archive-merge note
 
-- [ ] I.1 [SEQ] At archive: merge these deltas IN PLACE into `openspec/specs/calibration/spec.md` (existing capability — do NOT create a new path). Idempotence requirement already uses canonical-serialized equality. Ref: design Open Questions.
+- [x] I.1 [SEQ] At archive: merge these deltas IN PLACE into `openspec/specs/calibration/spec.md` (existing capability — do NOT create a new path). Idempotence requirement already uses canonical-serialized equality. Ref: design Open Questions.
 
 ## Spec → Task Traceability
 
