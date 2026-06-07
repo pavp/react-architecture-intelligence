@@ -9,8 +9,8 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P11 complete plus P9-S3; P11 shipped 9 React pattern analyzer slices (S1–S9), all merged to `main`; P11-S10 (API conventions) deferred as ungroundable on syntax-only facts; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. P13-S1 (`rai calibrate` suggest-only) implemented. |
-| Next phase | P13-S2 Evidence-correlated suggestions (observed+1 instead of current+1). P12 CI/PR moved to last. |
+| Product state | P0–P11 complete plus P9-S3; P11 shipped 9 React pattern analyzer slices (S1–S9), all merged to `main`; P11-S10 (API conventions) deferred as ungroundable on syntax-only facts; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. P13-S1 (`rai calibrate` suggest-only) implemented. P13-S2 (evidence-correlated suggestions) implemented. |
+| Next phase | P13-S3 `--apply` flag, or P13-S2.x secondary knobs. P12 CI/PR moved to last. |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
 | MCP | `analyze_repo`, findings, diagnostics, additive explainability in `explain_finding`, `get_node`, drift/query/refactor tools active |
@@ -67,6 +67,32 @@ Latest MCP compatibility fix:
 | P11-S8 | Implemented | Overlay control surface drift slice: `react/overlay-control-surface-drift` in `@rai/adapter-react`, detecting same-file JSX-usage-site open-state divergence (open/defaultOpen on distinct overlay elements, Gate A cross-element via spanContains) and handler-name divergence (onOpenChange/onClose/onDismiss across distinct overlay elements, Gate B); reads only jsx/jsx-attribute facts; NEVER reads ctx.graph.components (non-overlap boundary with P11-S3); capitalized OVERLAY_TAGS allow-set (Dialog/Modal/Popover/Drawer/Sheet/Tooltip/AlertDialog/HoverCard/DropdownMenu/ContextMenu/Combobox/Select); no `@rai/core` changes. |
 | P11-S9 | Implemented | Design-system usage surface drift slice: `react/design-system-usage-surface-drift` in `@rai/adapter-react`, detecting same-file JSX-usage-site styling-prop surface divergence across distinct usages of the same capitalized non-dotted tag — some usages carry variant-family props (VARIANT_PROPS: variant/size/color/tone/intent/appearance) and other usages carry raw-style props (RAW_STYLE_PROPS: className/style); per-tag cross-usage gate (>=2 usages, some hasVariant AND some hasRaw AND >=1 variant-only OR >=1 raw-only); reads only jsx/jsx-attribute facts; NEVER reads ctx.graph.components (non-overlap boundary with P11-S3); bare variant (valueKind absent) counts as present (OQ3); no `@rai/core` changes. |
 | P13-S1 | Implemented | `rai calibrate` suggest-only command: `aggregateFeedback` (SELECT-only over T4 feedback_event), `computeSuggestions` (pure deterministic fn, CALIBRATABLE_RULES allowlist of 4 core rules), `loadProjectConfig` (reads `rai.config.json`, absent→{}, malformed→ProjectConfigError exit 2), config wired into 5 cli.ts resolveConfig({}) sites (analyze/explain/mcp/backfill/buildCliMcpServer); SUGGEST-ONLY guardrail (no config/T4 write); 48 new tests (8+18+8+14 across 4 test files). |
+| P13-S2 | Implemented | Evidence-correlated calibration suggestions: `lookupRejectedEvidence(db, ruleId)` (T4→T3 join, SELECT-only), `computeSuggestionsWithEvidence` (pure fn, ceiling/floor arithmetic over observed breach metrics), CLI wiring in `runCalibrateCommand`; zero schema change, zero analyzer change; SUGGEST-ONLY + zero-write guardrail extended to cover T3 finding rows; 26 new tests (9+17 unit + CLI correlated + guardrail). |
+
+### P13-S2 Evidence-Correlated Calibration Suggestions
+
+P13-S2 replaces the blind `current+1` formula with values derived from the actual breach metrics of rejected findings:
+
+- `lookupRejectedEvidence(db, ruleId)` — T4→T3 join: selects distinct fingerprints with reject/wontfix/dismiss verdicts, resolves each to its current `finding` row via `FindingsStore.currentVersion`, extracts the primary breach metric per rule (render-coupling/hook-topology→`fanIn`; over-abstraction→`propCount`; shared-extraction→`instances.length`).
+- `computeSuggestionsWithEvidence(stats, currentConfig, evidenceByRule)` — pure deterministic fn; ceiling rules (render-coupling, over-abstraction, hook-topology): `newValue = min(max(values), 50)`; floor rule (shared-extraction): `newValue = min(max(values)+1, 50)`; if `newValue > current` → correlated suggestion citing observed max + rejected count; else falls back to generic `current+1`.
+- CLI wiring: `runCalibrateCommand` builds `evidenceByRule` map then calls `computeSuggestionsWithEvidence` in place of `computeSuggestions`.
+- SUGGEST-ONLY invariant maintained: zero writes; guardrail extended to assert `finding` row count unchanged after calibrate with T3+T4 seeded.
+- New exports: `lookupRejectedEvidence`, `computeSuggestionsWithEvidence`.
+- Zero schema change, zero analyzer change.
+
+Latest P13-S2 verification:
+
+```bash
+pnpm test       # 72 files / 595 tests
+pnpm test:launcher  # Go launcher tests ok
+pnpm typecheck  # all packages Done
+pnpm build      # all packages Done
+node scripts/check-core-framework-free.mjs  # exit 0 (evidence-lookup + suggest: zero framework/fs imports)
+git diff --check  # clean
+# New files: evidence-lookup.ts, evidence-lookup.test.ts, suggest-evidence.test.ts (core)
+# Modified: suggest.ts (extracted buildGenericSuggestion helper + computeSuggestionsWithEvidence), cli.ts, cli.calibrate.test.ts, index.ts
+# No changes: analyzers, config schema, db schema, doctor.ts
+```
 
 ### P13-S1 `rai calibrate` Suggest-Only
 
