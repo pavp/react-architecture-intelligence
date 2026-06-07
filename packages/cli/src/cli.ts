@@ -1,4 +1,4 @@
-import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, aggregateFeedback, computeSuggestions, openDb, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope, type CalibrationSuggestion, type RuleFeedbackStats } from "@rai/core";
+import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, aggregateFeedback, computeSuggestionsWithEvidence, lookupRejectedEvidence, CALIBRATABLE_RULES, openDb, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope, type CalibrationSuggestion, type RuleFeedbackStats } from "@rai/core";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
@@ -174,7 +174,18 @@ export async function runCalibrateCommand(input: { dir: string; dbPath: string }
   try {
     const rules = aggregateFeedback(db);
     const currentConfig = resolveConfig(loadProjectConfig(absDir));
-    const suggestions = computeSuggestions(rules, currentConfig);
+
+    // Build evidence map: for each calibratable rule past trigger, look up rejected finding metrics
+    const evidenceByRule = new Map<string, number[]>();
+    for (const rule of rules) {
+      const isCalibratable = CALIBRATABLE_RULES.some((r) => r.ruleId === rule.ruleId);
+      if (isCalibratable) {
+        const values = lookupRejectedEvidence(db, rule.ruleId);
+        if (values.length > 0) evidenceByRule.set(rule.ruleId, values);
+      }
+    }
+
+    const suggestions = computeSuggestionsWithEvidence(rules, currentConfig, evidenceByRule);
     const configPath = join(absDir, "rai.config.json");
     const configFile = existsSync(configPath) ? configPath : null;
     return { code: 0, result: { rules, suggestions, currentConfig, configFile } };
