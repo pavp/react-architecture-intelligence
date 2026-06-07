@@ -42,6 +42,40 @@ function seedFeedback(
   }
 }
 
+/**
+ * Seed T3 finding rows. Mirrors FindingsStore.insert column list (all 11 NOT NULL cols).
+ * evidence is a plain JS object that will be JSON-serialised.
+ */
+function seedFinding(
+  dbPath: string,
+  ruleId: string,
+  fingerprint: string,
+  evidence: Record<string, unknown>,
+): void {
+  const db = openDb(dbPath);
+  try {
+    db.prepare(
+      `INSERT INTO finding (id, fingerprint, rule_id, type, analysis_version, fp_algo_version,
+        producing_run_id, commit_sha, severity_raw, evidence_json, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      `finding-${ruleId}-${fingerprint}`,
+      fingerprint,
+      ruleId,
+      "structural",
+      1,
+      1,
+      "run-seed",
+      "abc123",
+      "warn",
+      JSON.stringify(evidence),
+      Date.now(),
+    );
+  } finally {
+    db.close();
+  }
+}
+
 // ── parseArgs ────────────────────────────────────────────────────────────────
 
 test("parseArgs routes calibrate with a directory", () => {
@@ -219,4 +253,112 @@ test("GUARDRAIL: feedback_event row count is unchanged after calibrate", async (
   dbAfter.close();
 
   expect(countAfter).toBe(countBefore);
+});
+
+// ── C1: Evidence-correlated suggestion in CLI output ─────────────────────────
+// seedFeedback seeds FP0..FP4 fingerprints; seedFinding seeds matching T3 rows
+// so the T4→T3 join resolves and lookupRejectedEvidence returns observed metrics.
+
+test("evidence-correlated: runCalibrateCommand --json result shows observed max not current+1", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  // Seed 5 reject events for render-coupling (FP0..FP4 fingerprints)
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  // Seed matching T3 finding rows with fanIn evidence values 6,7,9,12,8
+  const fanIns = [6, 7, 9, 12, 8];
+  for (let i = 0; i < 5; i++) {
+    seedFinding(dbPath, "react/render-coupling", `FP${i}`, { kind: "render-coupling", fanIn: fanIns[i] });
+  }
+
+  const { code, result } = await runCalibrateCommand({ dir, dbPath });
+  expect(code).toBe(0);
+
+  const rcSug = result.suggestions.find((s) => s.ruleId === "react/render-coupling");
+  expect(rcSug).toBeDefined();
+  // Correlated: max(6,7,9,12,8)=12; NOT current+1 (default maxFanIn=5 → current+1 would be 6)
+  expect(rcSug!.patch.renderCoupling?.maxFanIn).toBe(12);
+});
+
+test("evidence-correlated: human stdout also shows correlated suggestion", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  const fanIns = [6, 7, 9, 12, 8];
+  for (let i = 0; i < 5; i++) {
+    seedFinding(dbPath, "react/render-coupling", `FP${i}`, { kind: "render-coupling", fanIn: fanIns[i] });
+  }
+
+  const originalCwd = process.cwd();
+  let stdout = "";
+  const originalWrite = process.stdout.write;
+  process.chdir(dir);
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+    return true;
+  }) as typeof process.stdout.write;
+  try {
+    const code = await run(["calibrate", dir, "--db", dbPath]);
+    expect(code).toBe(0);
+    // Human output should mention render-coupling with observed max (12), not just current+1
+    expect(stdout).toMatch(/react\/render-coupling/);
+    expect(stdout).toMatch(/12/);
+  } finally {
+    process.chdir(originalCwd);
+    process.stdout.write = originalWrite;
+  }
+});
+
+// ── E1: GUARDRAIL extended for evidence path (T3+T4 → zero writes) ───────────
+
+test("GUARDRAIL: evidence path — calibrate does NOT create rai.config.json when T3+T4 seeded", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  for (let i = 0; i < 5; i++) {
+    seedFinding(dbPath, "react/render-coupling", `FP${i}`, { kind: "render-coupling", fanIn: i + 6 });
+  }
+  await runCalibrateCommand({ dir, dbPath });
+  expect(existsSync(join(dir, "rai.config.json"))).toBe(false);
+});
+
+test("GUARDRAIL: evidence path — feedback_event row count UNCHANGED after calibrate with T3+T4", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  for (let i = 0; i < 5; i++) {
+    seedFinding(dbPath, "react/render-coupling", `FP${i}`, { kind: "render-coupling", fanIn: i + 6 });
+  }
+
+  const dbBefore = openDb(dbPath);
+  const fbBefore = (dbBefore.prepare("SELECT COUNT(*) as cnt FROM feedback_event").get() as { cnt: number }).cnt;
+  dbBefore.close();
+
+  await runCalibrateCommand({ dir, dbPath });
+
+  const dbAfter = openDb(dbPath);
+  const fbAfter = (dbAfter.prepare("SELECT COUNT(*) as cnt FROM feedback_event").get() as { cnt: number }).cnt;
+  dbAfter.close();
+
+  expect(fbAfter).toBe(fbBefore);
+});
+
+test("GUARDRAIL: evidence path — finding row count UNCHANGED after calibrate with T3+T4", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+  for (let i = 0; i < 5; i++) {
+    seedFinding(dbPath, "react/render-coupling", `FP${i}`, { kind: "render-coupling", fanIn: i + 6 });
+  }
+
+  const dbBefore = openDb(dbPath);
+  const findBefore = (dbBefore.prepare("SELECT COUNT(*) as cnt FROM finding").get() as { cnt: number }).cnt;
+  dbBefore.close();
+
+  await runCalibrateCommand({ dir, dbPath });
+
+  const dbAfter = openDb(dbPath);
+  const findAfter = (dbAfter.prepare("SELECT COUNT(*) as cnt FROM finding").get() as { cnt: number }).cnt;
+  dbAfter.close();
+
+  expect(findAfter).toBe(findBefore);
 });
