@@ -1,7 +1,7 @@
 import { pass1 } from "./pass1.js";
 import { contentHash } from "../graph/content-hash.js";
 import type { RepoGraph } from "../graph/repograph.js";
-import type { GraphEdge, ModuleNode, ComponentNode, HookNode, PatternFact } from "../types.js";
+import type { GraphEdge, ModuleNode, ComponentNode, HookNode, PatternFact, PatternImportFact } from "../types.js";
 
 export interface SourceFile { file: string; source: string; }
 
@@ -48,7 +48,65 @@ export function buildGraph(files: SourceFile[]): RepoGraph {
     }
   }
 
+  // resolve imports edges from PatternImportFacts (relative-only, fs-free)
+  const moduleIdSet = new Set(modules.map((m) => m.id));
+  for (const f of patternFacts) {
+    if (f.kind !== "import") continue;
+    const imp = f as PatternImportFact;
+    const dst = resolveImportTarget(imp.file, imp.source, moduleIdSet);
+    if (dst && dst !== imp.file) edges.push({ srcId: imp.file, dstId: dst, kind: "imports" });
+  }
+
   return { components, hooks, modules, edges: dedupeEdges(edges).sort(compareEdges), patternFacts: dedupePatternFacts(patternFacts).sort(comparePatternFacts) };
+}
+
+// ── Import-edge resolver helpers (POSIX string arithmetic, no fs) ──────────
+
+function posixDirname(p: string): string {
+  const i = p.lastIndexOf("/");
+  if (i < 0) return ".";
+  return p.slice(0, i) || ".";
+}
+
+// Returns null when the path escapes above the scan root (over-pop).
+function posixNormalizeJoin(base: string, rel: string): string | null {
+  const parts = base === "." ? [] : base.split("/");
+  for (const seg of rel.split("/")) {
+    if (seg === "..") {
+      if (parts.length === 0) return null; // escapes scan root → unresolvable
+      parts.pop();
+    } else if (seg !== ".") {
+      parts.push(seg);
+    }
+  }
+  const result = parts.join("/");
+  return result.startsWith("./") ? result.slice(2) : result;
+}
+
+const IMPORT_EXTS = [".ts", ".tsx", ".js", ".jsx"] as const;
+
+function resolveImportTarget(
+  importerId: string,
+  source: string,
+  moduleIds: Set<string>,
+): string | null {
+  if (!source.startsWith("./") && !source.startsWith("../")) return null;
+  const base = posixDirname(importerId);
+  const joined = posixNormalizeJoin(base, source);
+  if (joined === null) return null; // path escapes scan root
+  // (a) exact match
+  if (moduleIds.has(joined)) return joined;
+  // (b) joined + extension
+  for (const ext of IMPORT_EXTS) {
+    const candidate = joined + ext;
+    if (moduleIds.has(candidate)) return candidate;
+  }
+  // (c) joined/index + extension
+  for (const ext of IMPORT_EXTS) {
+    const candidate = joined + "/index" + ext;
+    if (moduleIds.has(candidate)) return candidate;
+  }
+  return null;
 }
 
 function dedupeEdges(edges: GraphEdge[]): GraphEdge[] {
