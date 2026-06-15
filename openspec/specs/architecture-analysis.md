@@ -158,6 +158,116 @@ The resolver MUST NOT probe the filesystem. All resolution MUST use the `modules
 - WHEN those edges are inspected
 - THEN each edge MUST have exactly `{srcId, dstId, kind: "imports"}` — no additional fields
 
+## Requirement: Passes Graph Edge Construction
+
+`buildGraph` MUST materialize `passes` edges by promoting existing P11-S4
+`jsx-attribute` facts. `EdgeKind` MUST include `"passes"`. `GraphEdge` MUST
+support an optional `propNames?: string[]` field additively (existing consumers
+that key on `{kind, srcId, dstId}` are unaffected).
+
+For every `(file, tag)` group of `jsx-attribute` facts:
+
+- Spread props (`valueKind === "spread"`) MUST be excluded from `propNames`.
+- If no non-spread attribute remains in the group, no `passes` edge MUST be
+  emitted for that group.
+- `dstId` MUST be resolved via the existing `byName` component registry (same
+  as `renders` resolution).
+- `srcId` MUST be the single component in `file` whose `childComponents`
+  includes `tag`. If zero or more than one such component exists, the group is
+  AMBIGUOUS and MUST be silently skipped — no edge is emitted.
+- When multiple `(file, tag)` groups resolve to the same `(srcId, dstId)` pair,
+  their `propNames` arrays MUST be merged into a single sorted-unique union
+  BEFORE deduplication.
+- The deduplication key MUST remain `{kind, srcId, dstId}`; `propNames` content
+  MUST NOT affect dedup identity.
+- `propNames` in the emitted edge MUST be sorted lexicographically and contain
+  no duplicate entries.
+- Edge ordering MUST follow the existing `compareEdges` comparator applied to
+  all edge kinds; `passes` edges are not given special ordering treatment.
+
+#### Scenario: Component renders child with one named prop — one passes edge emitted
+
+- GIVEN `Button.tsx` contains one component `Button` that renders `<Icon size={16} />`
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain exactly one `passes` edge from `Button`'s node to
+  `Icon`'s node
+- AND the edge MUST carry `propNames: ["size"]`
+
+#### Scenario: Multiple named props to same child — single edge with sorted propNames
+
+- GIVEN `Card.tsx` contains one component `Card` that renders
+  `<Avatar name="x" size={32} theme="dark" />`
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain exactly one `passes` edge from `Card` to `Avatar`
+- AND `propNames` MUST be `["name", "size", "theme"]` (sorted, unique)
+
+#### Scenario: Multiple JSX call-sites to same child pair — propNames merged into one edge
+
+- GIVEN `Form.tsx` has one component `Form` that renders `<Field label="Name" />`
+  in one branch and `<Field required />` in another branch
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain exactly one `passes` edge from `Form` to `Field`
+- AND `propNames` MUST be the sorted union `["label", "required"]`
+
+#### Scenario: Spread-only props — no passes edge emitted
+
+- GIVEN `Wrapper.tsx` renders `<Child {...props} />` with no non-spread attributes
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT contain any `passes` edge for that `(Wrapper, Child)` pair
+- AND a `renders` edge MAY still exist if `childComponents` includes the tag
+
+#### Scenario: Mixed spread and named props — spread excluded, named props kept
+
+- GIVEN `Wrapper.tsx` renders `<Child {...rest} label="x" />`
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain one `passes` edge from `Wrapper` to `Child`
+- AND `propNames` MUST be `["label"]` — the spread attribute name is not included
+
+#### Scenario: Child rendered with no attributes — no passes edge
+
+- GIVEN `Parent.tsx` renders `<Badge />` with zero attributes of any kind
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT contain a `passes` edge for that `(Parent, Badge)` pair
+
+#### Scenario: Multiple components in same file render same child tag — ambiguous, no edge
+
+- GIVEN `multi.tsx` contains two components `Foo` and `Bar`, both rendering
+  `<Icon size={16} />`
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT contain any `passes` edge involving `Icon` from that
+  file
+- AND no error or diagnostic MUST be produced
+
+#### Scenario: Unresolved tag — child not in byName registry, no edge
+
+- GIVEN `Host.tsx` renders `<UnknownWidget label="x" />` but no `UnknownWidget`
+  component exists in the `byName` registry
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT contain any `passes` edge for that tag
+- AND `buildGraph` MUST return normally without throwing
+
+#### Scenario: Deterministic output — same input produces identical edge list
+
+- GIVEN `buildGraph` is called twice with identical inputs containing `passes`
+  edge candidates
+- WHEN both calls complete
+- THEN the `passes` edges in both results MUST appear in identical order
+- AND `propNames` arrays MUST be identical in both results
+
+#### Scenario: GraphEdge propNames field is optional — existing edges unaffected
+
+- GIVEN `buildGraph` emits both `renders` and `passes` edges
+- WHEN those edges are inspected
+- THEN `renders` edges MUST NOT carry a `propNames` field
+- AND `passes` edges MUST carry a `propNames` field containing at least one entry
+
+#### Scenario: Framework-free core invariant preserved
+
+- GIVEN `packages/core` is checked against the framework-free guard
+  (`check-core-framework-free.mjs`)
+- WHEN `passes` edge materialization is present
+- THEN the guard MUST exit 0 — no React or framework import introduced
+
 ## Requirement: MCP Observability of Imports Edges
 
 The MCP raw graph query (`kind: "edges"`) MUST return `imports` edges in its result set. No new MCP tool or field is introduced in S1; the existing `rawEdgeRows()` path already returns all edge kinds and MUST include `imports` edges once they are materialized.
@@ -200,9 +310,20 @@ The system MUST emit `react/hook-topology` findings only from current hook graph
 
 ## Requirement: Convention-Based Boundary Violation Findings
 
-The config MUST support `conventions[]` entries that forbid currently constructed graph edges. This capability version supports only `edgeKind: "renders"` and `edgeKind: "uses-hook"` for convention evaluation. The `imports` edge kind is now constructed by `buildGraph` but convention evaluation against `imports` edges is DEFERRED to a later slice. Unsupported edge kinds such as `calls` and `passes` MUST be rejected by config validation until those edges are constructed. The `imports` edge kind MUST also be rejected by config validation until convention evaluation is explicitly enabled in a future capability version.
+The config MUST support `conventions[]` entries that forbid currently
+constructed graph edges. This capability version supports only
+`edgeKind: "renders"` and `edgeKind: "uses-hook"` for convention evaluation.
+The `imports` edge kind is constructed by `buildGraph` (since P14-S1) but
+convention evaluation against `imports` edges is DEFERRED. The `passes` edge
+kind is constructed by `buildGraph` (since P14-S2) but convention evaluation
+against `passes` edges is also DEFERRED. Unsupported edge kinds such as `calls`
+MUST be rejected by config validation until those edges are constructed.
+The `imports` and `passes` edge kinds MUST also be rejected by config validation
+until convention evaluation is explicitly enabled in a future capability version.
 
-(Previously: listed `imports`, `calls`, and `passes` together as "not constructed" kinds that must be rejected. `imports` is now constructed but convention evaluation remains deferred and must still be rejected by config validation in this version.)
+(Previously: `passes` was listed as "not constructed" alongside `calls`. As of
+P14-S2, `passes` edges are constructed but convention evaluation remains
+deferred and must still be rejected by config validation in this version.)
 
 Each convention MUST include stable `id`, `edgeKind`, `from` selector, `to` selector, `reason`, optional `severity`, and `policy: "forbid"`. Selectors MAY match node `kind`, `name`, `file`, and `exportKind`; `name` and `file` selectors use the existing minimal glob semantics.
 
@@ -223,7 +344,8 @@ Each convention MUST include stable `id`, `edgeKind`, `from` selector, `to` sele
 
 ### Scenario: Unsupported edge kinds are rejected
 
-- GIVEN config declares a convention for an edge kind that is not convention-evaluable in this version (`imports`, `calls`, `passes`)
+- GIVEN config declares a convention for an edge kind that is not
+  convention-evaluable in this version (`imports`, `passes`, `calls`)
 - WHEN config resolution runs
 - THEN validation MUST fail rather than silently creating a no-op convention
 
