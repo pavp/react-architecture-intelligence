@@ -27,8 +27,8 @@ test("release config enables gated publishing while retaining snapshot preflight
     "rai(.exe)",
     "lib/rai/metadata.json",
     "lib/rai/engine/packages/cli/dist/index.js",
-    "lib/rai/runtime/",
-    "lib/rai/native/<os>-<arch>/",
+    "lib/rai/engine/packages/cli/dist/schema.sql",
+    "lib/rai/engine/node_modules/",
   ]);
   expect(report.channels).toEqual([
     "github-release-enabled",
@@ -154,7 +154,7 @@ release:
   mode: replace
 before:
   hooks:
-    - pnpm release:prepare
+    - ./scripts/prepare-release.sh
 builds:
   - id: rai
     main: ./cmd/rai
@@ -168,10 +168,10 @@ archives:
         dst: lib/rai/metadata.json
       - src: build/release-assets/rai/lib/rai/engine/packages/cli/dist/index.js
         dst: lib/rai/engine/packages/cli/dist/index.js
-      - src: build/release-assets/rai/lib/rai/runtime/README.md
-        dst: lib/rai/runtime/README.md
-      - src: build/release-assets/rai/lib/rai/native/README.md
-        dst: lib/rai/native/{{ .Os }}-{{ .Arch }}/README.md
+      - src: build/release-assets/rai/lib/rai/engine/packages/cli/dist/schema.sql
+        dst: lib/rai/engine/packages/cli/dist/schema.sql
+      - src: build/release-assets/rai/lib/rai/engine/node_modules/**
+        dst: lib/rai/engine/node_modules/
 checksum:
   name_template: "checksums.txt"
 brews:

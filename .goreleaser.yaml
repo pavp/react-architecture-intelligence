@@ -11,7 +11,7 @@ release:
 
 before:
   hooks:
-    - pnpm release:prepare
+    - ./scripts/prepare-release.sh
 
 builds:
   - id: rai
@@ -39,10 +39,10 @@ archives:
         dst: lib/rai/metadata.json
       - src: build/release-assets/rai/lib/rai/engine/packages/cli/dist/index.js
         dst: lib/rai/engine/packages/cli/dist/index.js
-      - src: build/release-assets/rai/lib/rai/runtime/README.md
-        dst: lib/rai/runtime/README.md
-      - src: build/release-assets/rai/lib/rai/native/README.md
-        dst: lib/rai/native/README.md
+      - src: build/release-assets/rai/lib/rai/engine/packages/cli/dist/schema.sql
+        dst: lib/rai/engine/packages/cli/dist/schema.sql
+      - src: build/release-assets/rai/lib/rai/engine/node_modules/**
+        dst: lib/rai/engine/node_modules/
 
 checksum:
   name_template: "checksums.txt"
