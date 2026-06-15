@@ -15,6 +15,7 @@ import { FORM_CONTROL_SURFACE_DRIFT_RULE_ID } from "./form-control-surface-drift
 import { DATA_FETCHING_SURFACE_DRIFT_RULE_ID } from "./data-fetching-surface-drift.js";
 import { OVERLAY_CONTROL_SURFACE_DRIFT_RULE_ID } from "./overlay-control-surface-drift.js";
 import { DESIGN_SYSTEM_USAGE_SURFACE_DRIFT_RULE_ID } from "./design-system-usage-surface-drift.js";
+import { PROP_DRILLING_RULE_ID } from "./prop-drilling.js";
 import { createReactCoreAnalyzers } from "./core-adapter.js";
 
 describe("React core analyzer adapter", () => {
@@ -51,6 +52,10 @@ describe("React core analyzer adapter", () => {
 			},
 			{
 				ruleId: DESIGN_SYSTEM_USAGE_SURFACE_DRIFT_RULE_ID,
+				framework: "react",
+			},
+			{
+				ruleId: PROP_DRILLING_RULE_ID,
 				framework: "react",
 			},
 		]);
