@@ -42,3 +42,7 @@ export {
 } from "./design-system-usage-surface-drift.js";
 export { createReactCoreAnalyzers } from "./core-adapter.js";
 export type { ReactCoreAnalyzerInput } from "./core-adapter.js";
+export {
+	PROP_DRILLING_RULE_ID,
+	createPropDrillingAnalyzer,
+} from "./prop-drilling.js";
