@@ -47,7 +47,7 @@ import {
   readFileSync,
   rmSync,
 } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -124,33 +124,41 @@ if (!existsSync(entryPoint)) {
   process.exit(1);
 }
 
-// ── 2. Find esbuild binary ─────────────────────────────────────────────────────
+// ── 2. Resolve esbuild JS API ─────────────────────────────────────────────────
+// Dynamically import esbuild's JS API from the pnpm virtual store.
+// This avoids spawning the binary (a Unix shell script on node_modules/.bin/esbuild),
+// which cannot be spawned on Windows without shell:true and is not the right entry anyway.
+// The JS API (lib/main.js) works cross-platform via Node's native child_process.
 
-function findEsbuild() {
-  const rootBin = join(ROOT, "node_modules", ".bin", "esbuild");
-  if (existsSync(rootBin)) return rootBin;
+function findEsbuildMain() {
+  // Prefer a symlinked/hoisted esbuild if pnpm hoisted it to root node_modules.
+  const rootMain = join(ROOT, "node_modules", "esbuild", "lib", "main.js");
+  if (existsSync(rootMain)) return rootMain;
+  // Walk .pnpm virtual store for any esbuild@* entry.
   const store = join(ROOT, "node_modules", ".pnpm");
   try {
     const entries = readdirSync(store).filter(e => e.startsWith("esbuild@")).sort().reverse();
     for (const entry of entries) {
-      const bin = join(store, entry, "node_modules", "esbuild", "bin", "esbuild");
-      if (existsSync(bin)) return bin;
+      const main = join(store, entry, "node_modules", "esbuild", "lib", "main.js");
+      if (existsSync(main)) return main;
     }
   } catch {}
   return null;
 }
 
-const ESBUILD_BIN = findEsbuild();
-if (!ESBUILD_BIN) {
-  console.error("[bundle-engine] ERROR: esbuild not found. Run: pnpm add -D esbuild");
+const esbuildMain = findEsbuildMain();
+if (!esbuildMain) {
+  console.error("[bundle-engine] ERROR: esbuild not found in node_modules. Run: pnpm add -D esbuild");
   process.exit(1);
 }
-console.log(`[bundle-engine] Using esbuild: ${ESBUILD_BIN}`);
+console.log(`[bundle-engine] Using esbuild JS API: ${esbuildMain}`);
 
-// ── 3. esbuild bundle ─────────────────────────────────────────────────────────
+const { build: esbuildBuild } = await import(pathToFileURL(esbuildMain).href);
+
+// ── 3. esbuild bundle (JS API — cross-platform, no binary spawn) ───────────────
 
 // Externals: native deps + all their platform-specific binding sub-packages.
-// esbuild skips packages that match --external; they must exist in co-located node_modules.
+// esbuild skips packages that match external; they must exist in co-located node_modules.
 const externals = [
   "better-sqlite3",
   "sqlite-vec",
@@ -184,26 +192,21 @@ const banner = [
 
 console.log("[bundle-engine] Running esbuild...");
 
-const esbuildArgs = [
-  entryPoint,
-  `--outfile=${BUNDLE_FILE}`,
-  "--bundle",
-  "--platform=node",
-  "--format=esm",
-  "--target=node22",
-  "--log-level=warning",
-  `--banner:js=${banner}`,
-  ...externals.map(e => `--external:${e}`),
-];
-
-const esbuildResult = spawnSync(ESBUILD_BIN, esbuildArgs, {
-  encoding: "utf8",
-  stdio: "inherit",
-});
-
-if (esbuildResult.status !== 0) {
-  console.error(`[bundle-engine] esbuild failed (exit ${esbuildResult.status})`);
-  process.exit(esbuildResult.status ?? 1);
+try {
+  await esbuildBuild({
+    entryPoints: [entryPoint],
+    outfile: BUNDLE_FILE,
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    logLevel: "warning",
+    banner: { js: banner },
+    external: externals,
+  });
+} catch (err) {
+  console.error(`[bundle-engine] esbuild failed: ${err.message ?? err}`);
+  process.exit(1);
 }
 
 console.log("[bundle-engine] esbuild done.");
@@ -244,7 +247,7 @@ console.log("[bundle-engine] Running pnpm deploy (builds pruned native node_modu
 const deployResult = spawnSync(
   "pnpm",
   ["--filter", "@rai/cli", "deploy", DEPLOY_TMP, "--prod", "--legacy", "--config.confirmModulesPurge=false"],
-  { cwd: ROOT, encoding: "utf8", stdio: "inherit" }
+  { cwd: ROOT, encoding: "utf8", stdio: "inherit", shell: true }
 );
 
 if (deployResult.status !== 0) {
@@ -408,7 +411,7 @@ if (missingPkgs.length > 0) {
 const cliPkg = JSON.parse(readFileSync(join(ROOT, "packages", "cli", "package.json"), "utf8"));
 const enginePackageVersion = cliPkg.version || "0.0.0";
 
-const gitResult = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT, encoding: "utf8" });
+const gitResult = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT, encoding: "utf8", shell: true });
 const gitCommit =
   process.env.GORELEASER_CURRENT_TAG ||
   process.env.GIT_COMMIT ||
