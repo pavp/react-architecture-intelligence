@@ -139,6 +139,14 @@ func ResolveEngine(input ResolveInput) (EngineResolution, error) {
 		}
 	}
 	if exePath != "" {
+		// Resolve symlinks so archive-mode resolution works when the binary is
+		// reached through a symlink (e.g. Homebrew links bin/rai -> libexec/rai).
+		// Without this, filepath.Dir would point at the symlink's directory
+		// (bin/) instead of the real payload location (libexec/), and the
+		// sibling lib/rai/** engine would not be found.
+		if real, err := filepath.EvalSymlinks(exePath); err == nil {
+			exePath = real
+		}
 		return resolveArchive(filepath.Dir(exePath))
 	}
 

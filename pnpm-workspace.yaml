@@ -1,2 +1,10 @@
 packages:
   - "packages/*"
+
+# pnpm 11 gates native/postinstall build scripts behind explicit approval.
+# It writes an `allowBuilds:` block with placeholders the first time install
+# hits an unbuilt dependency; the values MUST be set to `true` (not left as
+# placeholder text, which leaves builds blocked → ERR_PNPM_IGNORED_BUILDS).
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true

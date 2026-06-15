@@ -84,8 +84,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -113,13 +111,19 @@ jobs:
       - name: Run tests
         run: pnpm test && pnpm test:launcher
 
-      - name: Run GoReleaser snapshot without publishing
-        if: steps.release.outputs.publish != 'true'
+      # Always build the real archives via snapshot first, then smoke-test the
+      # packaged artifact + Homebrew install layout. This is a hard gate: a
+      # broken package (e.g. missing lib/rai engine payload) fails here and
+      # never reaches publish.
+      - name: Build release archives (snapshot)
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
           args: release --snapshot --clean --skip=publish
+
+      - name: Pre-release smoke gate (packaged artifact + Homebrew layout)
+        run: ./scripts/smoke-release.sh
 
       - name: Publish with GoReleaser
         if: steps.release.outputs.publish == 'true'
