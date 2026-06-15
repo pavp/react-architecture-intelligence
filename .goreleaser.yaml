@@ -37,7 +37,7 @@ archives:
       - src: build/release-assets/rai/lib/rai/runtime/README.md
         dst: lib/rai/runtime/README.md
       - src: build/release-assets/rai/lib/rai/native/README.md
-        dst: lib/rai/native/{{ .Os }}-{{ .Arch }}/README.md
+        dst: lib/rai/native/README.md
 
 checksum:
   name_template: "checksums.txt"
@@ -52,6 +52,14 @@ brews:
     homepage: "https://github.com/pavp/react-architecture-intelligence"
     description: "React Architecture Intelligence launcher"
     license: "MIT"
+    # The launcher resolves its engine at <dir-of-rai>/lib/rai/engine/...
+    # so the binary and its lib/ payload MUST stay siblings. The default
+    # `bin.install "rai"` copies only the binary and drops lib/, breaking
+    # archive-mode resolution. Install the whole archive into libexec
+    # (preserving the rai + lib/ layout) and symlink rai into bin.
+    install: |
+      libexec.install Dir["*"]
+      bin.install_symlink libexec/"rai"
 
 scoops:
   - name: rai

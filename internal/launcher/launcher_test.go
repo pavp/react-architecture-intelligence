@@ -118,6 +118,40 @@ func TestResolvesDevAndArchiveEnginePaths(t *testing.T) {
 	}
 }
 
+// Homebrew installs the archive into libexec/ and symlinks bin/rai ->
+// libexec/rai. The launcher must resolve the symlink to find the engine
+// payload sibling to the REAL binary, not sibling to the symlink.
+func TestResolvesArchiveEngineThroughSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires privilege on Windows; Homebrew layout is POSIX-only")
+	}
+	archiveRoot := buildArchiveEngine(t, validMetadata())
+	realBin := filepath.Join(archiveRoot, binName())
+	mustWrite(t, realBin, "")
+
+	binDir := t.TempDir()
+	link := filepath.Join(binDir, binName())
+	if err := os.Symlink(realBin, link); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+
+	resolved, err := ResolveEngine(ResolveInput{WorkDir: t.TempDir(), ExecutablePath: link})
+	if err != nil {
+		t.Fatalf("symlinked archive resolve error: %v", err)
+	}
+	// Canonicalize the expected root too: on macOS t.TempDir() lives under
+	// /var/folders which is itself a symlink to /private/var, and the launcher
+	// resolves the binary through EvalSymlinks, so both sides must be canonical.
+	canonRoot, err := filepath.EvalSymlinks(archiveRoot)
+	if err != nil {
+		t.Fatalf("evalsymlinks archiveRoot: %v", err)
+	}
+	wantEngine := filepath.Join(canonRoot, "lib", "rai", "engine", "packages", "cli", "dist", "index.js")
+	if resolved.Mode != ModeArchive || resolved.EnginePath != wantEngine {
+		t.Fatalf("symlinked archive resolve = %#v, want engine %s", resolved, wantEngine)
+	}
+}
+
 func TestArchiveMetadataMissingAndMismatchFailBeforeExecution(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
