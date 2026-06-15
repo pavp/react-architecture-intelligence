@@ -11,7 +11,7 @@ release:
 
 before:
   hooks:
-    - pnpm release:prepare
+    - ./scripts/prepare-release.sh
 
 builds:
   - id: rai
@@ -21,6 +21,12 @@ builds:
       - CGO_ENABLED=0
     goos: [darwin, linux, windows]
     goarch: [amd64, arm64]
+    # windows/arm64 is excluded: sqlite-vec does not publish a windows-arm64
+    # native package (npm 404), so that archive would ship with no natives.
+    # Remove this ignore only when sqlite-vec-windows-arm64 is published.
+    ignore:
+      - goos: windows
+        goarch: arm64
     ldflags:
       - -s -w
       - -X github.com/pavp/react-architecture-intelligence/internal/launcher.launcherVersion={{ .Version }}
@@ -35,14 +41,24 @@ archives:
       - goos: windows
         formats: [zip]
     files:
+      # metadata.json: written by prepare-release.sh on the single GoReleaser
+      # host. Platform field may reflect the build host, but the arch guard in
+      # the launcher uses the bundled sqlite-vec-<os>-<arch> directory (below),
+      # not the static metadata.json platform field.
       - src: build/release-assets/rai/lib/rai/metadata.json
         dst: lib/rai/metadata.json
+      # JS bundle and schema.sql are platform-independent (pure JS).
       - src: build/release-assets/rai/lib/rai/engine/packages/cli/dist/index.js
         dst: lib/rai/engine/packages/cli/dist/index.js
-      - src: build/release-assets/rai/lib/rai/runtime/README.md
-        dst: lib/rai/runtime/README.md
-      - src: build/release-assets/rai/lib/rai/native/README.md
-        dst: lib/rai/native/README.md
+      - src: build/release-assets/rai/lib/rai/engine/packages/cli/dist/schema.sql
+        dst: lib/rai/engine/packages/cli/dist/schema.sql
+      # Per-arch native node_modules: each matrix CI job builds natives on the
+      # actual target platform runner and uploads them as an artifact. The release
+      # job downloads each into build/release-assets/<goos>_<goarch>/node_modules/.
+      # GoReleaser templates {{ .Os }} and {{ .Arch }} select the correct tree for
+      # each of the five platform archives it produces (windows/arm64 ignored).
+      - src: "build/release-assets/{{ .Os }}_{{ .Arch }}/node_modules/**"
+        dst: lib/rai/engine/node_modules/
 
 checksum:
   name_template: "checksums.txt"

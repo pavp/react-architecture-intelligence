@@ -8,3 +8,8 @@ packages:
 allowBuilds:
   better-sqlite3: true
   esbuild: true
+
+# Prevent pnpm from prompting to purge modules in non-TTY environments
+# (e.g. goreleaser subprocess, CI without TTY). pnpm v11 runs a
+# deps-status-check before any script; without a TTY it aborts.
+confirmModulesPurge: false

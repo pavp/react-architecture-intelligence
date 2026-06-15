@@ -22,8 +22,8 @@ const archiveLayout = [
   "rai(.exe)",
   "lib/rai/metadata.json",
   "lib/rai/engine/packages/cli/dist/index.js",
-  "lib/rai/runtime/",
-  "lib/rai/native/<os>-<arch>/",
+  "lib/rai/engine/packages/cli/dist/schema.sql",
+  "lib/rai/engine/node_modules/",
 ];
 
 const channels = [
@@ -34,14 +34,14 @@ const channels = [
 ];
 
 const requiredConfigSnippets = [
-  "pnpm release:prepare",
+  "scripts/prepare-release.sh",
   "build/release-assets/rai/lib/rai",
   "goos: [darwin, linux, windows]",
   "goarch: [amd64, arm64]",
   "lib/rai/metadata.json",
   "lib/rai/engine/packages/cli/dist/index.js",
-  "lib/rai/runtime",
-  "lib/rai/native",
+  "lib/rai/engine/packages/cli/dist/schema.sql",
+  "lib/rai/engine/node_modules/",
   "checksum:",
   "brews:",
   'owner: "pavp"',
