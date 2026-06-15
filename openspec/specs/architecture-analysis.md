@@ -268,6 +268,133 @@ For every `(file, tag)` group of `jsx-attribute` facts:
 - WHEN `passes` edge materialization is present
 - THEN the guard MUST exit 0 — no React or framework import introduced
 
+## Requirement: Calls Graph Edge Construction
+
+`buildGraph` MUST materialize `calls` edges by grounding `PatternCallFact` and
+`PatternCallBindingFact` data against existing `PatternImportFact` specifier
+locals. `EdgeKind` already includes `"calls"`; no type widening is introduced.
+`GraphEdge` shape remains `{srcId, dstId, kind}` — no additional fields.
+
+For each call or call-binding fact in file A with a non-empty callee string,
+the implementation MUST:
+
+- Match the callee against file A's import specifier locals: exact identifier
+  match (`local === callee`) OR namespace prefix match
+  (`callee.startsWith(local + ".")`).
+- Resolve the matching import source via the existing `resolveImportTarget`.
+  Non-relative sources (external packages) MUST NOT produce an edge.
+- Emit `{srcId: fileAModuleId, dstId: resolvedModuleId, kind: "calls"}` when
+  the resolved module id exists in `moduleIdSet`.
+- Suppress self-edges (`srcId === dstId`).
+
+Deduplication MUST use the existing `dedupeEdges` mechanism; the dedup key is
+`"calls:${srcId}:${dstId}"`. Edge ordering MUST follow the existing
+`compareEdges` comparator. No new extraction pass is introduced.
+
+#### Scenario: Imported function called — calls edge emitted
+
+- GIVEN module A imports `add` from `"./math"` and calls `add(1, 2)`
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain exactly one `calls` edge from A's node to the math module node
+- AND the edge MUST have shape `{srcId, dstId, kind: "calls"}` with no extra fields
+
+#### Scenario: Namespace import — method call emits calls edge
+
+- GIVEN module A imports `* as utils` from `"./utils"` and calls `utils.format(x)`
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain a `calls` edge from A to the utils module
+- AND the namespace prefix match (`utils.format` starts with `utils.`) MUST be used
+
+#### Scenario: Call-binding fact contributes calls edge
+
+- GIVEN module A imports `create` from `"./factory"` and contains `const obj = create(cfg)`
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain a `calls` edge from A to the factory module
+- AND the call-binding fact MUST be treated identically to a plain call fact
+
+#### Scenario: Dynamic or empty callee — no edge
+
+- GIVEN a call expression has an empty or computed callee (callee string is `""`)
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT emit any `calls` edge for that call expression
+
+#### Scenario: Method call on non-import object — no edge
+
+- GIVEN module A calls `this.service.save()` where `service` matches no import local
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT emit any `calls` edge for that call
+
+#### Scenario: Same-file call — no edge
+
+- GIVEN module A calls a function defined in module A with no import fact linking them
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT emit any `calls` edge where `srcId === dstId`
+
+#### Scenario: External package call — no edge
+
+- GIVEN module A imports `render` from `"react"` (non-relative) and calls `render(...)`
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT emit any `calls` edge for that call
+- AND no error or diagnostic MUST be produced
+
+#### Scenario: Multiple calls between same module pair — exactly one edge
+
+- GIVEN module A calls `helper1()` and `helper2()` both imported from `"./helpers"`
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain exactly one `calls` edge from A to the helpers module
+- AND deduplication MUST collapse both calls into one edge
+
+#### Scenario: Self-edge suppressed
+
+- GIVEN a module's resolved callee target equals its own module id (`srcId === dstId`)
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT contain a `calls` edge with `srcId === dstId`
+
+#### Scenario: Deterministic edge ordering preserved
+
+- GIVEN `buildGraph` is called twice on the same input
+- WHEN both calls complete
+- THEN the `calls` edges in both results MUST appear in identical order
+- AND ordering MUST follow the existing `compareEdges` comparator applied to all edge kinds
+
+#### Scenario: Minimal edge shape — no propNames or metadata
+
+- GIVEN `buildGraph` emits `calls` edges
+- WHEN those edges are inspected
+- THEN each edge MUST have exactly `{srcId, dstId, kind: "calls"}` — no additional fields
+
+#### Scenario: Framework-free core invariant preserved
+
+- GIVEN `packages/core` is checked against the framework-free guard (`check-core-framework-free.mjs`)
+- WHEN `calls` edge materialization is present
+- THEN the guard MUST exit 0 — no React or framework import introduced
+
+#### Scenario: Existing edge behavior unchanged
+
+- GIVEN `buildGraph` processes a repository with `imports` and `passes` edges
+- WHEN `calls` edge materialization is added
+- THEN the count, shape, and order of existing `imports` and `passes` edges MUST be identical to pre-S5 output
+
+## Requirement: MCP Observability of Calls Edges
+
+The MCP raw graph query (`kind: "edges"`) MUST return `calls` edges in its
+result set. No new MCP tool or field is introduced; the existing `rawEdgeRows()`
+path already returns all edge kinds and MUST include `calls` edges once they are
+materialized.
+
+#### Scenario: MCP raw edges query surfaces calls edges
+
+- GIVEN `buildGraph` has emitted `calls` edges for a repository
+- WHEN an MCP client queries the raw graph with `kind: "edges"`
+- THEN the response MUST include at least one edge with `kind: "calls"` for a repo that has import-grounded cross-file calls
+- AND the edge payload MUST contain `srcId`, `dstId`, and `kind`
+
+#### Scenario: Repo with no import-grounded cross-file calls returns no calls edges
+
+- GIVEN a repository where all calls are same-file, dynamic, or to external packages
+- WHEN an MCP client queries the raw graph with `kind: "edges"`
+- THEN no edge with `kind: "calls"` MUST appear in the response
+
 ## Requirement: MCP Observability of Imports Edges
 
 The MCP raw graph query (`kind: "edges"`) MUST return `imports` edges in its result set. No new MCP tool or field is introduced in S1; the existing `rawEdgeRows()` path already returns all edge kinds and MUST include `imports` edges once they are materialized.
@@ -316,18 +443,26 @@ constructed graph edges. This capability version supports only
 The `imports` edge kind is constructed by `buildGraph` (since P14-S1) but
 convention evaluation against `imports` edges is DEFERRED. The `passes` edge
 kind is constructed by `buildGraph` (since P14-S2) but convention evaluation
-against `passes` edges is also DEFERRED. Unsupported edge kinds such as `calls`
-MUST be rejected by config validation until those edges are constructed.
-The `imports` and `passes` edge kinds MUST also be rejected by config validation
-until convention evaluation is explicitly enabled in a future capability version.
+against `passes` edges is also DEFERRED. The `calls` edge kind is constructed
+by `buildGraph` (since P14-S5) but convention evaluation against `calls` edges
+is also DEFERRED. Unsupported edge kinds (`calls`, `imports`, `passes`) MUST be
+rejected by config validation until convention evaluation is explicitly enabled
+in a future capability version.
 
-(Previously: `passes` was listed as "not constructed" alongside `calls`. As of
-P14-S2, `passes` edges are constructed but convention evaluation remains
-deferred and must still be rejected by config validation in this version.)
+(Previously: `calls` was listed as "not constructed" alongside `imports`/`passes`
+as a rejected kind. As of P14-S5, `calls` edges are constructed but convention
+evaluation remains deferred and MUST still be rejected by config validation in
+this version.)
 
-Each convention MUST include stable `id`, `edgeKind`, `from` selector, `to` selector, `reason`, optional `severity`, and `policy: "forbid"`. Selectors MAY match node `kind`, `name`, `file`, and `exportKind`; `name` and `file` selectors use the existing minimal glob semantics.
+Each convention MUST include stable `id`, `edgeKind`, `from` selector, `to`
+selector, `reason`, optional `severity`, and `policy: "forbid"`. Selectors MAY
+match node `kind`, `name`, `file`, and `exportKind`; `name` and `file` selectors
+use the existing minimal glob semantics.
 
-`react/boundary-violation` MUST emit `architectural-conflict` findings for forbidden matching edges. Evidence MUST identify the convention and the exact graph edge. Findings MUST NOT claim prop-flow, import, runtime call, or unstored ownership facts.
+`react/boundary-violation` MUST emit `architectural-conflict` findings for
+forbidden matching edges. Evidence MUST identify the convention and the exact
+graph edge. Findings MUST NOT claim prop-flow, import, runtime call, or
+unstored ownership facts.
 
 ### Scenario: Forbidden render edge emits conflict
 
