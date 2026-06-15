@@ -1,7 +1,7 @@
 import { pass1 } from "./pass1.js";
 import { contentHash } from "../graph/content-hash.js";
 import type { RepoGraph } from "../graph/repograph.js";
-import type { GraphEdge, ModuleNode, ComponentNode, HookNode, PatternFact, PatternImportFact, PatternJsxAttributeFact } from "../types.js";
+import type { GraphEdge, ModuleNode, ComponentNode, HookNode, PatternFact, PatternImportFact, PatternJsxAttributeFact, PatternCallFact, PatternCallBindingFact, PatternImportSpecifierFact } from "../types.js";
 
 export interface SourceFile { file: string; source: string; }
 
@@ -79,6 +79,19 @@ export function buildGraph(files: SourceFile[]): RepoGraph {
     if (dst && dst !== imp.file) edges.push({ srcId: imp.file, dstId: dst, kind: "imports" });
   }
 
+  // resolve calls edges from PatternCallFact + PatternCallBindingFact
+  const importLocalMap = buildImportLocalMap(patternFacts, moduleIdSet);
+  for (const f of patternFacts) {
+    if (f.kind !== "call" && f.kind !== "call-binding") continue;
+    const callee = (f as PatternCallFact | PatternCallBindingFact).callee;
+    if (!callee) continue;
+    const localMap = importLocalMap.get(f.file);
+    if (!localMap) continue;
+    const dst = resolveCallee(callee, localMap);
+    if (!dst || dst === f.file) continue;
+    edges.push({ srcId: f.file, dstId: dst, kind: "calls" });
+  }
+
   return { components, hooks, modules, edges: dedupeEdges(edges).sort(compareEdges), patternFacts: dedupePatternFacts(patternFacts).sort(comparePatternFacts) };
 }
 
@@ -129,6 +142,68 @@ function resolveImportTarget(
     if (moduleIds.has(candidate)) return candidate;
   }
   return null;
+}
+
+// ── Calls-edge helpers ────────────────────────────────────────────────────────
+
+interface ImportLocalEntry { moduleId: string; mode: "default" | "named" | "namespace"; }
+
+/**
+ * Build a per-file map of import local name → { moduleId, mode }.
+ * Only relative imports that resolve to a known module id are included.
+ * Self-imports (dst === importer) are skipped.
+ * mode is retained so resolveCallee can restrict prefix matching to namespace locals.
+ */
+function buildImportLocalMap(
+  facts: PatternFact[],
+  moduleIdSet: Set<string>,
+): Map<string, Map<string, ImportLocalEntry>> {
+  const result = new Map<string, Map<string, ImportLocalEntry>>();
+  for (const f of facts) {
+    if (f.kind !== "import") continue;
+    const imp = f as PatternImportFact;
+    const dst = resolveImportTarget(imp.file, imp.source, moduleIdSet);
+    if (!dst || dst === imp.file) continue;
+    let localMap = result.get(imp.file);
+    if (!localMap) { localMap = new Map(); result.set(imp.file, localMap); }
+    for (const spec of imp.specifiers as PatternImportSpecifierFact[]) {
+      localMap.set(spec.local, { moduleId: dst, mode: spec.mode });
+    }
+  }
+  return result;
+}
+
+/**
+ * Resolve a callee string against a per-file local → ImportLocalEntry map.
+ * (a) Exact match is mode-agnostic: named/default/namespace direct calls all valid.
+ * (b) Namespace-prefix branch (`callee` starts with `local + "."`) fires ONLY for
+ *     locals whose mode === "namespace" (i.e. `import * as ns`).
+ *     Named/default imports like `import { foo } from "..."` must NOT match via prefix
+ *     even if `foo.bar()` happens to startsWith("foo."), because that would emit a
+ *     spurious calls edge for what is already covered by the imports edge.
+ * Longest-local + lexicographic tie-break among namespace locals.
+ */
+function resolveCallee(callee: string, localMap: Map<string, ImportLocalEntry>): string | null {
+  // (a) exact match — mode-agnostic
+  const exact = localMap.get(callee);
+  if (exact) return exact.moduleId;
+  // (b) namespace prefix: only for mode === "namespace" locals
+  let bestLocal: string | null = null;
+  for (const [local, entry] of localMap.entries()) {
+    if (entry.mode !== "namespace") continue;
+    if (!callee.startsWith(local + ".")) continue;
+    if (
+      bestLocal === null ||
+      local.length > bestLocal.length ||
+      // Defensive determinism: two distinct equal-length locals cannot both
+      // prefix the same callee, so this branch is effectively unreachable.
+      // Kept to guarantee a stable, input-order-independent choice regardless.
+      (local.length === bestLocal.length && local < bestLocal)
+    ) {
+      bestLocal = local;
+    }
+  }
+  return bestLocal !== null ? localMap.get(bestLocal)!.moduleId : null;
 }
 
 function dedupeEdges(edges: GraphEdge[]): GraphEdge[] {
