@@ -232,19 +232,35 @@ func TestVersionReportsCoherentMetadataWithoutStartingEngine(t *testing.T) {
 	}
 }
 
-// TestArchGuard verifies that the arch guard in validateMetadata correctly
-// accepts matching native arch, rejects mismatched native arch, and skips
-// the check entirely when node_modules/ is absent.
+// goArchToNpm maps a Go GOARCH token to the npm arch token used by sqlite-vec
+// and oxc package names (e.g. amd64 → x64). arm64 needs no mapping.
+func goArchToNpm(goarch string) string {
+	if goarch == "amd64" {
+		return "x64"
+	}
+	return goarch
+}
+
+// TestArchGuard verifies that the arch guard in validateArchGuard correctly
+// accepts matching native arch (using the real npm token, e.g. x64 for amd64),
+// rejects mismatched native arch, and skips the check when node_modules/ is absent.
+//
+// The sqlite-vec packages published on npm use <os>-x64 / <os>-arm64 (npm tokens),
+// NOT <os>-amd64 (Go token). The guard must normalise before comparing.
 func TestArchGuard(t *testing.T) {
 	hostGOOS := runtime.GOOS
 	hostGOARCH := runtime.GOARCH
+	hostNpmArch := goArchToNpm(hostGOARCH)
 
-	// Choose a foreign os/arch that is guaranteed to differ from the host.
+	// Foreign combo: guaranteed different from the host.
 	foreignGOOS := "linux"
-	foreignGOARCH := "amd64"
+	foreignNpmArch := "x64"
 	if hostGOOS == "linux" && hostGOARCH == "amd64" {
 		foreignGOOS = "darwin"
-		foreignGOARCH = "arm64"
+		foreignNpmArch = "arm64"
+	} else if hostGOOS == "linux" && hostGOARCH == "arm64" {
+		foreignGOOS = "darwin"
+		foreignNpmArch = "x64"
 	}
 
 	for _, tt := range []struct {
@@ -253,10 +269,12 @@ func TestArchGuard(t *testing.T) {
 		wantErrSubstr string                            // empty means expect nil error
 	}{
 		{
+			// The dir name uses the REAL npm arch token (x64 for amd64), not the
+			// Go token (amd64). This exercises the guard's token normalisation.
 			name: "host arch matches bundled native — guard passes",
 			nmSetup: func(t *testing.T, nmDir string) {
 				t.Helper()
-				dirName := "sqlite-vec-" + hostGOOS + "-" + hostGOARCH
+				dirName := "sqlite-vec-" + hostGOOS + "-" + hostNpmArch
 				if err := os.MkdirAll(filepath.Join(nmDir, dirName), 0o755); err != nil {
 					t.Fatal(err)
 				}
@@ -267,7 +285,7 @@ func TestArchGuard(t *testing.T) {
 			name: "foreign arch native present — guard rejects",
 			nmSetup: func(t *testing.T, nmDir string) {
 				t.Helper()
-				dirName := "sqlite-vec-" + foreignGOOS + "-" + foreignGOARCH
+				dirName := "sqlite-vec-" + foreignGOOS + "-" + foreignNpmArch
 				if err := os.MkdirAll(filepath.Join(nmDir, dirName), 0o755); err != nil {
 					t.Fatal(err)
 				}
@@ -318,6 +336,56 @@ func TestArchGuard(t *testing.T) {
 			}
 		})
 	}
+
+	// Explicit amd64-host simulation: uses validateArchGuardFor so the test
+	// covers the npm-token boundary (amd64→x64) on ANY host, including arm64.
+	t.Run("simulation: amd64 binary accepts sqlite-vec-darwin-x64", func(t *testing.T) {
+		nmDir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(nmDir, "sqlite-vec-darwin-x64"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := validateArchGuardFor(nmDir, "darwin", "amd64"); err != nil {
+			t.Fatalf("expected guard to pass for amd64 binary with sqlite-vec-darwin-x64, got: %v", err)
+		}
+	})
+
+	t.Run("simulation: amd64 binary rejects sqlite-vec-darwin-arm64", func(t *testing.T) {
+		nmDir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(nmDir, "sqlite-vec-darwin-arm64"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		err := validateArchGuardFor(nmDir, "darwin", "amd64")
+		if err == nil {
+			t.Fatal("expected arch mismatch error, got nil")
+		}
+		if !strings.Contains(err.Error(), "arch mismatch") {
+			t.Fatalf("error %q does not contain 'arch mismatch'", err.Error())
+		}
+	})
+
+	t.Run("simulation: arm64 binary rejects sqlite-vec-darwin-x64", func(t *testing.T) {
+		nmDir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(nmDir, "sqlite-vec-darwin-x64"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		err := validateArchGuardFor(nmDir, "darwin", "arm64")
+		if err == nil {
+			t.Fatal("expected arch mismatch error, got nil")
+		}
+		if !strings.Contains(err.Error(), "arch mismatch") {
+			t.Fatalf("error %q does not contain 'arch mismatch'", err.Error())
+		}
+	})
+
+	t.Run("simulation: arm64 binary accepts sqlite-vec-darwin-arm64", func(t *testing.T) {
+		nmDir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(nmDir, "sqlite-vec-darwin-arm64"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := validateArchGuardFor(nmDir, "darwin", "arm64"); err != nil {
+			t.Fatalf("expected guard to pass for arm64 binary with sqlite-vec-darwin-arm64, got: %v", err)
+		}
+	})
 }
 
 func buildDevEngine(t *testing.T) string {

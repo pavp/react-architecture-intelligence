@@ -256,17 +256,36 @@ func validateMetadata(metadata AssetMetadata, nodeModulesDir string) error {
 	// Do not restore THIS form (static-metadata equality). The arch guard below
 	// replaces it: it derives the native arch from the bundled sqlite-vec-<os>-<arch>
 	// directory name (present only in S2+ archives) and compares it against the
-	// binary's OWN ldflags-injected identity (runtime.GOOS/runtime.GOARCH), which
-	// is correct because the binary cannot exec at all on the wrong arch.
+	// binary's own build target (runtime.GOOS/runtime.GOARCH, set by the Go
+	// toolchain — correct because GoReleaser cross-compiles one binary per arch).
 	if metadata.EnginePackageVersion == "" || metadata.LauncherVersion == "" {
 		return fmt.Errorf("metadata missing launcherVersion or enginePackageVersion")
 	}
 	return validateArchGuard(nodeModulesDir)
 }
 
+// goArchToNpmArch maps a Go GOARCH token to the npm arch token used by
+// sqlite-vec directory names (e.g. amd64 → x64). arm64 is identical in
+// both namespaces and needs no mapping.
+//
+// sqlite-vec uses <os>-x64 / <os>-arm64 (npm tokens), not <os>-amd64 (Go token).
+// GoReleaser cross-compiles one binary per arch, so runtime.GOARCH is always the
+// correct build target — but it must be normalised before comparing against the
+// npm-named directory in the archive.
+func goArchToNpmArch(goarch string) string {
+	if goarch == "amd64" {
+		return "x64"
+	}
+	return goarch
+}
+
 // validateArchGuard detects the bundled native arch from the sqlite-vec-<os>-<arch>
-// directory inside nodeModulesDir and compares it against the binary's own
-// runtime identity (runtime.GOOS + "/" + runtime.GOARCH, injected via ldflags).
+// directory inside nodeModulesDir and compares it against the binary's own build
+// target (runtime.GOOS / runtime.GOARCH, set by the Go toolchain at compile time —
+// correct because GoReleaser cross-compiles one binary per arch).
+//
+// The dir names use npm tokens (x64, arm64) so runtime.GOARCH is normalised via
+// goArchToNpmArch before comparing.
 //
 // The guard is skipped when nodeModulesDir does not exist, making it backwards-
 // compatible with S1-era archives that carry no per-arch native tree.
@@ -274,6 +293,13 @@ func validateMetadata(metadata AssetMetadata, nodeModulesDir string) error {
 // MUST NOT use metadata.json Platform field — that field is written by the build
 // host and may mismatch for valid installs (see removed check above).
 func validateArchGuard(nodeModulesDir string) error {
+	return validateArchGuardFor(nodeModulesDir, runtime.GOOS, runtime.GOARCH)
+}
+
+// validateArchGuardFor is the testable core of validateArchGuard; it accepts
+// explicit binaryOS and binaryGOARCH so tests can simulate any build target
+// without recompiling.
+func validateArchGuardFor(nodeModulesDir, binaryOS, binaryGOARCH string) error {
 	info, err := os.Stat(nodeModulesDir)
 	if err != nil || !info.IsDir() {
 		// node_modules absent — no per-arch natives bundled; skip guard.
@@ -285,6 +311,10 @@ func validateArchGuard(nodeModulesDir string) error {
 		return fmt.Errorf("arch guard: cannot read node_modules: %w", err)
 	}
 
+	// Normalise the binary's Go arch token to the npm arch token that
+	// sqlite-vec uses in its package (and directory) names.
+	binaryNpmArch := goArchToNpmArch(binaryGOARCH)
+
 	const prefix = "sqlite-vec-"
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -294,21 +324,19 @@ func validateArchGuard(nodeModulesDir string) error {
 		if !strings.HasPrefix(name, prefix) {
 			continue
 		}
-		// name is "sqlite-vec-<goos>-<goarch>", e.g. "sqlite-vec-darwin-arm64"
+		// name is "sqlite-vec-<os>-<npmArch>", e.g. "sqlite-vec-darwin-x64"
 		rest := name[len(prefix):]
-		// Split on last "-" to separate goos from goarch.
+		// Split on last "-" to separate os from npm arch token.
 		idx := strings.LastIndex(rest, "-")
 		if idx < 0 {
 			continue
 		}
 		detectedOS := rest[:idx]
-		detectedArch := rest[idx+1:]
-		binaryOS := runtime.GOOS
-		binaryArch := runtime.GOARCH
-		if detectedOS != binaryOS || detectedArch != binaryArch {
+		detectedNpmArch := rest[idx+1:]
+		if detectedOS != binaryOS || detectedNpmArch != binaryNpmArch {
 			return fmt.Errorf(
 				"arch mismatch: binary is %s/%s but bundled natives are for %s/%s — reinstall the correct platform archive",
-				binaryOS, binaryArch, detectedOS, detectedArch,
+				binaryOS, binaryGOARCH, detectedOS, detectedNpmArch,
 			)
 		}
 		// Matching native dir found — guard passes.
