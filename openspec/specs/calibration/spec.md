@@ -3,7 +3,8 @@
 Capability promoted from delta `openspec/changes/p13-s1-rai-calibrate/spec.md` at archive (2026-06-07).
 S2 delta merged from `openspec/changes/p13-s2-evidence-correlated-suggestions/spec.md` at archive (2026-06-07).
 S3 delta merged from `openspec/changes/p13-s3-calibrate-apply/spec.md` at archive (2026-06-07).
-Changes: `p13-s1-rai-calibrate`, `p13-s2-evidence-correlated-suggestions`, `p13-s3-calibrate-apply` · Persistence: hybrid
+S2.x delta merged from `openspec/changes/p13-s2x-secondary-knobs/spec.md` at archive (2026-06-15).
+Changes: `p13-s1-rai-calibrate`, `p13-s2-evidence-correlated-suggestions`, `p13-s3-calibrate-apply`, `p13-s2x-secondary-knobs` · Persistence: hybrid
 
 ---
 
@@ -262,6 +263,198 @@ not as an error.
 - AND it prints a message guiding the user to record feedback first
 - AND it exits with code 0.
 
+### Requirement: Secondary Knob Registration (maxFanOut)
+
+The system MUST register `maxFanOut` as a secondary calibrated knob for `react/render-coupling`
+(config path `renderCoupling.maxFanOut`, default 7) and `react/hook-topology`
+(config path `hookTopology.maxFanOut`, default 5). Both registrations MUST be additive and MUST
+NOT alter the existing primary knob (`maxFanIn`) path, its extractor, or its output. No config
+schema change is required — these fields already exist in `ConfigSchema`.
+
+#### Scenario: Secondary knobs registered without touching primary path
+
+- GIVEN the calibration engine initialises its calibratable-rule registry
+- WHEN the registry is inspected
+- THEN `react/render-coupling` exposes a secondary knob `renderCoupling.maxFanOut`
+- AND `react/hook-topology` exposes a secondary knob `hookTopology.maxFanOut`
+- AND the primary knob entries for both rules remain identical to their pre-S2.x state.
+
+---
+
+### Requirement: FanOut-Dominant Breach Gate
+
+A `maxFanOut` suggestion for a rule MUST fire ONLY when `fanOut` is the dominant breach metric
+across the rejected findings of that rule. Dominant means the count of rejected findings where
+`evidence.fanOut` is the sole or highest breaching metric exceeds the count of findings where
+`evidence.fanIn` is dominant. When `fanIn` is dominant (or equal), the engine MUST NOT emit a
+`maxFanOut` suggestion for that rule, regardless of whether any `fanOut` breach occurred.
+
+#### Scenario: fanOut dominant — suggestion emitted
+
+- GIVEN `react/render-coupling` passes the trigger threshold
+- AND among its rejected findings: 5 are dominated by `evidence.fanOut` and 2 are dominated by `evidence.fanIn`
+- WHEN the secondary-knob pass runs
+- THEN a `maxFanOut` suggestion is emitted for `react/render-coupling`.
+
+#### Scenario: fanIn dominant — no fanOut suggestion
+
+- GIVEN `react/render-coupling` passes the trigger threshold
+- AND among its rejected findings: 3 are dominated by `evidence.fanIn` and 1 is dominated by `evidence.fanOut`
+- WHEN the secondary-knob pass runs
+- THEN NO `maxFanOut` suggestion is emitted for `react/render-coupling`
+- AND the existing `maxFanIn` suggestion path is unaffected.
+
+#### Scenario: Equal dominance — no fanOut suggestion
+
+- GIVEN `react/hook-topology` passes the trigger threshold
+- AND among its rejected findings: 2 are dominated by `evidence.fanIn` and 2 are dominated by `evidence.fanOut`
+- WHEN the secondary-knob pass runs
+- THEN NO `maxFanOut` suggestion is emitted for `react/hook-topology`.
+
+---
+
+### Requirement: Loosen-Only Direction for maxFanOut Suggestions
+
+The engine MUST suggest a `maxFanOut` value that is strictly GREATER than the current configured
+value. The engine MUST NEVER suggest a value equal to or lower than the current value — it MUST
+NOT tighten `maxFanOut`. This mirrors the loosen-only guarantee already enforced for `maxFanIn`.
+
+#### Scenario: newValue exceeds current — suggestion emitted
+
+- GIVEN current `renderCoupling.maxFanOut` is 7
+- AND the dominant `evidence.fanOut` values across rejected findings are 8, 10, 12
+- WHEN the secondary-knob pass runs
+- THEN the emitted `maxFanOut` suggestion is 12 (`min(max(observed), 50)`)
+- AND 12 > 7, satisfying the loosen-only constraint.
+
+#### Scenario: newValue equals current — no suggestion emitted
+
+- GIVEN current `hookTopology.maxFanOut` is 9
+- AND the dominant `evidence.fanOut` values are 5, 7, 9
+- WHEN the secondary-knob pass runs
+- THEN NO `maxFanOut` suggestion is emitted (9 is not > 9)
+- AND the engine does NOT fall back to `current + 1` for the secondary knob.
+
+#### Scenario: newValue below current — no suggestion emitted
+
+- GIVEN current `renderCoupling.maxFanOut` is 12
+- AND the dominant `evidence.fanOut` values are 8, 10
+- WHEN the secondary-knob pass runs
+- THEN NO `maxFanOut` suggestion is emitted (10 < 12)
+- AND no patch touching `renderCoupling.maxFanOut` is produced.
+
+---
+
+### Requirement: maxFanOut Evidence Arithmetic
+
+When the fanOut-dominant gate passes and `newValue > current`, the suggested value MUST be
+`min(max(evidence.fanOut values over rejected findings), 50)`. The cap of 50 is the same
+`maxCap` constant used for primary knobs. The suggestion's rationale MUST cite the observed max
+`fanOut` and the count of rejected findings it was derived from.
+
+#### Scenario: Arithmetic mirrors primary ceiling rule
+
+- GIVEN `react/render-coupling` passes the gate with dominant `evidence.fanOut` values of 9, 11, 15
+- AND current `renderCoupling.maxFanOut` is 7
+- WHEN the secondary-knob arithmetic runs
+- THEN the suggested value is 15 (`max(9,11,15) = 15; 15 ≤ 50; 15 > 7`).
+
+#### Scenario: Observed max above cap is clamped to 50
+
+- GIVEN dominant `evidence.fanOut` values include 63
+- AND current `renderCoupling.maxFanOut` is 7
+- WHEN the secondary-knob arithmetic runs
+- THEN the suggested value is 50 (capped at `maxCap`)
+- AND the patch validates against `ConfigSchema.partial()`.
+
+#### Scenario: Rationale cites observed max and rejected count
+
+- GIVEN `react/hook-topology` emits a `maxFanOut` suggestion of 10 from 3 rejected findings
+- WHEN the suggestion rationale is rendered
+- THEN it cites the observed max `fanOut` (10) and the count of rejected findings (3)
+  (e.g. "observed max fanOut: 10 across 3 rejected findings").
+
+---
+
+### Requirement: Absent fanOut Evidence Suppresses Secondary Suggestion
+
+When the rule passes the trigger and the fanOut-dominant gate, but no rejected fingerprint
+resolves to a finding with a non-null `evidence.fanOut`, the engine MUST emit NO `maxFanOut`
+suggestion. The secondary knob MUST NOT fall back to `current + 1`. This differs from the
+primary knob fallback and is an explicit design constraint.
+
+#### Scenario: No fanOut evidence — no suggestion
+
+- GIVEN `react/render-coupling` passes the trigger and fanOut-dominant gate
+- AND none of its rejected fingerprints resolve to a T3 finding with `evidence.fanOut`
+- WHEN the secondary-knob pass runs
+- THEN NO `maxFanOut` suggestion is emitted
+- AND no `renderCoupling.maxFanOut` patch appears in the suggestion list.
+
+---
+
+### Requirement: Independent Dual Suggestions Per Rule
+
+A rule MAY emit both a `maxFanIn` suggestion (primary) and a `maxFanOut` suggestion (secondary)
+in the same calibration run as two distinct `CalibrationSuggestion` objects. The two paths MUST
+be evaluated independently. Emitting one MUST NOT suppress or replace the other.
+
+#### Scenario: Both suggestions emitted independently
+
+- GIVEN `react/render-coupling` passes the trigger
+- AND the rejected findings are dominated by `evidence.fanIn` in the primary pass
+- AND separately, `evidence.fanOut` is dominant with values above the current `maxFanOut`
+- WHEN calibration runs with both primary and secondary passes
+- THEN two distinct `CalibrationSuggestion` objects are produced for `react/render-coupling`:
+  one for `renderCoupling.maxFanIn` and one for `renderCoupling.maxFanOut`
+- AND both patches validate against `ConfigSchema.partial()`.
+
+#### Scenario: Primary emitted without secondary when fanIn dominant
+
+- GIVEN `react/render-coupling` passes the trigger
+- AND `evidence.fanIn` is dominant (fanOut-dominant gate fails)
+- WHEN calibration runs
+- THEN a `maxFanIn` suggestion is emitted
+- AND NO `maxFanOut` suggestion is emitted.
+
+#### Scenario: Secondary emitted without primary when evidence absent for fanIn
+
+- GIVEN `react/hook-topology` passes the trigger
+- AND no rejected fingerprints resolve to `evidence.fanIn`
+- AND `evidence.fanOut` is dominant and above current `maxFanOut`
+- WHEN calibration runs
+- THEN a `maxFanOut` suggestion is emitted
+- AND the primary path falls back to `current + 1` for `maxFanIn` per the existing fallback rule
+- AND both are distinct objects in the suggestion list.
+
+---
+
+### Requirement: Suggest-Only Guardrail Extended to Secondary Path
+
+The `maxFanOut` secondary suggestion path MUST be strictly suggest-only. It MUST NOT write any
+config file, MUST NOT mutate T4 (`feedback_event`), T5 (`weight`), or T3 (`finding`), and
+MUST NOT trigger any write behavior except through the existing `--apply --yes` path already
+specified in "Guarded Config-Write via `--apply`". The secondary path introduces no new write
+surface.
+
+#### Scenario: Secondary suggestion produces no writes by default
+
+- GIVEN `react/render-coupling` passes the fanOut-dominant gate and emits a `maxFanOut` suggestion
+- WHEN `rai calibrate` runs without `--apply`
+- THEN no `rai.config.json` is created or modified
+- AND no T4, T5, or T3 row is mutated
+- AND the `maxFanOut` suggestion is only printed for human review.
+
+#### Scenario: Secondary suggestion included in `--apply --yes` merged config
+
+- GIVEN `react/render-coupling` emits both a `maxFanIn` and a `maxFanOut` suggestion
+- WHEN `rai calibrate --apply --yes` runs
+- THEN the written `rai.config.json` includes both `renderCoupling.maxFanIn` and `renderCoupling.maxFanOut` patches
+- AND the merged config validates against `ConfigSchema.partial()`
+- AND no T4, T5, or T3 row is mutated.
+
+---
+
 ### Requirement: Calibrate Output Shape
 
 `rai calibrate` MUST produce a human-readable default output containing a per-rule stats table and a
@@ -289,11 +482,20 @@ For each calibratable core rule, the system MUST resolve the breach-metric value
 rejected findings for that rule by joining T4 negative feedback to T3 evidence. The lookup MUST
 select distinct fingerprints from `feedback_event` (T4) where verdict is `reject`, `wontfix`, or
 `dismiss` for the rule, resolve each `(fingerprint, rule_id)` to its current finding via
-`FindingsStore.currentVersion`, extract the rule's primary metric, and return a numeric array. The
-lookup MUST be strictly read-only over T4 and T3 (no insert, update, or delete) and MUST require no
-schema change. The extracted primary metric per rule MUST be: `react/render-coupling` →
-`evidence.fanIn`; `react/over-abstraction` → `evidence.propCount`; `react/hook-topology` →
-`evidence.fanIn`; `react/shared-extraction` → `evidence.instances.length`.
+`FindingsStore.currentVersion`, extract the rule's primary metric AND secondary metric (where
+registered), and return numeric arrays per metric. The lookup MUST be strictly read-only over T4
+and T3 (no insert, update, or delete) and MUST require no schema change. The extracted metrics
+per rule MUST be:
+
+| Rule | Primary metric | Secondary metric |
+|------|---------------|-----------------|
+| `react/render-coupling` | `evidence.fanIn` | `evidence.fanOut` |
+| `react/hook-topology` | `evidence.fanIn` | `evidence.fanOut` |
+| `react/over-abstraction` | `evidence.propCount` | (none) |
+| `react/shared-extraction` | `evidence.instances.length` | (none) |
+
+(Previously: the lookup extracted only the primary metric per rule and returned a single numeric
+array; `evidence.fanOut` was stored in findings but never retrieved by the calibration path.)
 
 #### Scenario: Lookup returns observed breach metrics for rejected findings
 
@@ -308,6 +510,20 @@ schema change. The extracted primary metric per rule MUST be: `react/render-coup
 - WHEN evidence is looked up for that rule
 - THEN that fingerprint contributes no value to the returned array
 - AND it is NOT treated as the value 0.
+
+#### Scenario: Lookup also returns fanOut array for render-coupling
+
+- GIVEN T4 has rejected events for `react/render-coupling` on fingerprints whose T3 findings carry `evidence.fanOut` of 8, 11, 14
+- WHEN evidence is looked up for that rule
+- THEN the returned secondary array contains 8, 11, and 14
+- AND the primary array (fanIn) is returned separately and unchanged.
+
+#### Scenario: Rules without secondary metric return only primary
+
+- GIVEN evidence is looked up for `react/over-abstraction` or `react/shared-extraction`
+- WHEN the lookup runs
+- THEN only the primary metric array is returned
+- AND no secondary array is produced for those rules.
 
 ### Requirement: Evidence-Correlated Suggestion Fallback
 
@@ -469,14 +685,17 @@ programmatically.
 
 ---
 
-## Out of Scope (explicit)
+## Out of Scope (this change)
 
-The following are NOT part of P13 S1–S3 and MUST NOT be implemented in these changes:
-- Secondary per-rule metric knobs (e.g. render-coupling `maxFanOut`/`maxDirectChildren`/`maxReachableDepth`, over-abstraction `maxHooks`/`maxChildren`, shared-extraction `minCosine`/`minPropOverlap`) — deferred to S2.x.
+The following remain deferred and MUST NOT be implemented in this change:
+- `maxDirectChildren`, `maxReachableDepth`, `maxDirectDependencies` secondary knobs for render-coupling and hook-topology.
+- Secondary knobs for `react/over-abstraction` or `react/shared-extraction`.
+- `shared.minCosine`, `minPropOverlap`, `minHookOverlap` similarity thresholds.
+- `shared.warnAtInstances` / `errorAtInstances` severity-band knobs.
+- Any new config schema field, DB table, or migration.
+- Any new MCP tool.
 - T5 suppression-state display in calibrate output (deferred to a future slice).
 - A `--min-events` flag override (`MIN_EVENTS = 3` is a named constant).
-- Any schema or DB table change, and any new migration.
-- A new MCP tool.
 - ML/probabilistic thresholds.
 - Adapter/unknown rules: NOT evidence-correlated (no config threshold knob); retain S1 `memory.severityMap` downgrade behavior unchanged.
 
@@ -510,3 +729,12 @@ The following are NOT part of P13 S1–S3 and MUST NOT be implemented in these c
 | Default no-flag path UNCHANGED — suggest-only, zero-write | Suggest-Only Calibration Command (Primary Guardrail) |
 | Guardrail invariant shifts: write ONLY with `--apply --yes` | Suggest-Only Calibration Command (Primary Guardrail) |
 | Memory/findings never mutated regardless of `--apply`/`--yes` | Suggest-Only Calibration Command (Primary Guardrail) |
+| maxFanOut secondary knob for render-coupling (default 7) and hook-topology (default 5) | Secondary Knob Registration |
+| Gate = fanOut DOMINANT (count comparison, not co-breach) | FanOut-Dominant Breach Gate |
+| Loosen-only: RAISE maxFanOut only, never tighten | Loosen-Only Direction |
+| Arithmetic: `min(max(observed fanOut), 50)` | maxFanOut Evidence Arithmetic |
+| No suggestion when newValue ≤ current | Loosen-Only Direction |
+| No secondary fallback to `current + 1` | Absent fanOut Evidence Suppresses Secondary Suggestion |
+| Independent dual suggestions (maxFanIn + maxFanOut) as two CalibrationSuggestion objects | Independent Dual Suggestions Per Rule |
+| Evidence source: `evidence.fanOut` already in T3 — zero new evidence collection | Rejected-Finding Evidence Lookup (MODIFIED) |
+| Suggest-only guardrail extended to secondary path — no new write surface | Suggest-Only Guardrail Extended to Secondary Path |
