@@ -1,6 +1,7 @@
 import { ConfigSchema } from "../config/schema.js";
 import type { RaiConfig, RaiConfigInput } from "../config/schema.js";
 import type { RuleFeedbackStats } from "../memory/feedback-aggregate.js";
+import type { RejectedMetricRow } from "./evidence-lookup.js";
 
 // Floor rule (raise to max+1 so the threshold clears all observed clusters).
 // All other calibratable rules are ceiling rules (raise to max of observed breach values).
@@ -214,6 +215,134 @@ export function computeSuggestionsWithEvidence(
   return suggestions.sort((a, b) =>
     a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0,
   );
+}
+
+// ── Secondary calibration knobs (maxFanOut) ────────────────────────────────
+
+/**
+ * Secondary calibratable rules — maxFanOut knob for render-coupling and hook-topology.
+ * Additive: does not alter the primary CALIBRATABLE_RULES or any existing signature.
+ */
+export const CALIBRATABLE_SECONDARY_RULES: Array<{
+  ruleId: string;
+  group: keyof RaiConfig;
+  knob: string;
+  currentValue: (config: RaiConfig) => number;
+  maxCap: number;
+  buildPatch: (newValue: number) => Partial<RaiConfigInput>;
+  defaultValue: number;
+}> = [
+  {
+    ruleId: "react/render-coupling",
+    group: "renderCoupling",
+    knob: "maxFanOut",
+    currentValue: (cfg) => cfg.renderCoupling.maxFanOut,
+    maxCap: 50,
+    buildPatch: (v) => ({ renderCoupling: { maxFanOut: v } }),
+    defaultValue: 7,
+  },
+  {
+    ruleId: "react/hook-topology",
+    group: "hookTopology",
+    knob: "maxFanOut",
+    currentValue: (cfg) => cfg.hookTopology.maxFanOut,
+    maxCap: 50,
+    buildPatch: (v) => ({ hookTopology: { maxFanOut: v } }),
+    defaultValue: 5,
+  },
+];
+
+/**
+ * Determine whether fanOut is the dominant breach metric.
+ * fanOut is dominant when count(rows where fanOut > currentFanOut) STRICTLY >
+ * count(rows where fanIn > currentFanIn). Tie or fanIn-majority → false.
+ */
+function isFanOutDominant(
+  rows: RejectedMetricRow[],
+  currentFanIn: number,
+  currentFanOut: number,
+): boolean {
+  let fanOutBreaches = 0;
+  let fanInBreaches = 0;
+  for (const row of rows) {
+    if (row.fanOut > currentFanOut) fanOutBreaches++;
+    if (row.fanIn > currentFanIn) fanInBreaches++;
+  }
+  return fanOutBreaches > fanInBreaches;
+}
+
+/**
+ * Compute secondary (maxFanOut) calibration suggestions.
+ * Emits a CalibrationSuggestion for each rule where:
+ *   - trigger threshold is met (MIN_EVENTS + MIN_NEGATIVE_RATE)
+ *   - the rule is in CALIBRATABLE_SECONDARY_RULES
+ *   - paired rows exist in rowsByRule
+ *   - fanOut is dominant (count > fanIn count vs current thresholds)
+ *   - newValue = min(max(dominant fanOut values), 50) STRICTLY > current maxFanOut
+ * Loosen-only: never tightens. No fallback when evidence is absent or newValue ≤ current.
+ */
+export function computeSecondarySuggestions(
+  stats: RuleFeedbackStats[],
+  currentConfig: RaiConfig,
+  rowsByRule: Map<string, RejectedMetricRow[]>,
+): CalibrationSuggestion[] {
+  const suggestions: CalibrationSuggestion[] = [];
+
+  for (const stat of stats) {
+    if (stat.totalEvents < MIN_EVENTS || stat.negativeRate < MIN_NEGATIVE_RATE) continue;
+
+    const secondary = CALIBRATABLE_SECONDARY_RULES.find((r) => r.ruleId === stat.ruleId);
+    if (!secondary) continue;
+
+    const rows = rowsByRule.get(stat.ruleId);
+    if (!rows || rows.length === 0) continue;
+
+    // Resolve current thresholds for the primary knob (maxFanIn) from CALIBRATABLE_RULES
+    const primary = CALIBRATABLE_RULES.find((r) => r.ruleId === stat.ruleId);
+    const currentFanIn = primary ? primary.currentValue(currentConfig) : 0;
+    const currentFanOut = secondary.currentValue(currentConfig);
+
+    if (!isFanOutDominant(rows, currentFanIn, currentFanOut)) continue;
+
+    // Collect fanOut values from dominant rows (rows where fanOut > currentFanOut)
+    const dominantFanOutValues = rows
+      .filter((row) => row.fanOut > currentFanOut)
+      .map((row) => row.fanOut);
+
+    if (dominantFanOutValues.length === 0) continue;
+
+    const maxObserved = Math.max(...dominantFanOutValues);
+    const newValue = Math.min(maxObserved, secondary.maxCap);
+    if (newValue <= currentFanOut) continue;
+
+    const patch = secondary.buildPatch(newValue);
+    const validated = ConfigSchema.partial().safeParse(patch);
+    if (!validated.success) continue;
+
+    suggestions.push({
+      ruleId: stat.ruleId,
+      reason: `observed max fanOut: ${maxObserved} across ${dominantFanOutValues.length} rejected findings — suggest ${secondary.knob}: ${newValue} to clear fanOut-dominated rejections`,
+      patch,
+    });
+  }
+
+  return suggestions.sort((a, b) =>
+    a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0,
+  );
+}
+
+/**
+ * Apply-safe secondary (maxFanOut) calibration suggestions.
+ * Identical logic to computeSecondarySuggestions — no fallback, idempotent.
+ * Separate export for naming clarity at the call site (apply path vs. suggest path).
+ */
+export function computeApplicableSecondarySuggestions(
+  stats: RuleFeedbackStats[],
+  currentConfig: RaiConfig,
+  rowsByRule: Map<string, RejectedMetricRow[]>,
+): CalibrationSuggestion[] {
+  // The logic is identical: dominant gate + loosen-only + no fallback.
+  return computeSecondarySuggestions(stats, currentConfig, rowsByRule);
 }
 
 /**

@@ -1,4 +1,4 @@
-import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, aggregateFeedback, computeSuggestionsWithEvidence, computeApplicableSuggestions, lookupRejectedEvidence, CALIBRATABLE_RULES, openDb, mergeSuggestionsIntoConfig, ConfigSchema, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope, type CalibrationSuggestion, type RuleFeedbackStats, type RaiConfigInput } from "@rai/core";
+import { buildMcpServer, createSession, serveStdio, readSources, resolveConfig, runBackfill, findingMatchesFile, aggregateFeedback, computeSuggestionsWithEvidence, computeApplicableSuggestions, lookupRejectedEvidence, lookupRejectedEvidenceRows, CALIBRATABLE_RULES, CALIBRATABLE_SECONDARY_RULES, computeSecondarySuggestions, computeApplicableSecondarySuggestions, openDb, mergeSuggestionsIntoConfig, ConfigSchema, type AnalysisDiagnostic, type PresentedFinding, type ExplanationEnvelope, type CalibrationSuggestion, type RuleFeedbackStats, type RaiConfigInput, type RejectedMetricRow } from "@rai/core";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
@@ -194,8 +194,22 @@ export async function runCalibrateCommand(input: { dir: string; dbPath: string; 
       }
     }
 
-    // suggest-only path: use computeSuggestionsWithEvidence (may include current+1 nudges for display)
-    const suggestions = computeSuggestionsWithEvidence(rules, currentConfig, evidenceByRule);
+    // Build paired-row map for secondary (maxFanOut) pass
+    const rowsByRule = new Map<string, RejectedMetricRow[]>();
+    for (const rule of rules) {
+      const isSecondary = CALIBRATABLE_SECONDARY_RULES.some((r) => r.ruleId === rule.ruleId);
+      if (isSecondary) {
+        const rows = lookupRejectedEvidenceRows(db, rule.ruleId);
+        if (rows.length > 0) rowsByRule.set(rule.ruleId, rows);
+      }
+    }
+
+    // suggest-only path: primary + secondary suggestions, re-sorted by ruleId
+    const primarySuggestions = computeSuggestionsWithEvidence(rules, currentConfig, evidenceByRule);
+    const secondarySuggestions = computeSecondarySuggestions(rules, currentConfig, rowsByRule);
+    const suggestions = [...primarySuggestions, ...secondarySuggestions].sort((a, b) =>
+      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0,
+    );
     const configPath = join(absDir, "rai.config.json");
     const configFile = existsSync(configPath) ? configPath : null;
 
@@ -204,10 +218,13 @@ export async function runCalibrateCommand(input: { dir: string; dbPath: string; 
       return { code: 0, result: { rules, suggestions, currentConfig, configFile } };
     }
 
-    // Apply sub-flow: use computeApplicableSuggestions — suppresses current+1 fallback for
-    // calibratable rules, making --apply --yes idempotent (fix for non-convergence bug).
-    // preview (--apply no --yes) uses the same set so preview == what would be written.
-    const applicableSuggestions = computeApplicableSuggestions(rules, currentConfig, evidenceByRule);
+    // Apply sub-flow: primary + secondary applicable suggestions, re-sorted by ruleId.
+    // Both suppress current+1 fallback for calibratable rules → idempotent.
+    const primaryApplicable = computeApplicableSuggestions(rules, currentConfig, evidenceByRule);
+    const secondaryApplicable = computeApplicableSecondarySuggestions(rules, currentConfig, rowsByRule);
+    const applicableSuggestions = [...primaryApplicable, ...secondaryApplicable].sort((a, b) =>
+      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0,
+    );
 
     // Zero applicable suggestions: nothing genuine to apply.
     // If a config file already exists → "already calibrated" (idempotent).

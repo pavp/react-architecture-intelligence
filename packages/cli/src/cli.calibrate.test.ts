@@ -598,6 +598,80 @@ test("GUARDRAIL: evidence path — feedback_event row count UNCHANGED after cali
   expect(fbAfter).toBe(fbBefore);
 });
 
+// ── P13-S2.x: Dual-suggestion (maxFanIn + maxFanOut) ──────────────────────────
+
+test("dual-suggestion: suggest path returns both maxFanIn and maxFanOut suggestions for render-coupling", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+
+  // Seed 5 reject events for react/render-coupling
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+
+  // Seed T3 findings with BOTH fanIn evidence (for primary) AND fanOut evidence (for secondary).
+  // fanIn values: [6,7,9,12,8] → max=12 > default maxFanIn(5) → primary suggestion maxFanIn=12
+  // fanOut values: [8,9,10,11,12] → fanOut breach count (vs default maxFanOut=7): all 5 > 7
+  // fanIn breach count (vs default maxFanIn=5): all 5 > 5
+  // Tie: 5 vs 5 → fanOut NOT dominant → secondary suggestion suppressed
+  // To make fanOut dominant: use fewer fanIn breaches
+  // fanIn: [4,4,4,6,6] → 2 breach (6>5); fanOut: [8,9,10,4,4] → 3 breach (>7)
+  // → fanOut dominant (3>2) → secondary suggestion emitted
+  const findings = [
+    { fingerprint: "FP0", evidence: { kind: "render-coupling", fanIn: 4, fanOut: 8, directChildren: 1, reachableDepth: 1 } },
+    { fingerprint: "FP1", evidence: { kind: "render-coupling", fanIn: 4, fanOut: 9, directChildren: 1, reachableDepth: 1 } },
+    { fingerprint: "FP2", evidence: { kind: "render-coupling", fanIn: 4, fanOut: 10, directChildren: 1, reachableDepth: 1 } },
+    { fingerprint: "FP3", evidence: { kind: "render-coupling", fanIn: 6, fanOut: 4, directChildren: 1, reachableDepth: 1 } },
+    { fingerprint: "FP4", evidence: { kind: "render-coupling", fanIn: 6, fanOut: 4, directChildren: 1, reachableDepth: 1 } },
+  ];
+  for (const f of findings) {
+    seedFinding(dbPath, "react/render-coupling", f.fingerprint, f.evidence);
+  }
+
+  const { code, result } = await runCalibrateCommand({ dir, dbPath });
+  expect(code).toBe(0);
+
+  // Primary suggestion (maxFanIn) must be present
+  const primarySug = result.suggestions.find(
+    (s) => s.ruleId === "react/render-coupling" && s.patch.renderCoupling?.maxFanIn !== undefined,
+  );
+  expect(primarySug).toBeDefined();
+
+  // Secondary suggestion (maxFanOut) must also be present
+  const secondarySug = result.suggestions.find(
+    (s) => s.ruleId === "react/render-coupling" && s.patch.renderCoupling?.maxFanOut !== undefined,
+  );
+  expect(secondarySug).toBeDefined();
+
+  // They are distinct objects
+  expect(primarySug).not.toBe(secondarySug);
+});
+
+test("dual-suggestion: --apply --yes writes both maxFanIn and maxFanOut into renderCoupling group", async () => {
+  const dir = makeTmp();
+  const dbPath = join(dir, "rai.sqlite");
+
+  seedFeedback(dbPath, "react/render-coupling", "reject", 5);
+
+  const findings = [
+    { fingerprint: "FP0", evidence: { kind: "render-coupling", fanIn: 4, fanOut: 8, directChildren: 1, reachableDepth: 1 } },
+    { fingerprint: "FP1", evidence: { kind: "render-coupling", fanIn: 4, fanOut: 9, directChildren: 1, reachableDepth: 1 } },
+    { fingerprint: "FP2", evidence: { kind: "render-coupling", fanIn: 4, fanOut: 10, directChildren: 1, reachableDepth: 1 } },
+    { fingerprint: "FP3", evidence: { kind: "render-coupling", fanIn: 6, fanOut: 4, directChildren: 1, reachableDepth: 1 } },
+    { fingerprint: "FP4", evidence: { kind: "render-coupling", fanIn: 6, fanOut: 4, directChildren: 1, reachableDepth: 1 } },
+  ];
+  for (const f of findings) {
+    seedFinding(dbPath, "react/render-coupling", f.fingerprint, f.evidence);
+  }
+
+  const { code, result } = await runCalibrateCommand({ dir, dbPath, apply: true, yes: true });
+  expect(code).toBe(0);
+  expect(result.applied).toBe("written");
+
+  const onDisk = JSON.parse(readFileSync(join(dir, "rai.config.json"), "utf8"));
+  // Both maxFanIn and maxFanOut must be in the written config
+  expect(onDisk.renderCoupling?.maxFanIn).toBeDefined();
+  expect(onDisk.renderCoupling?.maxFanOut).toBeDefined();
+});
+
 test("GUARDRAIL: evidence path — finding row count UNCHANGED after calibrate with T3+T4", async () => {
   const dir = makeTmp();
   const dbPath = join(dir, "rai.sqlite");
