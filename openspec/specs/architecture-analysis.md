@@ -92,6 +92,89 @@ Name-only resolution is allowed in this capability version. Calls to unknown hoo
 - WHEN graph construction runs
 - THEN the graph MUST include `Component -> Hook` `uses-hook` edge from `Page` to `useCheckout`
 
+## Requirement: Imports Graph Edge Construction
+
+Pass-1 `PatternImportFact` data MUST be promoted to typed graph edges by `buildGraph`. For every relative import where the resolved importee exists in the in-memory `modules` map, `buildGraph` MUST emit exactly one `GraphEdge` of kind `"imports"` with shape `{srcId, dstId, kind: "imports"}`. No new extraction pass is introduced; this requirement reuses already-collected facts.
+
+The resolver MUST NOT probe the filesystem. All resolution MUST use the `modules` map already built during the same `buildGraph` call.
+
+#### Scenario: Relative import resolves to a known module — edge emitted
+
+- GIVEN module A imports `"./utils"` and a module at `./utils.ts` exists in the graph
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain exactly one `imports` edge from A's node to the utils node
+
+#### Scenario: External or package import — no edge emitted
+
+- GIVEN module A imports `"react"` or any non-relative specifier
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT contain any `imports` edge for that import statement
+- AND no error or diagnostic MUST be produced
+
+#### Scenario: Relative import does not resolve to any known module — no edge, no error
+
+- GIVEN module A imports `"../missing/file"` and no such module exists in the `modules` map
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT contain an `imports` edge for that specifier
+- AND `buildGraph` MUST return normally without throwing
+
+#### Scenario: Multiple import statements or specifiers between same pair — exactly one edge
+
+- GIVEN module A has two import statements both targeting module B, or one statement with multiple named specifiers
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain exactly one `imports` edge from A to B
+- AND no duplicate edges MUST exist for the same ordered (srcId, dstId, "imports") triple
+
+#### Scenario: Self-import suppressed
+
+- GIVEN a module imports itself (same resolved canonical path)
+- WHEN `buildGraph` runs
+- THEN the graph MUST NOT contain any `imports` edge where `srcId === dstId`
+
+#### Scenario: Bidirectional import cycle — both edges emitted
+
+- GIVEN module A imports module B AND module B imports module A
+- WHEN `buildGraph` runs
+- THEN the graph MUST contain an `imports` edge from A to B
+- AND the graph MUST contain an `imports` edge from B to A
+- AND neither edge is suppressed
+
+#### Scenario: Deterministic edge ordering preserved
+
+- GIVEN `buildGraph` is called twice on the same input
+- WHEN both calls complete
+- THEN the `imports` edges in both results MUST appear in identical order
+- AND ordering MUST follow the existing `compareEdge` comparator applied to all edge kinds
+
+#### Scenario: Framework-free core invariant preserved
+
+- GIVEN `packages/core` is checked against the framework-free guard (`check-core-framework-free.mjs`)
+- WHEN `imports` edge materialization is present
+- THEN the guard MUST exit 0 — no React or framework import introduced
+
+#### Scenario: Immutable edge shape preserved
+
+- GIVEN `buildGraph` emits `imports` edges
+- WHEN those edges are inspected
+- THEN each edge MUST have exactly `{srcId, dstId, kind: "imports"}` — no additional fields
+
+## Requirement: MCP Observability of Imports Edges
+
+The MCP raw graph query (`kind: "edges"`) MUST return `imports` edges in its result set. No new MCP tool or field is introduced in S1; the existing `rawEdgeRows()` path already returns all edge kinds and MUST include `imports` edges once they are materialized.
+
+#### Scenario: MCP raw edges query surfaces imports edges
+
+- GIVEN `buildGraph` has emitted `imports` edges for a repository
+- WHEN an MCP client queries the raw graph with `kind: "edges"`
+- THEN the response MUST include at least one edge with `kind: "imports"` for a repo that has relative imports
+- AND the edge payload MUST contain `srcId`, `dstId`, and `kind`
+
+#### Scenario: Repo with no relative imports returns no imports edges
+
+- GIVEN a repository where all imports are external packages
+- WHEN an MCP client queries the raw graph with `kind: "edges"`
+- THEN no edge with `kind: "imports"` MUST appear in the response
+
 ## Requirement: Current-Data Hook Topology Findings
 
 The system MUST emit `react/hook-topology` findings only from current hook graph data: `HookNode` identities and `uses-hook` edges where both source and destination are hooks. Findings MUST cover configured threshold breaches for hook fan-in, fan-out, direct dependencies, and reachable hook depth. Evidence MUST be metric-only and MUST NOT claim convention, ownership, boundary, import, or runtime coupling.
@@ -117,7 +200,9 @@ The system MUST emit `react/hook-topology` findings only from current hook graph
 
 ## Requirement: Convention-Based Boundary Violation Findings
 
-The config MUST support `conventions[]` entries that forbid currently constructed graph edges. This capability version supports only `edgeKind: "renders"` and `edgeKind: "uses-hook"`. Unsupported edge kinds such as `imports`, `calls`, and `passes` MUST be rejected by config validation until those edges are constructed.
+The config MUST support `conventions[]` entries that forbid currently constructed graph edges. This capability version supports only `edgeKind: "renders"` and `edgeKind: "uses-hook"` for convention evaluation. The `imports` edge kind is now constructed by `buildGraph` but convention evaluation against `imports` edges is DEFERRED to a later slice. Unsupported edge kinds such as `calls` and `passes` MUST be rejected by config validation until those edges are constructed. The `imports` edge kind MUST also be rejected by config validation until convention evaluation is explicitly enabled in a future capability version.
+
+(Previously: listed `imports`, `calls`, and `passes` together as "not constructed" kinds that must be rejected. `imports` is now constructed but convention evaluation remains deferred and must still be rejected by config validation in this version.)
 
 Each convention MUST include stable `id`, `edgeKind`, `from` selector, `to` selector, `reason`, optional `severity`, and `policy: "forbid"`. Selectors MAY match node `kind`, `name`, `file`, and `exportKind`; `name` and `file` selectors use the existing minimal glob semantics.
 
@@ -138,7 +223,7 @@ Each convention MUST include stable `id`, `edgeKind`, `from` selector, `to` sele
 
 ### Scenario: Unsupported edge kinds are rejected
 
-- GIVEN config declares a convention for an edge kind that is not constructed
+- GIVEN config declares a convention for an edge kind that is not convention-evaluable in this version (`imports`, `calls`, `passes`)
 - WHEN config resolution runs
 - THEN validation MUST fail rather than silently creating a no-op convention
 
