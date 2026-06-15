@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { describe, expect, it, test } from "vitest";
 import { buildGraph } from "./graph-build.js";
 import { freezeGraph } from "../graph/repograph.js";
 
@@ -284,4 +284,224 @@ test("freezes graph pattern facts", () => {
 	expect(() => {
 		(firstFact as { id: string }).id = "mutated";
 	}).toThrow(TypeError);
+});
+
+// ── P1: one non-spread prop → one passes edge ───────────────────────────────
+describe("P1: one non-spread prop emits one passes edge", () => {
+	const iconSrc = `export function Icon({ size }: { size: number }) { return <svg />; }`;
+	const btnSrc = `import { Icon } from "./Icon";
+export function Button() { return <Icon size={16} />; }`;
+
+	it("emits exactly one passes edge from Button to Icon with propNames:[size]", () => {
+		const g = buildGraph([
+			{ file: "Icon.tsx", source: iconSrc },
+			{ file: "Button.tsx", source: btnSrc },
+		]);
+		const btn = g.components.find((c) => c.name === "Button")!;
+		const icon = g.components.find((c) => c.name === "Icon")!;
+		const passEdges = g.edges.filter((e) => e.kind === "passes");
+		expect(passEdges).toHaveLength(1);
+		expect(passEdges[0]).toMatchObject({
+			srcId: btn.id,
+			dstId: icon.id,
+			kind: "passes",
+			propNames: ["size"],
+		});
+	});
+});
+
+// ── P2: multiple props sorted unique ────────────────────────────────────────
+describe("P2: multiple props produce sorted unique propNames", () => {
+	const avatarSrc = `export function Avatar({ name, size, theme }: any) { return <div />; }`;
+	const cardSrc = `import { Avatar } from "./Avatar";
+export function Card() { return <Avatar name="x" size={32} theme="dark" />; }`;
+
+	it("emits one passes edge with sorted propNames", () => {
+		const g = buildGraph([
+			{ file: "Avatar.tsx", source: avatarSrc },
+			{ file: "Card.tsx", source: cardSrc },
+		]);
+		const card = g.components.find((c) => c.name === "Card")!;
+		const avatar = g.components.find((c) => c.name === "Avatar")!;
+		const passEdges = g.edges.filter((e) => e.kind === "passes");
+		expect(passEdges).toHaveLength(1);
+		expect(passEdges[0]).toMatchObject({
+			srcId: card.id,
+			dstId: avatar.id,
+			kind: "passes",
+			propNames: ["name", "size", "theme"],
+		});
+	});
+});
+
+// ── P3: spread-only → no passes edge ────────────────────────────────────────
+describe("P3: spread-only props produce no passes edge", () => {
+	const childSrc = `export function Child(props: any) { return <div />; }`;
+	const wrapperSrc = `import { Child } from "./Child";
+export function Wrapper(props: any) { return <Child {...props} />; }`;
+
+	it("emits zero passes edges when only spread attrs present", () => {
+		const g = buildGraph([
+			{ file: "Child.tsx", source: childSrc },
+			{ file: "Wrapper.tsx", source: wrapperSrc },
+		]);
+		expect(g.edges.filter((e) => e.kind === "passes")).toHaveLength(0);
+	});
+});
+
+// ── P4: renders with no props → no passes edge; renders edge still present ──
+describe("P4: child rendered with zero attributes — no passes edge", () => {
+	const badgeSrc = `export function Badge() { return <span />; }`;
+	const parentSrc = `import { Badge } from "./Badge";
+export function Parent() { return <Badge />; }`;
+
+	it("emits zero passes edges and still has the renders edge", () => {
+		const g = buildGraph([
+			{ file: "Badge.tsx", source: badgeSrc },
+			{ file: "Parent.tsx", source: parentSrc },
+		]);
+		const parent = g.components.find((c) => c.name === "Parent")!;
+		const badge = g.components.find((c) => c.name === "Badge")!;
+		expect(g.edges.filter((e) => e.kind === "passes")).toHaveLength(0);
+		expect(g.edges).toContainEqual({ srcId: parent.id, dstId: badge.id, kind: "renders" });
+	});
+});
+
+// ── P5: ambiguity guard — two components same file → no passes edge ──────────
+describe("P5: two components in same file rendering same child — no passes edge", () => {
+	const iconSrc2 = `export function Icon({ size }: any) { return <svg />; }`;
+	const multiSrc = `import { Icon } from "./Icon";
+export function Foo() { return <Icon size={16} />; }
+export function Bar() { return <Icon size={24} />; }`;
+
+	it("emits zero passes edges for the ambiguous tag", () => {
+		const g = buildGraph([
+			{ file: "Icon.tsx", source: iconSrc2 },
+			{ file: "multi.tsx", source: multiSrc },
+		]);
+		const passEdgesForIcon = g.edges.filter(
+			(e) => e.kind === "passes" && e.dstId === g.components.find((c) => c.name === "Icon")!.id,
+		);
+		expect(passEdgesForIcon).toHaveLength(0);
+	});
+
+	it("does not throw", () => {
+		expect(() =>
+			buildGraph([
+				{ file: "Icon.tsx", source: iconSrc2 },
+				{ file: "multi.tsx", source: multiSrc },
+			]),
+		).not.toThrow();
+	});
+});
+
+// ── P6: unresolved dst → no edge, no throw ──────────────────────────────────
+describe("P6: unresolved tag (not in byName) produces no edge and no throw", () => {
+	const hostSrc = `export function Host() { return <UnknownWidget label="x" />; }`;
+
+	it("does not throw", () => {
+		expect(() => buildGraph([{ file: "Host.tsx", source: hostSrc }])).not.toThrow();
+	});
+
+	it("emits zero passes edges", () => {
+		const g = buildGraph([{ file: "Host.tsx", source: hostSrc }]);
+		expect(g.edges.filter((e) => e.kind === "passes")).toHaveLength(0);
+	});
+});
+
+// ── P7: multiple call-sites → ONE edge with merged sorted propNames ──────────
+describe("P7: multiple call-sites to same child — one passes edge with merged propNames", () => {
+	const fieldSrc = `export function Field(props: any) { return <div />; }`;
+	const formSrc = `import { Field } from "./Field";
+export function Form({ isRequired }: any) {
+  if (isRequired) return <Field label="Name" required />;
+  return <Field label="Name" />;
+}`;
+
+	it("emits exactly one passes edge from Form to Field", () => {
+		const g = buildGraph([
+			{ file: "Field.tsx", source: fieldSrc },
+			{ file: "Form.tsx", source: formSrc },
+		]);
+		const passEdges = g.edges.filter((e) => e.kind === "passes");
+		expect(passEdges).toHaveLength(1);
+	});
+
+	it("propNames is sorted union of all call-site props", () => {
+		const g = buildGraph([
+			{ file: "Field.tsx", source: fieldSrc },
+			{ file: "Form.tsx", source: formSrc },
+		]);
+		const edge = g.edges.find((e) => e.kind === "passes")!;
+		expect(edge.propNames).toEqual(["label", "required"]);
+	});
+});
+
+// ── P8: edge shape, determinism, freezeGraph no throw ───────────────────────
+describe("P8: edge shape, determinism, and freezeGraph compatibility", () => {
+	const itemSrc = `export function Item({ id, label }: any) { return <li />; }`;
+	const listSrc = `import { Item } from "./Item";
+export function List() { return <Item id={1} label="x" />; }`;
+
+	it("passes edge has exactly {srcId, dstId, kind, propNames}", () => {
+		const g = buildGraph([
+			{ file: "Item.tsx", source: itemSrc },
+			{ file: "List.tsx", source: listSrc },
+		]);
+		const edge = g.edges.find((e) => e.kind === "passes")!;
+		expect(Object.keys(edge).sort()).toEqual(["dstId", "kind", "propNames", "srcId"]);
+	});
+
+	it("buildGraph produces identical passes edges on repeated calls", () => {
+		const files = [
+			{ file: "Item.tsx", source: itemSrc },
+			{ file: "List.tsx", source: listSrc },
+		];
+		const g1 = buildGraph(files);
+		const g2 = buildGraph(files);
+		const p1 = g1.edges.filter((e) => e.kind === "passes");
+		const p2 = g2.edges.filter((e) => e.kind === "passes");
+		expect(p1).toEqual(p2);
+	});
+
+	it("freezeGraph does not throw when passes edges present", () => {
+		const g = buildGraph([
+			{ file: "Item.tsx", source: itemSrc },
+			{ file: "List.tsx", source: listSrc },
+		]);
+		expect(() => freezeGraph(g)).not.toThrow();
+	});
+
+	it("passes edge is JSON-safe", () => {
+		const g = buildGraph([
+			{ file: "Item.tsx", source: itemSrc },
+			{ file: "List.tsx", source: listSrc },
+		]);
+		const edge = g.edges.find((e) => e.kind === "passes")!;
+		expect(JSON.parse(JSON.stringify(edge))).toEqual(edge);
+	});
+});
+
+// ── P9: mixed spread and named props → only named prop names emitted ─────────
+describe("P9: mixed spread and named props keeps named, drops spread", () => {
+	const fieldSrc = `export function Field({ label }: any) { return <input />; }`;
+	const formSrc = `import { Field } from "./Field";
+export function Form(props: any) { return <Field {...props} label="x" />; }`;
+
+	it("emits one passes edge with only the named prop", () => {
+		const g = buildGraph([
+			{ file: "Field.tsx", source: fieldSrc },
+			{ file: "Form.tsx", source: formSrc },
+		]);
+		const form = g.components.find((c) => c.name === "Form")!;
+		const field = g.components.find((c) => c.name === "Field")!;
+		const passEdges = g.edges.filter((e) => e.kind === "passes");
+		expect(passEdges).toHaveLength(1);
+		expect(passEdges[0]).toMatchObject({
+			srcId: form.id,
+			dstId: field.id,
+			kind: "passes",
+			propNames: ["label"],
+		});
+	});
 });
