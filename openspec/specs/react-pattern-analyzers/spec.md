@@ -1042,6 +1042,126 @@ positional (file+span) — derived only from stable observed inputs. The analyze
 - AND the analyzer MUST NOT write configuration, memory, snapshots, feedback, persistence, documentation,
   or instruction files directly.
 
+### Requirement: Prop-Drilling Detection via passes Edges
+
+The React adapter MUST provide an adapter-owned analyzer for rule id `react/prop-drilling` that emits findings by consuming `passes` graph edges. This analyzer is the sole consumer of `kind === "passes"` edges. It MUST NOT read `renders` edges or any other edge kind.
+
+For a component B that is the `dstId` of at least one `passes` edge and the `srcId` of at least one `passes` edge, the analyzer MUST identify drilled prop names: names present in B's inbound `passes` edge `propNames`, AND in B's outbound `passes` edge `propNames`, AND in `B.propNames`. After applying the common-name exclusion guard, if any drilled prop names remain, the analyzer MUST emit exactly one finding for B. A self-edge (`srcId === dstId`) MUST NOT contribute, since it cannot form a real A→B→C chain.
+
+The analyzer MUST be a pure synchronous function over `AnalysisContext`. It MUST NOT modify core types, introduce new evidence kinds, or add new MCP tools.
+
+#### Scenario: A→B→C same-name prop present in B.propNames — info finding
+
+- GIVEN graph has passes edge A→B with propNames including "theme", passes edge B→C with propNames including "theme", and B.propNames includes "theme"
+- AND "theme" is not in the common-name exclusion set
+- WHEN the analyzer runs
+- THEN exactly one `react/prop-drilling` finding is emitted for B
+- AND finding type is "opportunity", severityRaw is "info"
+- AND evidence contains "theme" in the drilled prop names
+- AND evidence records the identities of A, B, and C
+
+#### Scenario: Multiple drilled props — warn severity
+
+- GIVEN component B has two or more drilled prop names remaining after common-name guard
+- WHEN the analyzer runs
+- THEN one finding is emitted for B with severityRaw "warn"
+- AND all drilled prop names appear in evidence, sorted and frozen
+
+#### Scenario: Common-name-only pass-through — no finding
+
+- GIVEN component B passes only names in the common-name exclusion set (e.g. "value", "className", "onChange")
+- WHEN the analyzer runs
+- THEN NO finding is emitted for B
+
+#### Scenario: Prop in passes edges but NOT in B.propNames — no finding
+
+- GIVEN passes edge A→B and B→C both carry prop "theme"
+- AND B.propNames does NOT include "theme"
+- WHEN the analyzer runs
+- THEN NO finding is emitted for B
+
+#### Scenario: Incoming passes edge but no outgoing — no finding
+
+- GIVEN component B is the dstId of a passes edge from A carrying "theme"
+- AND B has no outgoing passes edges
+- WHEN the analyzer runs
+- THEN NO finding is emitted for B
+
+#### Scenario: Outgoing passes edge but no incoming — no finding
+
+- GIVEN component B has a passes edge B→C carrying "theme"
+- AND B is not the dstId of any passes edge
+- WHEN the analyzer runs
+- THEN NO finding is emitted for B
+
+#### Scenario: No passes edges in graph — silent
+
+- GIVEN the graph contains no edges of kind "passes"
+- WHEN the analyzer runs
+- THEN NO finding is emitted and no error is thrown
+
+#### Scenario: Self-edge B→B — no finding
+
+- GIVEN a passes edge B→B carrying a domain prop also present in B.propNames
+- WHEN the analyzer runs
+- THEN NO finding is emitted for B
+
+### Requirement: Prop-Drilling Common-Name Exclusion Guard
+
+The analyzer MUST apply a hardcoded exclusion set of universally-common prop names before evaluating drilled props. The exclusion set MUST include at minimum: `id`, `key`, `className`, `class`, `style`, `children`, `value`, `onChange`, `ref`, `name`, `type`, `disabled`. The set MUST be stored as a named, locatable constant to enable future calibration without changing analysis logic.
+
+#### Scenario: Prop in exclusion set removed before guard check
+
+- GIVEN a candidate drilled prop name is "className"
+- WHEN the common-name guard is applied
+- THEN "className" is excluded from the drilled set
+- AND if no non-excluded drilled names remain, no finding is emitted
+
+### Requirement: Prop-Drilling Stable Fingerprint and Deterministic Evidence
+
+Each `react/prop-drilling` finding MUST carry a three-part fingerprint. Structural fingerprint MUST incorporate ruleId, B's file, B's name, and the sorted list of drilled prop names (post-guard). Nominal fingerprint MUST incorporate B's name and sorted drilled prop names. Positional fingerprint MUST incorporate B's file and B's span start/end. Endpoint identities (A, C) MUST appear only in evidence, NOT in the structural fingerprint, to avoid churn when multiple parents or children share B.
+
+Evidence MUST be frozen and sorted. Finding IDs MUST be deterministic given the same run inputs.
+
+#### Scenario: Same drilled props, same location — same fingerprint
+
+- GIVEN two analysis runs produce the same B component with the same drilled prop names
+- WHEN fingerprints are computed
+- THEN structural, nominal, and positional fingerprints are identical across runs
+
+#### Scenario: Different B component — different fingerprint
+
+- GIVEN two components B1 and B2 in different files with the same drilled prop names
+- WHEN fingerprints are computed
+- THEN structural and positional fingerprints differ
+
+### Requirement: Prop-Drilling Adapter-Owned Explain Hook with Explicit Limits
+
+The `react/prop-drilling` analyzer MUST register an adapter-owned explain hook. The hook MUST return null for any finding whose ruleId is not `react/prop-drilling` or whose evidence kind is not `adapter-metric`. For matching findings, the hook MUST populate the `limits` array with at least these two statements: (1) the analyzer cannot determine whether B uses prop P itself or merely forwards it; (2) name-level matching cannot confirm that the value passed A→B→C is the same runtime reference. The hook MUST NOT claim a bug, required remediation, or value-level information.
+
+#### Scenario: Explain called for prop-drilling finding
+
+- GIVEN a `react/prop-drilling` finding with adapter-metric evidence
+- WHEN the explain hook is invoked
+- THEN the response includes `limits[]` with statements on name-level grounding
+- AND `whyItMatters` and `inspectFirst` are populated with finding-specific content
+
+#### Scenario: Explain called for unrelated finding — returns null
+
+- GIVEN a finding whose ruleId is not "react/prop-drilling"
+- WHEN the explain hook is invoked
+- THEN the hook returns null
+
+### Requirement: Prop-Drilling Non-Overlap with Existing Analyzers
+
+The `react/prop-drilling` analyzer MUST be the sole analyzer reading `passes` edges. Existing analyzers MUST NOT be modified by this change. The new analyzer MUST be orthogonal to all existing analyzers — no shared mutable state, no shared edge kind reads.
+
+#### Scenario: Existing analyzers unaffected
+
+- GIVEN a codebase analyzed before and after adding react/prop-drilling
+- WHEN both analysis runs complete
+- THEN findings from all other ruleIds are identical
+
 ## MODIFIED Requirements
 
 ### Requirement: Deferred React Pattern Families Stay Scoped by Slice
