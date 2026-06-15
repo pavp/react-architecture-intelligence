@@ -1,7 +1,7 @@
 import { pass1 } from "./pass1.js";
 import { contentHash } from "../graph/content-hash.js";
 import type { RepoGraph } from "../graph/repograph.js";
-import type { GraphEdge, ModuleNode, ComponentNode, HookNode, PatternFact, PatternImportFact } from "../types.js";
+import type { GraphEdge, ModuleNode, ComponentNode, HookNode, PatternFact, PatternImportFact, PatternJsxAttributeFact } from "../types.js";
 
 export interface SourceFile { file: string; source: string; }
 
@@ -29,6 +29,28 @@ export function buildGraph(files: SourceFile[]): RepoGraph {
       const dst = byName.get(childName);
       if (dst && dst !== c.id) edges.push({ srcId: c.id, dstId: dst, kind: "renders" });
     }
+  }
+
+  // resolve passes edges from jsx-attribute facts (file-scoped, name-resolved)
+  const propsByPair = new Map<string, { srcId: string; dstId: string; props: Set<string> }>();
+  for (const f of patternFacts) {
+    if (f.kind !== "jsx-attribute") continue;
+    const jf = f as PatternJsxAttributeFact;
+    if (jf.valueKind === "spread") continue;
+    const dstId = byName.get(jf.tag);
+    if (!dstId) continue;
+    const cands = components.filter((c) => c.file === jf.file && c.childComponents.includes(jf.tag));
+    if (cands.length !== 1) continue;
+    const srcId = cands[0]!.id;
+    if (srcId === dstId) continue;
+    const key = `${srcId}|${dstId}`;
+    let entry = propsByPair.get(key);
+    if (!entry) { entry = { srcId, dstId, props: new Set() }; propsByPair.set(key, entry); }
+    entry.props.add(jf.name);
+  }
+  for (const { srcId, dstId, props } of propsByPair.values()) {
+    if (props.size === 0) continue;
+    edges.push({ srcId, dstId, kind: "passes", propNames: [...props].sort() });
   }
 
   const hookByName = new Map<string, string>();

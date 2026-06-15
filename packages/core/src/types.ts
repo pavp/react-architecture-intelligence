@@ -126,8 +126,8 @@ export interface HookNode {
   hookCalls: string[]; // hook names invoked by this hook
 }
 export interface ModuleNode { id: string; file: string; contentHash: string; }
-export type EdgeKind = "renders" | "imports" | "calls" | "uses-hook";
-export interface GraphEdge { srcId: string; dstId: string; kind: EdgeKind; }
+export type EdgeKind = "renders" | "imports" | "calls" | "uses-hook" | "passes";
+export interface GraphEdge { srcId: string; dstId: string; kind: EdgeKind; propNames?: string[]; }
 
 // ── Fingerprint (§2.3) ──────────────────────────────────────────────────
 export interface Fingerprint {
