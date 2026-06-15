@@ -35,13 +35,23 @@ archives:
       - goos: windows
         formats: [zip]
     files:
+      # metadata.json: written by prepare-release.sh on the single GoReleaser
+      # host. Platform field may reflect the build host, but the arch guard in
+      # the launcher uses the bundled sqlite-vec-<os>-<arch> directory (below),
+      # not the static metadata.json platform field.
       - src: build/release-assets/rai/lib/rai/metadata.json
         dst: lib/rai/metadata.json
+      # JS bundle and schema.sql are platform-independent (pure JS).
       - src: build/release-assets/rai/lib/rai/engine/packages/cli/dist/index.js
         dst: lib/rai/engine/packages/cli/dist/index.js
       - src: build/release-assets/rai/lib/rai/engine/packages/cli/dist/schema.sql
         dst: lib/rai/engine/packages/cli/dist/schema.sql
-      - src: build/release-assets/rai/lib/rai/engine/node_modules/**
+      # Per-arch native node_modules: each matrix CI job builds natives on the
+      # actual target platform runner and uploads them as an artifact. The release
+      # job downloads each into build/release-assets/<goos>_<goarch>/node_modules/.
+      # GoReleaser templates {{ .Os }} and {{ .Arch }} select the correct tree for
+      # each of the six platform archives it produces.
+      - src: "build/release-assets/{{ .Os }}_{{ .Arch }}/node_modules/**"
         dst: lib/rai/engine/node_modules/
 
 checksum:
