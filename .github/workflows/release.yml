@@ -216,6 +216,29 @@ jobs:
           name: native-assets-windows-amd64
           path: build/release-assets/windows_amd64/node_modules/
 
+      # Belt-and-suspenders: assert each downloaded node_modules tree contains
+      # at least one sqlite-vec-* directory. download-artifact@v4 is non-fatal
+      # on a missing/renamed artifact and goreleaser silently globs an empty dir
+      # into the archive. This check fails the job loudly before goreleaser runs.
+      - name: Assert native assets present for all platforms
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for platform in darwin_arm64 darwin_amd64 linux_amd64 linux_arm64 windows_amd64; do
+            nm_dir="build/release-assets/${platform}/node_modules"
+            if ! compgen -G "${nm_dir}/sqlite-vec-*" > /dev/null 2>&1; then
+              echo "ERROR: no sqlite-vec-* dir in ${nm_dir}" >&2
+              missing=$((missing + 1))
+            else
+              echo "OK: ${platform} native assets present"
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then
+            echo "${missing} platform(s) missing native assets — aborting before goreleaser" >&2
+            exit 1
+          fi
+
       # Always build the real archives via snapshot first, then smoke-test the
       # packaged artifact + Homebrew install layout. This is a hard gate: a
       # broken package (e.g. missing lib/rai engine payload) fails here and
