@@ -9,7 +9,7 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 |------|--------|
 | Branch | `main` is trunk/default; legacy `feat/rai-mvp-p0-p3` was deleted after the first successful release. |
 | Repo | `https://github.com/pavp/react-architecture-intelligence` |
-| Product state | P0–P11 complete plus P9-S3; P11 shipped 9 React pattern analyzer slices (S1–S9), all merged to `main`; P11-S10 (API conventions) deferred as ungroundable on syntax-only facts; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket. P13-S1 (`rai calibrate` suggest-only) implemented. P13-S2 (evidence-correlated suggestions) implemented. P13-S3 (`rai calibrate --apply` guarded write) implemented. P13-S2.x (`maxFanOut` secondary calibrated knob) implemented and merged (PR #39). P14-S1 (`imports` graph edges) implemented and merged (PR #40). P14-S2 (`passes` graph edges) implemented and merged (PR #41). P14-S3 (`react/prop-drilling` analyzer) implemented and merged (PR #42). P14-S5 (`calls` graph edges) implemented and merged (PR #43). **P14 COMPLETE** (S4 exportKind killed as ungroundable). |
+| Product state | P0–P11 complete plus P9-S3; P11 shipped 9 React pattern analyzer slices (S1–S9), all merged to `main`; P11-S10 (API conventions) deferred as ungroundable on syntax-only facts; first installable release `v0.1.3` published through GitHub Release, Homebrew tap, and Scoop bucket; **`v0.2.0` is the current release** (accumulates P9–P14: explainability, 9 React analyzers, calibration, deeper graph; 7 assets, Homebrew + Scoop updated to 0.2.0). P13-S1 (`rai calibrate` suggest-only) implemented. P13-S2 (evidence-correlated suggestions) implemented. P13-S3 (`rai calibrate --apply` guarded write) implemented. P13-S2.x (`maxFanOut` secondary calibrated knob) implemented and merged (PR #39). P14-S1 (`imports` graph edges) implemented and merged (PR #40). P14-S2 (`passes` graph edges) implemented and merged (PR #41). P14-S3 (`react/prop-drilling` analyzer) implemented and merged (PR #42). P14-S5 (`calls` graph edges) implemented and merged (PR #43). **P14 COMPLETE** (S4 exportKind killed as ungroundable). |
 | Next phase | P16 safe code proposals (next priority — actionability on calibrated + deeper-graph findings). P12 CI/PR remains last. |
 | Core boundary | `@rai/core` remains framework-agnostic |
 | Next adapter | `@rai/adapter-next` loads through CLI composition, not core imports |
@@ -20,23 +20,21 @@ This is the canonical project status after P9-S3 and P11-S4. Historical status i
 Latest release verification after P8:
 
 ```bash
-pnpm release:check
-pnpm test       # 52 files / 326 tests
+pnpm release:check   # status: pass, 0 failures (run release-config-check.ts directly if pnpm pre-hook is blocked locally)
+pnpm test       # 78 files / 719 tests (v0.2.0 baseline)
 pnpm typecheck
 pnpm build
 pnpm lint
 git diff --check
-gh release view v0.1.3 --repo pavp/react-architecture-intelligence
-brew fetch pavp/tap/rai
-brew install pavp/tap/rai
+gh release view v0.2.0 --repo pavp/react-architecture-intelligence
+brew upgrade rai   # or: brew install pavp/tap/rai
 rai doctor . --json
 ```
 
 Latest published release:
 
-- `v0.1.3`: first successful installable release; GitHub Release published with darwin/linux/windows amd64/arm64 archives plus `checksums.txt`.
-- Homebrew formula: `pavp/homebrew-tap/Formula/rai.rb` references `0.1.3` and passed `brew fetch pavp/tap/rai`.
-- Scoop manifest: `pavp/scoop-bucket/rai.json` references `0.1.3`.
+- `v0.2.0` (current): accumulates P9–P14 since v0.1.3 — explainability, P10/P11 React pattern facts + 9 analyzers, P13 calibration, P14 deeper graph (imports/passes/calls edges + prop-drilling). Release workflow run 27576232164 completed/success; GitHub Release has 7 assets (darwin/linux/windows amd64/arm64 + checksums); Homebrew `pavp/homebrew-tap/Formula/rai.rb` and Scoop `pavp/scoop-bucket/rai.json` both reference `0.2.0`. Tagged from `main` at `35b24b0`.
+- `v0.1.3`: first successful installable release; GitHub Release with darwin/linux/windows amd64/arm64 archives plus `checksums.txt`; Homebrew/Scoop referenced `0.1.3`.
 - Failed immutable tags retained for audit: `v0.1.0`, `v0.1.1`, `v0.1.2`.
 
 Latest MCP compatibility fix:
