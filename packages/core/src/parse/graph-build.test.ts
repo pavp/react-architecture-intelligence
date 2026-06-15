@@ -505,3 +505,209 @@ export function Form(props: any) { return <Field {...props} label="x" />; }`;
 		});
 	});
 });
+
+// ── C1: named import identifier call → calls edge ────────────────────────────
+describe("C1: named import identifier call emits calls edge", () => {
+	it("emits exactly one calls edge from caller to math module", () => {
+		const g = buildGraph([
+			{ file: "math.ts", source: `export function add(a: number, b: number) { return a + b; }` },
+			{ file: "App.tsx", source: `import { add } from "./math"; add(1, 2);` },
+		]);
+		const callEdges = g.edges.filter((e) => e.kind === "calls");
+		expect(callEdges).toHaveLength(1);
+		expect(callEdges[0]).toMatchObject({ srcId: "App.tsx", dstId: "math.ts", kind: "calls" });
+	});
+
+	it("calls edge has exactly {srcId, dstId, kind} — no propNames or extra fields", () => {
+		const g = buildGraph([
+			{ file: "math.ts", source: `export function add(a: number, b: number) { return a + b; }` },
+			{ file: "App.tsx", source: `import { add } from "./math"; add(1, 2);` },
+		]);
+		const callEdge = g.edges.find((e) => e.kind === "calls");
+		expect(callEdge).toBeDefined();
+		expect(Object.keys(callEdge!).sort()).toEqual(["dstId", "kind", "srcId"]);
+	});
+});
+
+// ── C2: default import call → calls edge ─────────────────────────────────────
+describe("C2: default import call emits calls edge", () => {
+	it("emits a calls edge when the default import is called", () => {
+		const g = buildGraph([
+			{ file: "foo.ts", source: `export default function foo() {}` },
+			{ file: "App.tsx", source: `import foo from "./foo"; foo();` },
+		]);
+		const callEdges = g.edges.filter((e) => e.kind === "calls");
+		expect(callEdges).toHaveLength(1);
+		expect(callEdges[0]).toMatchObject({ srcId: "App.tsx", dstId: "foo.ts", kind: "calls" });
+	});
+});
+
+// ── C3: namespace import + prefix call → calls edge ──────────────────────────
+describe("C3: namespace import method call emits calls edge via prefix match", () => {
+	it("emits a calls edge when utils.format() is called via namespace import", () => {
+		const g = buildGraph([
+			{ file: "utils.ts", source: `export function format(x: string) { return x; }` },
+			{ file: "App.tsx", source: `import * as utils from "./utils"; utils.format("x");` },
+		]);
+		const callEdges = g.edges.filter((e) => e.kind === "calls");
+		expect(callEdges).toHaveLength(1);
+		expect(callEdges[0]).toMatchObject({ srcId: "App.tsx", dstId: "utils.ts", kind: "calls" });
+	});
+});
+
+// ── C4: call-binding fact → calls edge ───────────────────────────────────────
+describe("C4: call-binding fact contributes calls edge", () => {
+	it("emits a calls edge from the call-binding fact", () => {
+		const g = buildGraph([
+			{ file: "factory.ts", source: `export function create(cfg: any) { return cfg; }` },
+			{ file: "App.tsx", source: `import { create } from "./factory"; const obj = create({});` },
+		]);
+		const callEdges = g.edges.filter((e) => e.kind === "calls");
+		expect(callEdges).toHaveLength(1);
+		expect(callEdges[0]).toMatchObject({ srcId: "App.tsx", dstId: "factory.ts", kind: "calls" });
+	});
+});
+
+// ── C5: same-file call → no edge ─────────────────────────────────────────────
+describe("C5: same-file call produces no calls edge", () => {
+	it("emits zero calls edges when callee is defined in same file", () => {
+		const g = buildGraph([
+			{ file: "App.tsx", source: `function helper() {} helper();` },
+		]);
+		expect(g.edges.filter((e) => e.kind === "calls")).toHaveLength(0);
+	});
+});
+
+// ── C6: external package call → no edge ──────────────────────────────────────
+describe("C6: external package call produces no calls edge", () => {
+	it("emits zero calls edges for non-relative import sources", () => {
+		const g = buildGraph([
+			{ file: "App.tsx", source: `import { render } from "react-dom"; render(<div />, document.body);` },
+		]);
+		expect(g.edges.filter((e) => e.kind === "calls")).toHaveLength(0);
+	});
+});
+
+// ── C7: method call on non-import object → no false edge ─────────────────────
+describe("C7: method call on non-import object produces no calls edge", () => {
+	it("emits zero calls edges when the object is not an import local", () => {
+		const g = buildGraph([
+			{ file: "App.tsx", source: `this.service.save();` },
+		]);
+		expect(g.edges.filter((e) => e.kind === "calls")).toHaveLength(0);
+	});
+});
+
+// ── C8: multiple A→B calls collapse to one edge ──────────────────────────────
+describe("C8: multiple calls between same module pair collapse to exactly one edge", () => {
+	it("emits exactly one calls edge regardless of how many call facts exist", () => {
+		const g = buildGraph([
+			{ file: "helpers.ts", source: `export function helper1() {} export function helper2() {}` },
+			{
+				file: "App.tsx",
+				source: `import { helper1, helper2 } from "./helpers"; helper1(); helper2();`,
+			},
+		]);
+		const callEdges = g.edges.filter(
+			(e) => e.kind === "calls" && e.srcId === "App.tsx" && e.dstId === "helpers.ts",
+		);
+		expect(callEdges).toHaveLength(1);
+	});
+});
+
+// ── C9: self-edge suppressed ──────────────────────────────────────────────────
+describe("C9: self-edge (srcId === dstId) suppressed in calls edges", () => {
+	it("emits zero calls edges when resolved dst equals src file", () => {
+		// A.tsx imports from ./A (self-import) and calls the imported fn — no edge
+		const g = buildGraph([
+			{ file: "A.tsx", source: `import { fn } from "./A"; fn();` },
+		]);
+		expect(g.edges.filter((e) => e.kind === "calls" && e.srcId === e.dstId)).toHaveLength(0);
+	});
+});
+
+// ── C10: determinism + existing edges unaffected ──────────────────────────────
+describe("C10: determinism and existing edge kinds unaffected", () => {
+	const mathSrc = `export function add(a: number, b: number) { return a + b; }`;
+	const appSrc = `import { add } from "./math"; add(1, 2);`;
+
+	it("two identical buildGraph calls produce calls edges in same order", () => {
+		const files = [
+			{ file: "math.ts", source: mathSrc },
+			{ file: "App.tsx", source: appSrc },
+		];
+		const g1 = buildGraph(files);
+		const g2 = buildGraph(files);
+		expect(g1.edges.filter((e) => e.kind === "calls")).toEqual(
+			g2.edges.filter((e) => e.kind === "calls"),
+		);
+	});
+
+	it("existing imports/renders edges are unchanged after adding call facts", () => {
+		const iconSrc = `export function Icon({ size }: any) { return <svg />; }`;
+		const btnSrc = `import { Icon } from "./Icon";
+export function Button() { return <Icon size={16} />; }`;
+		const g = buildGraph([
+			{ file: "Icon.tsx", source: iconSrc },
+			{ file: "Button.tsx", source: btnSrc },
+		]);
+		const rendersEdges = g.edges.filter((e) => e.kind === "renders");
+		const importsEdges = g.edges.filter((e) => e.kind === "imports");
+		expect(rendersEdges).toHaveLength(1);
+		expect(importsEdges).toHaveLength(1);
+	});
+});
+
+// ── C11: dynamic/computed callee (empty callee name) → no calls edge ──────────
+describe("C11: dynamic computed callee produces no calls edge", () => {
+	it("emits zero calls edges when the callee is a computed member expression", () => {
+		// `handlers[key]()` has no static callee identifier → callee is "" → skipped
+		const g = buildGraph([
+			{ file: "App.tsx", source: `import { handlers } from "./handlers"; const key = "x"; handlers[key]();` },
+		]);
+		expect(g.edges.filter((e) => e.kind === "calls")).toHaveLength(0);
+	});
+});
+
+// ── C12: named-import member callee → NO calls edge (prefix branch is namespace-only) ──
+describe("C12: named import member callee does not emit a spurious calls edge", () => {
+	it("emits zero calls edges when foo is a named import and foo.bar() is called", () => {
+		// foo is imported as a named specifier (mode="named"), not a namespace.
+		// The prefix branch `foo.bar`.startsWith(`foo.`) must NOT fire here.
+		const g = buildGraph([
+			{ file: "foo.ts", source: `export const foo = { bar() {} };` },
+			{ file: "App.tsx", source: `import { foo } from "./foo"; foo.bar();` },
+		]);
+		expect(g.edges.filter((e) => e.kind === "calls")).toHaveLength(0);
+	});
+});
+
+// ── C13: namespace import member callee → calls edge (prefix branch fires) ────
+describe("C13: namespace import method call still emits calls edge after mode gating", () => {
+	it("emits exactly one calls edge when ns.format() called via namespace import", () => {
+		// This confirms the namespace-prefix branch is not over-gated.
+		// (Same scenario as C3 — kept here to explicitly document the positive case
+		// alongside the negative C12 to prevent regression.)
+		const g = buildGraph([
+			{ file: "utils.ts", source: `export function format(x: string) { return x; }` },
+			{ file: "App.tsx", source: `import * as utils from "./utils"; utils.format("x");` },
+		]);
+		const callEdges = g.edges.filter((e) => e.kind === "calls");
+		expect(callEdges).toHaveLength(1);
+		expect(callEdges[0]).toMatchObject({ srcId: "App.tsx", dstId: "utils.ts", kind: "calls" });
+	});
+});
+
+// ── C14: named import direct call → calls edge (exact match stays mode-agnostic) ──
+describe("C14: named import direct call still emits calls edge after mode gating", () => {
+	it("emits exactly one calls edge when named import is called directly", () => {
+		// Exact-match branch is mode-agnostic — must still work for named imports.
+		const g = buildGraph([
+			{ file: "foo.ts", source: `export function foo() {}` },
+			{ file: "App.tsx", source: `import { foo } from "./foo"; foo();` },
+		]);
+		const callEdges = g.edges.filter((e) => e.kind === "calls");
+		expect(callEdges).toHaveLength(1);
+		expect(callEdges[0]).toMatchObject({ srcId: "App.tsx", dstId: "foo.ts", kind: "calls" });
+	});
+});
