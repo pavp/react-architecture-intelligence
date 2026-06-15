@@ -262,7 +262,16 @@ if (deployResult.status !== 0) {
 //
 // oxc-parser linux binding: uses "-gnu" suffix (musl not relevant for our targets).
 
+// sqlite-vec publishes as sqlite-vec-<os>-<arch> where <arch> uses npm tokens
+// (x64, arm64) — NOT Go tokens (amd64). OS token matches Go GOOS (darwin/linux/windows).
+const SQLITE_ARCH = TARGET_ARCH === "amd64" ? "x64" : TARGET_ARCH;
+
+// oxc-parser publishes as @oxc-parser/binding-<os>-<arch>[<suffix>] where:
+//   <os>   uses win32 (not windows), darwin, linux — NOT Go GOOS for windows
+//   <arch> uses x64 / arm64 — NOT Go GOARCH (amd64)
+//   <suffix> is -gnu for linux (musl not a target for our runners), empty otherwise
 const OXC_ARCH = TARGET_ARCH === "amd64" ? "x64" : TARGET_ARCH;
+const OXC_OS = TARGET_OS === "windows" ? "win32" : TARGET_OS;
 const OXC_SUFFIX = TARGET_OS === "linux" ? "-gnu" : "";
 
 /**
@@ -325,9 +334,11 @@ const REQUIRED_NATIVE_NAMES = [
   "bindings",
   "file-uri-to-path",
   "sqlite-vec",
-  `sqlite-vec-${TARGET_OS}-${TARGET_ARCH}`,
+  // sqlite-vec uses <os>-x64 / <os>-arm64 (npm tokens). OS matches Go GOOS.
+  `sqlite-vec-${TARGET_OS}-${SQLITE_ARCH}`,
   "oxc-parser",
-  `@oxc-parser/binding-${TARGET_OS}-${OXC_ARCH}${OXC_SUFFIX}`,
+  // oxc uses win32 (not windows) for OS, and x64/arm64 (not amd64) for arch.
+  `@oxc-parser/binding-${OXC_OS}-${OXC_ARCH}${OXC_SUFFIX}`,
 ];
 
 console.log("[bundle-engine] Resolving native package versions from deploy output...");
