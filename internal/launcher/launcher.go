@@ -210,7 +210,8 @@ func resolveArchive(root string) (EngineResolution, error) {
 	if err != nil {
 		return EngineResolution{}, err
 	}
-	if err := validateMetadata(metadata); err != nil {
+	nodeModulesDir := filepath.Join(root, "lib", "rai", "engine", "node_modules")
+	if err := validateMetadata(metadata, nodeModulesDir); err != nil {
 		return EngineResolution{}, err
 	}
 	return EngineResolution{Mode: ModeArchive, EnginePath: engine, Metadata: &metadata}, nil
@@ -228,11 +229,16 @@ func readMetadata(path string) (AssetMetadata, error) {
 	return metadata, nil
 }
 
-func validateMetadata(metadata AssetMetadata) error {
+// validateMetadata checks asset compatibility before spawning Node. It accepts
+// nodeModulesDir, the path to the node_modules/ tree co-located with the
+// engine bundle. When nodeModulesDir exists, validateMetadata runs the arch
+// guard (see below). When it is absent or does not exist as a directory, the
+// guard is skipped (S1-era archives without per-arch natives are still valid).
+func validateMetadata(metadata AssetMetadata, nodeModulesDir string) error {
 	if metadata.AssetSchemaVersion != assetSchemaVersion {
 		return fmt.Errorf("asset schema mismatch: launcher supports %s, assets declare %s", assetSchemaVersion, metadata.AssetSchemaVersion)
 	}
-	// Platform check intentionally removed.
+	// Static metadata.Platform equality check intentionally removed.
 	//
 	// Why: GoReleaser OSS cannot template archive file CONTENTS (Pro-only
 	// feature), so a single metadata.json written by the prepare hook on the
@@ -242,21 +248,74 @@ func validateMetadata(metadata AssetMetadata) error {
 	//
 	// The check was self-defeating: the archive binary IS compiled for the target
 	// arch — a wrong-arch binary cannot exec at all (SIGKILL / exec format error),
-	// so it never reaches this code. Today the bundled engine is pure JS
-	// (lib/rai/engine/.../index.js) running on system Node, with no per-arch
-	// native artifact in the archive — so there is nothing arch-specific to guard.
-	// The check compared metadata (static, written on build host) against runtime
-	// (always the running platform) — it could never catch a real mismatch while
-	// being the sole failure source for all foreign-arch installs.
+	// so it never reaches this code. The check compared metadata (static, written
+	// on build host) against runtime (always the running platform) — it could
+	// never catch a real mismatch while being the sole failure source for all
+	// foreign-arch installs.
 	//
-	// Do not restore THIS form (static-metadata equality). When P8-S3 ships
-	// per-arch native assets in the archive (e.g. a better-sqlite3 *.node or a
-	// bundled runtime), add an arch guard derived from the binary's OWN identity
-	// (ldflags-injected) versus the bundled native asset — not from a build-host
-	// static metadata string.
+	// Do not restore THIS form (static-metadata equality). The arch guard below
+	// replaces it: it derives the native arch from the bundled sqlite-vec-<os>-<arch>
+	// directory name (present only in S2+ archives) and compares it against the
+	// binary's OWN ldflags-injected identity (runtime.GOOS/runtime.GOARCH), which
+	// is correct because the binary cannot exec at all on the wrong arch.
 	if metadata.EnginePackageVersion == "" || metadata.LauncherVersion == "" {
 		return fmt.Errorf("metadata missing launcherVersion or enginePackageVersion")
 	}
+	return validateArchGuard(nodeModulesDir)
+}
+
+// validateArchGuard detects the bundled native arch from the sqlite-vec-<os>-<arch>
+// directory inside nodeModulesDir and compares it against the binary's own
+// runtime identity (runtime.GOOS + "/" + runtime.GOARCH, injected via ldflags).
+//
+// The guard is skipped when nodeModulesDir does not exist, making it backwards-
+// compatible with S1-era archives that carry no per-arch native tree.
+//
+// MUST NOT use metadata.json Platform field — that field is written by the build
+// host and may mismatch for valid installs (see removed check above).
+func validateArchGuard(nodeModulesDir string) error {
+	info, err := os.Stat(nodeModulesDir)
+	if err != nil || !info.IsDir() {
+		// node_modules absent — no per-arch natives bundled; skip guard.
+		return nil
+	}
+
+	entries, err := os.ReadDir(nodeModulesDir)
+	if err != nil {
+		return fmt.Errorf("arch guard: cannot read node_modules: %w", err)
+	}
+
+	const prefix = "sqlite-vec-"
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		// name is "sqlite-vec-<goos>-<goarch>", e.g. "sqlite-vec-darwin-arm64"
+		rest := name[len(prefix):]
+		// Split on last "-" to separate goos from goarch.
+		idx := strings.LastIndex(rest, "-")
+		if idx < 0 {
+			continue
+		}
+		detectedOS := rest[:idx]
+		detectedArch := rest[idx+1:]
+		binaryOS := runtime.GOOS
+		binaryArch := runtime.GOARCH
+		if detectedOS != binaryOS || detectedArch != binaryArch {
+			return fmt.Errorf(
+				"arch mismatch: binary is %s/%s but bundled natives are for %s/%s — reinstall the correct platform archive",
+				binaryOS, binaryArch, detectedOS, detectedArch,
+			)
+		}
+		// Matching native dir found — guard passes.
+		return nil
+	}
+
+	// No sqlite-vec-* dir found — no per-arch native marker present; skip guard.
 	return nil
 }
 

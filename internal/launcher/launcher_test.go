@@ -232,6 +232,94 @@ func TestVersionReportsCoherentMetadataWithoutStartingEngine(t *testing.T) {
 	}
 }
 
+// TestArchGuard verifies that the arch guard in validateMetadata correctly
+// accepts matching native arch, rejects mismatched native arch, and skips
+// the check entirely when node_modules/ is absent.
+func TestArchGuard(t *testing.T) {
+	hostGOOS := runtime.GOOS
+	hostGOARCH := runtime.GOARCH
+
+	// Choose a foreign os/arch that is guaranteed to differ from the host.
+	foreignGOOS := "linux"
+	foreignGOARCH := "amd64"
+	if hostGOOS == "linux" && hostGOARCH == "amd64" {
+		foreignGOOS = "darwin"
+		foreignGOARCH = "arm64"
+	}
+
+	for _, tt := range []struct {
+		name          string
+		nmSetup       func(t *testing.T, nmDir string) // populates node_modules/ for this case
+		wantErrSubstr string                            // empty means expect nil error
+	}{
+		{
+			name: "host arch matches bundled native — guard passes",
+			nmSetup: func(t *testing.T, nmDir string) {
+				t.Helper()
+				dirName := "sqlite-vec-" + hostGOOS + "-" + hostGOARCH
+				if err := os.MkdirAll(filepath.Join(nmDir, dirName), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantErrSubstr: "",
+		},
+		{
+			name: "foreign arch native present — guard rejects",
+			nmSetup: func(t *testing.T, nmDir string) {
+				t.Helper()
+				dirName := "sqlite-vec-" + foreignGOOS + "-" + foreignGOARCH
+				if err := os.MkdirAll(filepath.Join(nmDir, dirName), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantErrSubstr: "arch mismatch",
+		},
+		{
+			name:          "node_modules absent — guard skipped",
+			nmSetup:       nil, // no node_modules dir created
+			wantErrSubstr: "",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			archiveRoot := t.TempDir()
+			engineDir := filepath.Join(archiveRoot, "lib", "rai", "engine", "packages", "cli", "dist")
+			if err := os.MkdirAll(engineDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(engineDir, "index.js"), []byte(""), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			nmDir := filepath.Join(archiveRoot, "lib", "rai", "engine", "node_modules")
+			if tt.nmSetup != nil {
+				if err := os.MkdirAll(nmDir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				tt.nmSetup(t, nmDir)
+			}
+			meta := AssetMetadata{
+				LauncherVersion:      "0.0.0",
+				EnginePackageVersion: "0.0.0",
+				AssetSchemaVersion:   "1",
+				RuntimeKind:          "system-node",
+				Platform:             hostGOOS + "/" + hostGOARCH,
+			}
+			err := validateMetadata(meta, nmDir)
+			if tt.wantErrSubstr == "" {
+				if err != nil {
+					t.Fatalf("expected nil error, got: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErrSubstr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErrSubstr) {
+					t.Fatalf("error %q does not contain %q", err.Error(), tt.wantErrSubstr)
+				}
+			}
+		})
+	}
+}
+
 func buildDevEngine(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
