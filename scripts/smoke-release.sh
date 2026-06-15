@@ -53,7 +53,7 @@ if [ -z "$ARCHIVE_TGZ" ] || [ ! -f "$ARCHIVE_TGZ" ]; then
 fi
 ok "archive: $(basename "$ARCHIVE_TGZ")"
 
-WORK="$(mktemp -d)"
+WORK="$(mktemp -d)" || exit 1
 trap 'rm -rf "$WORK"' EXIT
 ARCHIVE="$WORK/unpacked"
 mkdir -p "$ARCHIVE"
@@ -67,6 +67,13 @@ section "Archive payload"
 [ -d "$ARCHIVE/$NM_REL/better-sqlite3" ] && ok "better-sqlite3 present"   || bad "better-sqlite3 missing from node_modules"
 [ -d "$ARCHIVE/$NM_REL/bindings" ]       && ok "bindings present"         || bad "bindings missing from node_modules (critical transitive dep)"
 [ -d "$ARCHIVE/$NM_REL/sqlite-vec" ]     && ok "sqlite-vec present"       || bad "sqlite-vec missing from node_modules"
+[ -d "$ARCHIVE/$NM_REL/oxc-parser" ]     && ok "oxc-parser present"       || bad "oxc-parser missing from node_modules"
+oxc_arch="$(uname -m)"; case "$oxc_arch" in arm64|aarch64) oxc_arch="arm64";; x86_64|amd64) oxc_arch="x64";; esac
+oxc_os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+[ "$oxc_os" = "linux" ] && oxc_suffix="-gnu" || oxc_suffix=""
+[ -d "$ARCHIVE/$NM_REL/@oxc-parser/binding-${oxc_os}-${oxc_arch}${oxc_suffix}" ] \
+  && ok "oxc-parser binding present (@oxc-parser/binding-${oxc_os}-${oxc_arch}${oxc_suffix})" \
+  || bad "oxc-parser binding missing from node_modules (@oxc-parser/binding-${oxc_os}-${oxc_arch}${oxc_suffix})"
 [ -f "$ARCHIVE/lib/rai/metadata.json" ]  && ok "metadata.json present"    || bad "metadata.json missing"
 chmod +x "$ARCHIVE/rai" 2>/dev/null || true
 
@@ -99,11 +106,12 @@ else
   if [ "$ANALYZE_RC" -ne 0 ]; then
     printf '  stderr: %s\n' "$(head -5 "$WORK/analyze.err")"
   fi
-  # analyze must include at least one finding keyword
-  if printf '%s' "$ANALYZE_OUT" | grep -qiE 'finding|component|issue|warning|error|result|analysis'; then
-    ok "rai analyze output contains finding keyword"
+  # Structural success marker: "topFingerprints" only appears in a valid analyze payload.
+  # RC check above already catches failure exits; this confirms the payload is well-formed.
+  if printf '%s' "$ANALYZE_OUT" | grep -q '"topFingerprints"'; then
+    ok "rai analyze output is structurally valid (topFingerprints present)"
   else
-    bad "rai analyze output has no finding keyword: $(printf '%s' "$ANALYZE_OUT" | head -3)"
+    bad "rai analyze output missing topFingerprints — unexpected payload shape: $(printf '%s' "$ANALYZE_OUT" | head -3)"
   fi
 fi
 

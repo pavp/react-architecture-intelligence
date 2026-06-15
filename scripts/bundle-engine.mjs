@@ -252,32 +252,105 @@ if (deployResult.status !== 0) {
   process.exit(deployResult.status ?? 1);
 }
 
-// Map from (pnpm virtual store dir name) → (npm package name) for each native package.
-// pnpm --legacy deploy puts packages in .pnpm/<storeDir>/node_modules/<pkgName>.
+// Map from (npm package name) for each required native package.
+// pnpm --legacy deploy puts packages in .pnpm/<name>@<version>/node_modules/<name>.
 // For scoped packages, pnpm encodes "/" as "+" in the store dir name.
+//
+// Versions are derived at runtime from the deploy OUTPUT — we scan the .pnpm
+// virtual store for each package name prefix and read the actual package.json
+// version. This keeps versioning in sync with the lockfile automatically.
 //
 // oxc-parser linux binding: uses "-gnu" suffix (musl not relevant for our targets).
 
 const OXC_ARCH = TARGET_ARCH === "amd64" ? "x64" : TARGET_ARCH;
 const OXC_SUFFIX = TARGET_OS === "linux" ? "-gnu" : "";
 
-const NATIVE_PACKAGES = [
-  { storeDir: "better-sqlite3@11.10.0",  name: "better-sqlite3" },
-  { storeDir: "bindings@1.5.0",          name: "bindings" },
-  { storeDir: "file-uri-to-path@1.0.0",  name: "file-uri-to-path" },
-  { storeDir: "sqlite-vec@0.1.9",        name: "sqlite-vec" },
-  {
-    storeDir: `sqlite-vec-${TARGET_OS}-${TARGET_ARCH}@0.1.9`,
-    name:     `sqlite-vec-${TARGET_OS}-${TARGET_ARCH}`,
-  },
-  { storeDir: "oxc-parser@0.30.5",       name: "oxc-parser" },
-  {
-    storeDir: `@oxc-parser+binding-${TARGET_OS}-${OXC_ARCH}${OXC_SUFFIX}@0.30.5`,
-    name:     `@oxc-parser/binding-${TARGET_OS}-${OXC_ARCH}${OXC_SUFFIX}`,
-  },
-];
+/**
+ * Resolve the pnpm virtual store directory name for a package by scanning the
+ * .pnpm dir for entries matching the package name prefix.
+ *
+ * For unscoped packages:  <name>@<version>/node_modules/<name>/package.json
+ * For scoped packages:    <scope>+<pkg>@<version>/node_modules/<scope>/<pkg>/package.json
+ *
+ * Returns { storeDir, name, version } or null if not found.
+ */
+function resolveNativePackage(deployStore, pkgName) {
+  // Build the store dir prefix: for scoped "@scope/pkg", pnpm uses "@scope+pkg@ver"
+  // (the leading @ is preserved; only the "/" separator becomes "+").
+  const storePrefix = pkgName.startsWith("@")
+    ? pkgName.replace("/", "+") + "@"
+    : pkgName + "@";
+
+  let entries;
+  try {
+    entries = readdirSync(deployStore);
+  } catch (e) {
+    return null;
+  }
+
+  // Find matching entry (there should be exactly one per package name)
+  const match = entries.find(e => e.startsWith(storePrefix));
+  if (!match) return null;
+
+  // Verify the package.json exists and read the version from it
+  let pkgJsonPath;
+  if (pkgName.startsWith("@")) {
+    const slashIdx = pkgName.indexOf("/");
+    const scope = pkgName.slice(0, slashIdx);
+    const pkg = pkgName.slice(slashIdx + 1);
+    pkgJsonPath = join(deployStore, match, "node_modules", scope, pkg, "package.json");
+  } else {
+    pkgJsonPath = join(deployStore, match, "node_modules", pkgName, "package.json");
+  }
+
+  if (!existsSync(pkgJsonPath)) return null;
+
+  let version;
+  try {
+    const parsed = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
+    version = parsed.version;
+  } catch {
+    return null;
+  }
+
+  return { storeDir: match, name: pkgName, version };
+}
 
 const DEPLOY_STORE = join(DEPLOY_TMP, "node_modules", ".pnpm");
+
+// Required native package names (the human-readable npm names).
+// Versions are resolved from the deploy output — NOT hardcoded here.
+const REQUIRED_NATIVE_NAMES = [
+  "better-sqlite3",
+  "bindings",
+  "file-uri-to-path",
+  "sqlite-vec",
+  `sqlite-vec-${TARGET_OS}-${TARGET_ARCH}`,
+  "oxc-parser",
+  `@oxc-parser/binding-${TARGET_OS}-${OXC_ARCH}${OXC_SUFFIX}`,
+];
+
+console.log("[bundle-engine] Resolving native package versions from deploy output...");
+
+const NATIVE_PACKAGES = [];
+const resolveErrors = [];
+
+for (const pkgName of REQUIRED_NATIVE_NAMES) {
+  const resolved = resolveNativePackage(DEPLOY_STORE, pkgName);
+  if (!resolved) {
+    resolveErrors.push(pkgName);
+    console.error(`[bundle-engine] ERROR: could not resolve '${pkgName}' in deploy store: ${DEPLOY_STORE}`);
+  } else {
+    console.log(`[bundle-engine] resolved ${pkgName}@${resolved.version} (storeDir: ${resolved.storeDir})`);
+    NATIVE_PACKAGES.push(resolved);
+  }
+}
+
+if (resolveErrors.length > 0) {
+  console.error(`[bundle-engine] ${resolveErrors.length} native package(s) could not be resolved from the deploy output.`);
+  console.error("  Ensure pnpm lockfile includes these packages for the target platform and re-run pnpm deploy.");
+  process.exit(1);
+}
 
 console.log("[bundle-engine] Extracting native packages from deploy output...");
 
