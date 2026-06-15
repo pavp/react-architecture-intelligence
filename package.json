@@ -8,7 +8,7 @@
     "build": "pnpm -r build",
     "build:launcher": "mkdir -p dist/rai && go build -o dist/rai/rai ./cmd/rai",
     "release:check": "tsx packages/cli/src/release-config-check.ts",
-    "release:prepare": "./scripts/prepare-release-dry-run.sh",
+    "release:prepare": "./scripts/prepare-release.sh",
     "test": "vitest run",
     "test:launcher": "go test ./...",
     "test:watch": "vitest",
