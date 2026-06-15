@@ -160,7 +160,6 @@ func TestArchiveMetadataMissingAndMismatchFailBeforeExecution(t *testing.T) {
 	}{
 		{name: "missing", metadata: "", want: "metadata.json"},
 		{name: "schema mismatch", metadata: strings.ReplaceAll(validMetadata(), `"assetSchemaVersion":"1"`, `"assetSchemaVersion":"2"`), want: "asset schema"},
-		{name: "platform mismatch", metadata: strings.ReplaceAll(validMetadata(), runtime.GOOS+"/"+runtime.GOARCH, "plan9/wasm"), want: "platform"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			archiveRoot := buildArchiveEngine(t, tt.metadata)
@@ -183,6 +182,35 @@ func TestArchiveMetadataMissingAndMismatchFailBeforeExecution(t *testing.T) {
 				t.Fatalf("child executed %d times, want 0", len(runner.calls))
 			}
 		})
+	}
+}
+
+// Platform field in metadata is no longer validated. A foreign-platform
+// metadata.json (e.g. linux/amd64 metadata inside a darwin/arm64 archive, which
+// happened in v0.2.1 because GoReleaser OSS cannot template archive file
+// contents) must no longer block installation. The binary itself IS compiled for
+// the correct arch; a wrong-arch binary fails exec before reaching this code.
+func TestPlatformMismatchInMetadataNoLongerBlocksResolution(t *testing.T) {
+	foreignPlatformMetadata := strings.ReplaceAll(validMetadata(), runtime.GOOS+"/"+runtime.GOARCH, "plan9/wasm")
+	archiveRoot := buildArchiveEngine(t, foreignPlatformMetadata)
+	runner := &recordingRunner{}
+
+	code := Run(context.Background(), Options{
+		Args:           []string{"doctor", "."},
+		WorkDir:        t.TempDir(),
+		ExecutablePath: filepath.Join(archiveRoot, binName()),
+		Stdout:         &bytes.Buffer{},
+		Stderr:         &bytes.Buffer{},
+		Runner:         runner,
+	})
+
+	// Resolution must succeed (engine found, metadata valid); the runner records
+	// one call because the engine is executed.
+	if code != 0 {
+		t.Fatalf("exit = %d, want 0 (platform mismatch must no longer be an error)", code)
+	}
+	if len(runner.calls) != 1 {
+		t.Fatalf("child executed %d times, want 1", len(runner.calls))
 	}
 }
 

@@ -18,9 +18,16 @@ import (
 const (
 	ModeDev     = "dev"
 	ModeArchive = "archive"
+)
 
+// These vars are overridden at link time via GoReleaser ldflags -X so each
+// platform binary carries its own real identity. Keeping them as vars (not
+// consts) is required for -X injection.
+var (
 	assetSchemaVersion = "1"
 	launcherVersion    = "0.0.0"
+	gitCommit          = ""
+	buildDate          = ""
 )
 
 type Options struct {
@@ -225,9 +232,28 @@ func validateMetadata(metadata AssetMetadata) error {
 	if metadata.AssetSchemaVersion != assetSchemaVersion {
 		return fmt.Errorf("asset schema mismatch: launcher supports %s, assets declare %s", assetSchemaVersion, metadata.AssetSchemaVersion)
 	}
-	if metadata.Platform != runtime.GOOS+"/"+runtime.GOARCH {
-		return fmt.Errorf("platform mismatch: launcher is %s/%s, assets declare %s", runtime.GOOS, runtime.GOARCH, metadata.Platform)
-	}
+	// Platform check intentionally removed.
+	//
+	// Why: GoReleaser OSS cannot template archive file CONTENTS (Pro-only
+	// feature), so a single metadata.json written by the prepare hook on the
+	// build host (linux/amd64) was copied verbatim into all 6 platform archives.
+	// The check `metadata.Platform == runtime.GOOS+"/"+runtime.GOARCH` then
+	// rejected every non-linux/amd64 install with "platform mismatch".
+	//
+	// The check was self-defeating: the archive binary IS compiled for the target
+	// arch — a wrong-arch binary cannot exec at all (SIGKILL / exec format error),
+	// so it never reaches this code. Today the bundled engine is pure JS
+	// (lib/rai/engine/.../index.js) running on system Node, with no per-arch
+	// native artifact in the archive — so there is nothing arch-specific to guard.
+	// The check compared metadata (static, written on build host) against runtime
+	// (always the running platform) — it could never catch a real mismatch while
+	// being the sole failure source for all foreign-arch installs.
+	//
+	// Do not restore THIS form (static-metadata equality). When P8-S3 ships
+	// per-arch native assets in the archive (e.g. a better-sqlite3 *.node or a
+	// bundled runtime), add an arch guard derived from the binary's OWN identity
+	// (ldflags-injected) versus the bundled native asset — not from a build-host
+	// static metadata string.
 	if metadata.EnginePackageVersion == "" || metadata.LauncherVersion == "" {
 		return fmt.Errorf("metadata missing launcherVersion or enginePackageVersion")
 	}
@@ -245,6 +271,12 @@ func writeVersion(stdout io.Writer, resolution EngineResolution) int {
 		"mode":                 resolution.Mode,
 		"runtimeKind":          "system-node",
 		"platform":             runtime.GOOS + "/" + runtime.GOARCH,
+	}
+	if gitCommit != "" {
+		payload["gitCommit"] = gitCommit
+	}
+	if buildDate != "" {
+		payload["buildDate"] = buildDate
 	}
 	if resolution.Metadata != nil {
 		payload["assetSchemaVersion"] = resolution.Metadata.AssetSchemaVersion
