@@ -26,7 +26,7 @@ pnpm typecheck
 pnpm build
 pnpm lint
 git diff --check
-gh release view v0.2.1 --repo pavp/react-architecture-intelligence
+gh release view v0.2.2 --repo pavp/react-architecture-intelligence
 ./scripts/smoke-release.sh   # pre-release packaging gate (also runs in release.yml before publish)
 brew update && brew upgrade rai   # or: brew install pavp/tap/rai
 rai version   # must report mode "archive" + engine version, NOT "engine not found"
@@ -35,7 +35,8 @@ rai doctor . --json
 
 Latest published release:
 
-- `v0.2.1` (current): fixes broken v0.2.0 Homebrew packaging — the formula installed only `bin/rai` and dropped the `lib/rai` engine payload, so `rai` failed at startup with "engine not found". Fix: formula installs the full archive into `libexec` + symlinks `bin/rai`; launcher resolves symlinks (`EvalSymlinks`) before deriving the engine root. Added `scripts/smoke-release.sh` pre-release smoke gate that runs in `release.yml` BEFORE publish (unpacks the real archive, verifies archive-mode resolution + the Homebrew install layout + a binary-only negative control) — a broken package can no longer reach users. Also fixed pnpm 11 build approvals (`allowBuilds: true`, `packageManager` pin). PR #44, squash e564ab5.
+- `v0.2.2` (current): first cross-platform-installable release. Fixes v0.2.1 platform-mismatch — a single static `metadata.json` (build-host linux/amd64) was copied into all 6 archives (GoReleaser OSS can't template archive file contents) and the launcher rejected every non-matching platform. Fix: removed the self-defeating platform check from `validateMetadata` (archive bundles no per-arch native code — pure JS on system-node; a wrong-arch binary can't exec anyway), and inject real per-target identity via ldflags (`launcherVersion`/`gitCommit`/`buildDate`). PR #45, squash b55daf8. NOTE: when P8-S3 ships per-arch native assets, re-add an arch guard keyed off the binary's ldflags identity (see launcher.go comment). Deferred (S2): real `enginePackageVersion` (still ships `0.0.0` placeholder) + cross-platform smoke-gate coverage.
+- `v0.2.1` (superseded — broken on non-linux/amd64 platforms): fixed broken v0.2.0 Homebrew packaging — the formula installed only `bin/rai` and dropped the `lib/rai` engine payload, so `rai` failed at startup with "engine not found". Fix: formula installs the full archive into `libexec` + symlinks `bin/rai`; launcher resolves symlinks (`EvalSymlinks`) before deriving the engine root. Added `scripts/smoke-release.sh` pre-release smoke gate that runs in `release.yml` BEFORE publish (unpacks the real archive, verifies archive-mode resolution + the Homebrew install layout + a binary-only negative control) — a broken package can no longer reach users. Also fixed pnpm 11 build approvals (`allowBuilds: true`, `packageManager` pin). PR #44, squash e564ab5.
 - `v0.2.0` (superseded — broken via Homebrew, retained as immutable audit history): accumulated P9–P14 since v0.1.3 — explainability, P10/P11 React pattern facts + 9 analyzers, P13 calibration, P14 deeper graph (imports/passes/calls edges + prop-drilling). Release workflow run 27576232164 completed/success; GitHub Release has 7 assets (darwin/linux/windows amd64/arm64 + checksums); Homebrew `pavp/homebrew-tap/Formula/rai.rb` and Scoop `pavp/scoop-bucket/rai.json` both reference `0.2.0`. Tagged from `main` at `35b24b0`.
 - `v0.1.3`: first successful installable release; GitHub Release with darwin/linux/windows amd64/arm64 archives plus `checksums.txt`; Homebrew/Scoop referenced `0.1.3`.
 - Failed immutable tags retained for audit: `v0.1.0`, `v0.1.1`, `v0.1.2`.
