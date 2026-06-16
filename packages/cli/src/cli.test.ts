@@ -89,6 +89,7 @@ test("parseArgs routes install with platform and safety flags", () => {
 		platforms: ["opencode,codex", "copilot"],
 		dryRun: true,
 		yes: true,
+		json: false,
 		includeInstructions: false,
 	});
 });
@@ -306,6 +307,69 @@ test("buildCliMcpServer includes React adapter compound divergence through analy
 	});
 });
 
+// Task 2.1 RED: bare rai install applies directly, exits 0, human-readable output
+test("run install with no flags applies directly and emits human-readable output", async () => {
+	const dir = installRepo();
+	const output = await captureStdout(() =>
+		run(["install", "--platform", "opencode", "--no-instructions"]),
+	);
+
+	expect(output.code).toBe(0);
+	// Should NOT be JSON — human-readable summary
+	expect(() => JSON.parse(output.stdout)).toThrow();
+	expect(output.stdout).toMatch(/opencode/i);
+	// File must actually be written
+	const written = JSON.parse(readFileSync(join(dir, "opencode.json"), "utf8")) as Record<string, unknown>;
+	expect(written).toMatchObject({ mcp: { rai: expect.any(Object) } });
+});
+
+// Task 2.3 RED: bare rai install does NOT return confirmation-required or exit 1
+test("run install without --yes does not return confirmation-required", async () => {
+	const dir = installRepo();
+	const output = await captureStdout(() =>
+		run(["install", "--platform", "opencode", "--no-instructions"]),
+	);
+
+	expect(output.code).toBe(0);
+	expect(output.stdout).not.toContain("confirmation-required");
+	// No file left unwritten
+	const written = JSON.parse(readFileSync(join(dir, "opencode.json"), "utf8")) as Record<string, unknown>;
+	expect(written).toMatchObject({ mcp: { rai: expect.any(Object) } });
+});
+
+// Task 2.4 RED: --json flag emits raw JSON envelope
+test("run install --json emits raw JSON install result envelope", async () => {
+	installRepo();
+	const output = await captureStdout(() =>
+		run(["install", "--platform", "opencode", "--no-instructions", "--json"]),
+	);
+
+	expect(output.code).toBe(0);
+	const envelope = JSON.parse(output.stdout) as { status: string; operations: unknown[] };
+	expect(envelope.status).toBe("ok");
+	expect(envelope.operations).toBeInstanceOf(Array);
+	// Must not contain prose mixed in
+	expect(output.stdout.trim()).toBe(JSON.stringify(envelope, null, 2));
+});
+
+// Task 2.2 RED: --dry-run exits 0 and does not write files (human-readable or JSON both fine)
+test("run install --dry-run exits 0 and writes no files", async () => {
+	const dir = installRepo();
+	const output = await captureStdout(() =>
+		run([
+			"install",
+			"--platform",
+			"opencode",
+			"--dry-run",
+			"--no-instructions",
+		]),
+	);
+
+	expect(output.code).toBe(0);
+	// File unchanged
+	expect(readFileSync(join(dir, "opencode.json"), "utf8")).toBe("{}\n");
+});
+
 test("run install --dry-run prints a read-only plan and writes nothing", async () => {
 	const dir = installRepo();
 	const output = await captureStdout(() =>
@@ -330,28 +394,24 @@ test("run install --dry-run prints a read-only plan and writes nothing", async (
 	expect(readFileSync(join(dir, "opencode.json"), "utf8")).toBe("{}\n");
 });
 
-test("run install without --yes prints a plan and requires confirmation before writing", async () => {
+// Task 3.1: inverted — bare install now applies directly (no confirmation-required)
+test("run install without --yes applies directly (confirmation gate removed)", async () => {
 	const dir = installRepo();
 	const output = await captureStdout(() =>
 		run(["install", "--platform", "opencode", "--no-instructions"]),
 	);
 
-	expect(output.code).toBe(1);
-	const envelope = JSON.parse(output.stdout) as {
-		status: string;
-		plan: { operations: Array<{ path: string }> };
-	};
-	expect(envelope.status).toBe("confirmation-required");
-	expect(envelope.plan.operations).toEqual([
-		expect.objectContaining({ path: join(dir, "opencode.json") }),
-	]);
-	expect(readFileSync(join(dir, "opencode.json"), "utf8")).toBe("{}\n");
+	expect(output.code).toBe(0);
+	expect(output.stdout).not.toContain("confirmation-required");
+	// File is written
+	const written = JSON.parse(readFileSync(join(dir, "opencode.json"), "utf8")) as Record<string, unknown>;
+	expect(written).toMatchObject({ mcp: { rai: expect.any(Object) } });
 });
 
-test("run install --yes applies MCP config and skips instructions when requested", async () => {
+test("run install --yes --json applies MCP config and skips instructions when requested", async () => {
 	const dir = installRepo();
 	const output = await captureStdout(() =>
-		run(["install", "--platform", "opencode", "--yes", "--no-instructions"]),
+		run(["install", "--platform", "opencode", "--yes", "--json", "--no-instructions"]),
 	);
 
 	expect(output.code).toBe(0);

@@ -72,8 +72,34 @@ function mergeJsonMcpConfig(current: string | null, operation: InstallOperation)
     }
   }
 
-  const mcp = isRecord(parsed.mcp) ? parsed.mcp : {};
-  parsed.mcp = { ...mcp, rai: operation.mcpServer ?? { command: "rai", args: ["mcp"] } };
+  const shape = operation.mcpConfigShape ?? { kind: "flat-mcp" };
+  const raiEntry = operation.mcpServer ?? { command: "rai", args: ["mcp"] };
+
+  if (shape.kind === "flat-mcp") {
+    const mcp = isRecord(parsed.mcp) ? parsed.mcp : {};
+    parsed.mcp = { ...mcp, rai: raiEntry };
+  } else if (shape.kind === "claude-project") {
+    const mcpServers = isRecord(parsed.mcpServers) ? parsed.mcpServers : {};
+    parsed.mcpServers = { ...mcpServers, rai: raiEntry };
+  } else if (shape.kind === "claude-home") {
+    const projects = isRecord(parsed.projects) ? parsed.projects : {};
+    const projectEntry = isRecord(projects[shape.projectRoot]) ? (projects[shape.projectRoot] as Record<string, unknown>) : {};
+    const existingMcpServers = isRecord(projectEntry["mcpServers"]) ? (projectEntry["mcpServers"] as Record<string, unknown>) : {};
+    parsed.projects = {
+      ...projects,
+      [shape.projectRoot]: {
+        ...projectEntry,
+        mcpServers: { ...existingMcpServers, rai: raiEntry },
+      },
+    };
+  } else {
+    // Exhaustiveness guard: a new McpConfigShape must be handled explicitly.
+    // Falling through here would write unchanged JSON while reporting success —
+    // the exact silent-false-success bug this change fixes.
+    const _exhaustive: never = shape;
+    throw new Error(`Unhandled MCP config shape: ${JSON.stringify(_exhaustive)}`);
+  }
+
   return `${JSON.stringify(parsed, null, 2)}\n`;
 }
 

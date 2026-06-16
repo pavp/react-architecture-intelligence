@@ -1,6 +1,6 @@
 import { detectInstallPlatforms, normalizeContext } from "./detect.js";
-import { defaultPlatformTarget, isSupportedPlatformId, platformOperationMode, supportedPlatformIds } from "./platforms.js";
-import type { BuildInstallPlanInput, InstallOperation, InstallPlan, InstallPlanError, InstallPlanWarning, InstallPlatformId, InstallPlatformTarget, McpServerCommand } from "./types.js";
+import { defaultPlatformTarget, isSupportedPlatformId, platformMcpConfigShape, platformOperationMode, supportedPlatformIds } from "./platforms.js";
+import type { BuildInstallPlanInput, InstallOperation, InstallPlan, InstallPlanError, InstallPlanWarning, InstallPlatformId, InstallPlatformTarget, McpConfigShape, McpServerCommand } from "./types.js";
 
 export function parsePlatformOverrides(values: string[] = []): string[] {
   return values.flatMap((value) => value.split(",")).map((value) => value.trim()).filter((value) => value.length > 0);
@@ -36,7 +36,7 @@ export function buildInstallPlan(input: BuildInstallPlanInput): InstallPlan {
   if (dryRun) warnings.push({ code: "DRY_RUN_READ_ONLY", message: "Dry run only: no files will be created or changed." });
 
   const targets = resolveTargets(selectedPlatforms, detectedPlatforms, context);
-  const operations = targets.flatMap((target) => buildOperations(target, mcpCommand, dryRun, includeInstructions));
+  const operations = targets.flatMap((target) => buildOperations(target, mcpCommand, dryRun, includeInstructions, context.projectRoot, context.homeDir));
 
   return {
     status: "ok",
@@ -68,7 +68,15 @@ function resolveTargets(selectedPlatforms: InstallPlatformId[], detectedPlatform
   return selectedPlatforms.map((id) => detectedPlatforms.find((platform) => platform.id === id) ?? defaultPlatformTarget(id, context));
 }
 
-function buildOperations(target: InstallPlatformTarget, mcpCommand: McpServerCommand, dryRun: boolean, includeInstructions: boolean): InstallOperation[] {
+function resolveMcpConfigShape(target: InstallPlatformTarget, projectRoot: string, homeDir: string): McpConfigShape {
+  const level = target.mcpConfigPath.startsWith(homeDir) ? "home" : "project";
+  const shape = platformMcpConfigShape(target.id, level);
+  if (shape.kind === "claude-home") return { kind: "claude-home", projectRoot };
+  return shape;
+}
+
+function buildOperations(target: InstallPlatformTarget, mcpCommand: McpServerCommand, dryRun: boolean, includeInstructions: boolean, projectRoot: string, homeDir: string): InstallOperation[] {
+  const mcpConfigShape = resolveMcpConfigShape(target, projectRoot, homeDir);
   const operations: InstallOperation[] = [
     {
       platform: target.id,
@@ -78,6 +86,7 @@ function buildOperations(target: InstallPlatformTarget, mcpCommand: McpServerCom
       dryRun,
       description: `Install RAI MCP server entry for ${target.id}.`,
       mcpServer: mcpCommand,
+      mcpConfigShape,
     },
   ];
 

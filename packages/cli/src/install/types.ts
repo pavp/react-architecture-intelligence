@@ -1,5 +1,10 @@
 export const SUPPORTED_PLATFORM_IDS = ["opencode", "claude-code", "codex", "copilot"] as const;
 
+export type McpConfigShape =
+  | { kind: "flat-mcp" }
+  | { kind: "claude-project" }
+  | { kind: "claude-home"; projectRoot: string };
+
 export type InstallPlatformId = typeof SUPPORTED_PLATFORM_IDS[number];
 export type SchemaConfidence = "low" | "medium" | "high";
 export type InstallPlanStatus = "ok" | "error";
@@ -27,6 +32,7 @@ export interface InstallOperation {
   dryRun: boolean;
   description: string;
   mcpServer?: McpServerCommand;
+  mcpConfigShape?: McpConfigShape;
 }
 
 export interface InstallPlanWarning {
