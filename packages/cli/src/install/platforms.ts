@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { SUPPORTED_PLATFORM_IDS, type InstallOperationMode, type InstallPlatformId, type InstallPlatformTarget, type InstallPlanningContext, type SchemaConfidence } from "./types.js";
+import { SUPPORTED_PLATFORM_IDS, type InstallOperationMode, type InstallPlatformId, type InstallPlatformTarget, type InstallPlanningContext, type McpConfigShape, type SchemaConfidence } from "./types.js";
 
 interface PlatformDefinition {
   id: InstallPlatformId;
@@ -9,6 +9,7 @@ interface PlatformDefinition {
   homeMcpCandidates(context: InstallPlanningContext): string[];
   defaultMcpPath(context: InstallPlanningContext): string;
   defaultInstructionPath(context: InstallPlanningContext): string;
+  mcpConfigShape(level: "project" | "home"): McpConfigShape;
 }
 
 export const PLATFORM_DEFINITIONS: readonly PlatformDefinition[] = [
@@ -20,15 +21,17 @@ export const PLATFORM_DEFINITIONS: readonly PlatformDefinition[] = [
     homeMcpCandidates: ({ configDir }) => [join(configDir, "opencode", "opencode.json"), join(configDir, "opencode", "opencode.jsonc")],
     defaultMcpPath: ({ projectRoot }) => join(projectRoot, "opencode.json"),
     defaultInstructionPath: ({ projectRoot }) => join(projectRoot, "AGENTS.md"),
+    mcpConfigShape: (_level) => ({ kind: "flat-mcp" }),
   },
   {
     id: "claude-code",
-    schemaConfidence: "medium",
+    schemaConfidence: "high",
     mcpOperationMode: "merge-json",
     projectMcpCandidates: ({ projectRoot }) => [join(projectRoot, ".mcp.json")],
     homeMcpCandidates: ({ homeDir }) => [join(homeDir, ".claude.json")],
     defaultMcpPath: ({ projectRoot }) => join(projectRoot, ".mcp.json"),
     defaultInstructionPath: ({ projectRoot }) => join(projectRoot, "CLAUDE.md"),
+    mcpConfigShape: (level) => level === "home" ? { kind: "claude-home", projectRoot: "" } : { kind: "claude-project" },
   },
   {
     id: "codex",
@@ -38,6 +41,7 @@ export const PLATFORM_DEFINITIONS: readonly PlatformDefinition[] = [
     homeMcpCandidates: ({ homeDir }) => [join(homeDir, ".codex", "config.toml")],
     defaultMcpPath: ({ homeDir }) => join(homeDir, ".codex", "config.toml"),
     defaultInstructionPath: ({ projectRoot }) => join(projectRoot, "AGENTS.md"),
+    mcpConfigShape: (_level) => ({ kind: "flat-mcp" }),
   },
   {
     id: "copilot",
@@ -47,6 +51,7 @@ export const PLATFORM_DEFINITIONS: readonly PlatformDefinition[] = [
     homeMcpCandidates: () => [],
     defaultMcpPath: ({ projectRoot }) => join(projectRoot, ".vscode", "mcp.json"),
     defaultInstructionPath: ({ projectRoot }) => join(projectRoot, ".github", "copilot-instructions.md"),
+    mcpConfigShape: (_level) => ({ kind: "flat-mcp" }),
   },
 ] as const;
 
@@ -77,4 +82,8 @@ export function defaultPlatformTarget(id: InstallPlatformId, context: InstallPla
 
 export function platformOperationMode(id: InstallPlatformId): InstallOperationMode {
   return platformDefinition(id).mcpOperationMode;
+}
+
+export function platformMcpConfigShape(id: InstallPlatformId, level: "project" | "home"): McpConfigShape {
+  return platformDefinition(id).mcpConfigShape(level);
 }

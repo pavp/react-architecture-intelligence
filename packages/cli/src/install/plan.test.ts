@@ -102,6 +102,47 @@ describe("buildInstallPlan", () => {
       expect.objectContaining({ code: "DRY_RUN_READ_ONLY", message: "Dry run only: no files will be created or changed." }),
     ]);
   });
+
+  // Task 1.10: assert buildOperations attaches correct mcpConfigShape per platform+level
+  test("attaches flat-mcp shape for opencode MCP config operation", () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    file(projectRoot, "opencode.json", "{}\n");
+
+    const plan = buildInstallPlan({ projectRoot, homeDir, configDir, dryRun: true });
+
+    const mcpOp = plan.operations.find((op) => op.kind === "mcp-config" && op.platform === "opencode");
+    expect(mcpOp?.mcpConfigShape).toEqual({ kind: "flat-mcp" });
+  });
+
+  test("attaches claude-project shape for claude-code project-level MCP config", () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    file(projectRoot, ".mcp.json", "{}\n");
+
+    const plan = buildInstallPlan({ projectRoot, homeDir, configDir, dryRun: true });
+
+    const mcpOp = plan.operations.find((op) => op.kind === "mcp-config" && op.platform === "claude-code");
+    expect(mcpOp?.mcpConfigShape).toEqual({ kind: "claude-project" });
+  });
+
+  test("attaches claude-home shape with resolved projectRoot for claude-code home-level MCP config", () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    file(homeDir, ".claude.json", "{}\n");
+
+    const plan = buildInstallPlan({ projectRoot, homeDir, configDir, dryRun: true });
+
+    const mcpOp = plan.operations.find((op) => op.kind === "mcp-config" && op.platform === "claude-code");
+    expect(mcpOp?.mcpConfigShape).toEqual({ kind: "claude-home", projectRoot });
+  });
+
+  test("attaches flat-mcp shape for copilot MCP config operation", () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    file(projectRoot, ".vscode/mcp.json", "{}\n");
+
+    const plan = buildInstallPlan({ projectRoot, homeDir, configDir, dryRun: true });
+
+    const mcpOp = plan.operations.find((op) => op.kind === "mcp-config" && op.platform === "copilot");
+    expect(mcpOp?.mcpConfigShape).toEqual({ kind: "flat-mcp" });
+  });
 });
 
 function fixture(): { projectRoot: string; homeDir: string; configDir: string } {

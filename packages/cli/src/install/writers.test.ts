@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import { applyInstallPlan } from "./writers.js";
-import type { InstallPlan } from "./types.js";
+import type { InstallOperation, InstallPlan } from "./types.js";
 
 const dirs: string[] = [];
 
@@ -68,6 +68,135 @@ describe("applyInstallPlan", () => {
   });
 });
 
+// Task 1.1 RED: claude-code project-level write uses mcpServers.rai, not mcp.rai
+describe("mergeJsonMcpConfig — claude-code project-level", () => {
+  test("writes entry at mcpServers.rai, not mcp.rai, preserving pre-existing keys", async () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    const mcpPath = join(projectRoot, ".mcp.json");
+    writeFileSync(mcpPath, JSON.stringify({ mcpServers: { existing: { command: "keep", args: [] } } }, null, 2));
+
+    const result = await applyInstallPlan(plan({
+      projectRoot, homeDir, configDir, path: mcpPath,
+      platform: "claude-code",
+      mcpConfigShape: { kind: "claude-project" },
+    }));
+
+    expect(result.status).toBe("ok");
+    const written = JSON.parse(readFileSync(mcpPath, "utf8")) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      mcpServers: {
+        existing: { command: "keep", args: [] },
+        rai: { command: "rai", args: ["mcp", projectRoot] },
+      },
+    });
+    expect((written as Record<string, unknown>).mcp).toBeUndefined();
+  });
+});
+
+// Task 1.2 RED: claude-code home-level write uses projects[absRoot].mcpServers.rai
+describe("mergeJsonMcpConfig — claude-code home-level", () => {
+  test("writes entry at projects[absRoot].mcpServers.rai, preserving other projects and top-level keys", async () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    const claudeJsonPath = join(homeDir, ".claude.json");
+    const otherRoot = "/other/project";
+    writeFileSync(claudeJsonPath, JSON.stringify({
+      autoUpdaterStatus: "enabled",
+      projects: {
+        [otherRoot]: { mcpServers: { other: { command: "other", args: [] } } },
+      },
+    }, null, 2));
+
+    const result = await applyInstallPlan(plan({
+      projectRoot, homeDir, configDir, path: claudeJsonPath,
+      platform: "claude-code",
+      mcpConfigShape: { kind: "claude-home", projectRoot },
+    }));
+
+    expect(result.status).toBe("ok");
+    const written = JSON.parse(readFileSync(claudeJsonPath, "utf8")) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      autoUpdaterStatus: "enabled",
+      projects: {
+        [otherRoot]: { mcpServers: { other: { command: "other", args: [] } } },
+        [projectRoot]: { mcpServers: { rai: { command: "rai", args: ["mcp", projectRoot] } } },
+      },
+    });
+    expect((written as Record<string, unknown>).mcp).toBeUndefined();
+  });
+});
+
+// Task 1.3 RED: idempotent re-run produces no duplicates
+describe("mergeJsonMcpConfig — idempotent", () => {
+  test("second run does not duplicate or corrupt the entry", async () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    const mcpPath = join(projectRoot, ".mcp.json");
+
+    const planInput = { projectRoot, homeDir, configDir, path: mcpPath, platform: "claude-code" as const, mcpConfigShape: { kind: "claude-project" as const } };
+    await applyInstallPlan(plan(planInput));
+    await applyInstallPlan(plan(planInput));
+
+    const written = JSON.parse(readFileSync(mcpPath, "utf8")) as Record<string, unknown>;
+    const mcpServers = (written as { mcpServers: Record<string, unknown> }).mcpServers;
+    expect(Object.keys(mcpServers)).toEqual(["rai"]);
+    expect(mcpServers["rai"]).toEqual({ command: "rai", args: ["mcp", projectRoot] });
+  });
+});
+
+// Task 1.4 RED: platform dispatch is exhaustive — all platforms reach correct key path
+describe("mergeJsonMcpConfig — platform dispatch exhaustive", () => {
+  test("opencode writes to mcp.rai", async () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    const mcpPath = join(projectRoot, "opencode.json");
+
+    await applyInstallPlan(plan({ projectRoot, homeDir, configDir, path: mcpPath, platform: "opencode", mcpConfigShape: { kind: "flat-mcp" } }));
+
+    const written = JSON.parse(readFileSync(mcpPath, "utf8")) as Record<string, unknown>;
+    expect((written as Record<string, unknown>).mcp).toBeDefined();
+    expect((written as { mcp: Record<string, unknown> }).mcp["rai"]).toBeDefined();
+    expect((written as Record<string, unknown>).mcpServers).toBeUndefined();
+  });
+
+  test("copilot writes to mcp.rai", async () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    const mcpPath = join(projectRoot, ".vscode", "mcp.json");
+    mkdirSync(join(projectRoot, ".vscode"), { recursive: true });
+
+    await applyInstallPlan(plan({ projectRoot, homeDir, configDir, path: mcpPath, platform: "copilot", mcpConfigShape: { kind: "flat-mcp" } }));
+
+    const written = JSON.parse(readFileSync(mcpPath, "utf8")) as Record<string, unknown>;
+    expect((written as Record<string, unknown>).mcp).toBeDefined();
+    expect((written as { mcp: Record<string, unknown> }).mcp["rai"]).toBeDefined();
+    expect((written as Record<string, unknown>).mcpServers).toBeUndefined();
+  });
+
+  test("claude-code project writes to mcpServers.rai", async () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    const mcpPath = join(projectRoot, ".mcp.json");
+
+    await applyInstallPlan(plan({ projectRoot, homeDir, configDir, path: mcpPath, platform: "claude-code", mcpConfigShape: { kind: "claude-project" } }));
+
+    const written = JSON.parse(readFileSync(mcpPath, "utf8")) as Record<string, unknown>;
+    expect((written as Record<string, unknown>).mcpServers).toBeDefined();
+    expect((written as { mcpServers: Record<string, unknown> }).mcpServers["rai"]).toBeDefined();
+    expect((written as Record<string, unknown>).mcp).toBeUndefined();
+  });
+
+  test("claude-code home writes to projects[root].mcpServers.rai", async () => {
+    const { projectRoot, homeDir, configDir } = fixture();
+    const claudeJsonPath = join(homeDir, ".claude.json");
+
+    await applyInstallPlan(plan({ projectRoot, homeDir, configDir, path: claudeJsonPath, platform: "claude-code", mcpConfigShape: { kind: "claude-home", projectRoot } }));
+
+    const written = JSON.parse(readFileSync(claudeJsonPath, "utf8")) as Record<string, unknown>;
+    const projects = (written as { projects: Record<string, unknown> }).projects;
+    expect(projects).toBeDefined();
+    expect(projects[projectRoot]).toBeDefined();
+    const projectEntry = projects[projectRoot] as { mcpServers: Record<string, unknown> };
+    expect(projectEntry.mcpServers["rai"]).toBeDefined();
+    expect((written as Record<string, unknown>).mcp).toBeUndefined();
+  });
+});
+
 function fixture(): { projectRoot: string; homeDir: string; configDir: string } {
   const root = mkdtempSync(join(tmpdir(), "rai-install-writers-"));
   dirs.push(root);
@@ -80,15 +209,16 @@ function fixture(): { projectRoot: string; homeDir: string; configDir: string } 
   return { projectRoot, homeDir, configDir };
 }
 
-function plan(input: { projectRoot: string; homeDir: string; configDir: string; path: string; mode?: "merge-json" | "replace-toml-section" | "replace-marker-block"; kind?: "mcp-config" | "instructions"; extraInstructionPath?: string }): InstallPlan {
+function plan(input: { projectRoot: string; homeDir: string; configDir: string; path: string; mode?: "merge-json" | "replace-toml-section" | "replace-marker-block"; kind?: "mcp-config" | "instructions"; extraInstructionPath?: string; platform?: InstallOperation["platform"]; mcpConfigShape?: InstallOperation["mcpConfigShape"] }): InstallPlan {
   const operations: InstallPlan["operations"] = [{
-    platform: "opencode",
+    platform: input.platform ?? "opencode",
     kind: input.kind ?? "mcp-config",
     path: input.path,
     mode: input.mode ?? "merge-json",
     dryRun: false,
     description: "Test operation",
     mcpServer: { command: "rai", args: ["mcp", input.projectRoot] },
+    ...(input.mcpConfigShape !== undefined ? { mcpConfigShape: input.mcpConfigShape } : {}),
   }];
   if (input.extraInstructionPath) {
     operations.push({
