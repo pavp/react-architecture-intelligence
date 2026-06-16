@@ -42,6 +42,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       platforms: flags(argv, "--platform"),
       dryRun: argv.includes("--dry-run"),
       yes: argv.includes("--yes"),
+      json: argv.includes("--json"),
       includeInstructions: !argv.includes("--no-instructions"),
     };
   }
@@ -140,10 +141,20 @@ export async function runInstallCommand(input: { dir: string; platforms?: string
 
   if (plan.status !== "ok") return { code: 1, payload: plan };
   if (input.dryRun) return { code: 0, payload: plan };
-  if (!input.yes) return { code: 1, payload: { status: "confirmation-required", plan } };
 
   const result = await applyInstallPlan(plan);
   return { code: result.status === "ok" ? 0 : 1, payload: result };
+}
+
+export function formatInstallResult(payload: { status: string; operations: Array<{ action: string; platform: string; kind: string; path: string; status: string; error?: string }> }): string {
+  const lines = ["RAI install", ""];
+  for (const op of payload.operations) {
+    const indicator = op.status === "ok" ? `[${op.action}]` : "[error]";
+    const detail = op.status === "error" && op.error ? ` — ${op.error}` : "";
+    lines.push(`${indicator} ${op.platform} / ${op.kind}: ${op.path}${detail}`);
+  }
+  lines.push("");
+  return `${lines.join("\n")}\n`;
 }
 
 export async function buildCliMcpServer(dir: string) {
@@ -349,7 +360,10 @@ Usage:
   rai explain [dir] <file> [--json]
   rai backfill [dir] --from <sha> --to <sha> --db <path>
   rai calibrate [dir] [--json] [--db <path>]   Suggest config calibration from feedback history
-  rai install [dir] [--platform <id[,id]>] [--dry-run] [--yes] [--no-instructions]
+  rai install [dir] [--platform <id[,id]>] [--dry-run] [--json] [--no-instructions]
+    Applies MCP config writes to all detected platforms by default.
+    --dry-run   Plan only; no files written.
+    --json      Machine-readable JSON output.
   rai doctor [dir] [--json]
   rai mcp [dir]       Serve the MCP stdio server over the repo (default dir: .)
 `;
@@ -396,7 +410,15 @@ async function runInner(argv: string[]): Promise<number> {
     }
     case "install": {
       const r = await runInstallCommand({ dir, ...(platforms ? { platforms } : {}), ...(dryRun !== undefined ? { dryRun } : {}), ...(yes !== undefined ? { yes } : {}), ...(includeInstructions !== undefined ? { includeInstructions } : {}) });
-      process.stdout.write(JSON.stringify(r.payload, null, 2) + "\n");
+      if (json) {
+        process.stdout.write(JSON.stringify(r.payload, null, 2) + "\n");
+      } else if (dryRun) {
+        process.stdout.write(JSON.stringify(r.payload, null, 2) + "\n");
+      } else if (r.code === 0) {
+        process.stdout.write(formatInstallResult(r.payload as Parameters<typeof formatInstallResult>[0]));
+      } else {
+        process.stdout.write(JSON.stringify(r.payload, null, 2) + "\n");
+      }
       return r.code;
     }
     case "doctor": {
