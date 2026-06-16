@@ -92,6 +92,12 @@ function mergeJsonMcpConfig(current: string | null, operation: InstallOperation)
         mcpServers: { ...existingMcpServers, rai: raiEntry },
       },
     };
+  } else {
+    // Exhaustiveness guard: a new McpConfigShape must be handled explicitly.
+    // Falling through here would write unchanged JSON while reporting success —
+    // the exact silent-false-success bug this change fixes.
+    const _exhaustive: never = shape;
+    throw new Error(`Unhandled MCP config shape: ${JSON.stringify(_exhaustive)}`);
   }
 
   return `${JSON.stringify(parsed, null, 2)}\n`;
