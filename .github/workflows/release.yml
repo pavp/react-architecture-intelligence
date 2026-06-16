@@ -33,9 +33,6 @@ jobs:
           - os: macos-14
             goos: darwin
             goarch: arm64
-          - os: macos-13
-            goos: darwin
-            goarch: amd64
           - os: ubuntu-latest
             goos: linux
             goarch: amd64
@@ -192,12 +189,6 @@ jobs:
           name: native-assets-darwin-arm64
           path: build/release-assets/darwin_arm64/node_modules/
 
-      - name: Download darwin/amd64 native assets
-        uses: actions/download-artifact@v4
-        with:
-          name: native-assets-darwin-amd64
-          path: build/release-assets/darwin_amd64/node_modules/
-
       - name: Download linux/amd64 native assets
         uses: actions/download-artifact@v4
         with:
@@ -225,7 +216,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for platform in darwin_arm64 darwin_amd64 linux_amd64 linux_arm64 windows_amd64; do
+          for platform in darwin_arm64 linux_amd64 linux_arm64 windows_amd64; do
             nm_dir="build/release-assets/${platform}/node_modules"
             if ! compgen -G "${nm_dir}/sqlite-vec-*" > /dev/null 2>&1; then
               echo "ERROR: no sqlite-vec-* dir in ${nm_dir}" >&2
