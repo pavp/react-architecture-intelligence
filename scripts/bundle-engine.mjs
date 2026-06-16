@@ -272,10 +272,12 @@ const SQLITE_ARCH = TARGET_ARCH === "amd64" ? "x64" : TARGET_ARCH;
 // oxc-parser publishes as @oxc-parser/binding-<os>-<arch>[<suffix>] where:
 //   <os>   uses win32 (not windows), darwin, linux — NOT Go GOOS for windows
 //   <arch> uses x64 / arm64 — NOT Go GOARCH (amd64)
-//   <suffix> is -gnu for linux (musl not a target for our runners), empty otherwise
+//   <suffix> is -gnu for linux (musl not a target for our runners),
+//            -msvc for windows, empty for darwin
 const OXC_ARCH = TARGET_ARCH === "amd64" ? "x64" : TARGET_ARCH;
 const OXC_OS = TARGET_OS === "windows" ? "win32" : TARGET_OS;
-const OXC_SUFFIX = TARGET_OS === "linux" ? "-gnu" : "";
+const OXC_SUFFIX =
+  TARGET_OS === "linux" ? "-gnu" : TARGET_OS === "windows" ? "-msvc" : "";
 
 /**
  * Resolve the pnpm virtual store directory name for a package by scanning the
