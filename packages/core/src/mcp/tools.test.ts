@@ -1538,3 +1538,373 @@ test("getDrift: ok-status result writes nothing to finding, snapshot, or feedbac
 function cloneJson<T>(value: T): T {
 	return JSON.parse(JSON.stringify(value)) as T;
 }
+
+// ─── P16-S2: findProposals tests (RED → GREEN) ────────────────────────────────
+
+function makeSharedExtractionFinding(fingerprint: string): Finding {
+	return {
+		id: `finding-se-${fingerprint}`,
+		ruleId: "react/shared-extraction",
+		type: "opportunity",
+		fingerprint: {
+			structural: fingerprint,
+			nominal: `nom-${fingerprint}`,
+			positional: `pos-${fingerprint}`,
+		},
+		analysisVersion: 1,
+		fpAlgoVersion: 1,
+		producingRunId: "run-se",
+		commitSha: "c-se",
+		severityRaw: "warn",
+		evidence: {
+			kind: "shared-extraction",
+			instances: [],
+			cosine: 0.9,
+			propOverlap: 0.8,
+			hookOverlap: 0.0,
+			variancePoints: [],
+			sharedSurface: [],
+		},
+		createdAt: 0,
+	};
+}
+
+function makeAdapterMetricFinding(fingerprint: string, subjectName: string): Finding {
+	const evidence: AdapterMetricEvidence = {
+		kind: "adapter-metric",
+		adapterId: "react",
+		ruleId: "react/prop-drilling",
+		subject: {
+			id: `react:prop-drilling:${subjectName}-id`,
+			name: subjectName,
+			file: `${subjectName}.tsx`,
+			span: { file: `${subjectName}.tsx`, start: 0, end: 50, kind: "component", astPath: "module>component" },
+			fingerprint: `subj-${fingerprint}`,
+		},
+		roles: [{ role: "drilled-prop", variant: "theme", file: `${subjectName}.tsx` }],
+		metrics: { drilledProps: 1, upstreamSources: 1, downstreamTargets: 1, propCount: 3 },
+		thresholds: { maxDrilledProps: 0 },
+		topology: { directChildIds: [], reachableNodeIds: [], exceeded: ["propDrilling:theme"] },
+	};
+	return {
+		id: `finding-am-${fingerprint}`,
+		ruleId: "react/prop-drilling",
+		type: "opportunity",
+		fingerprint: {
+			structural: fingerprint,
+			nominal: `nom-${fingerprint}`,
+			positional: `pos-${fingerprint}`,
+		},
+		analysisVersion: 1,
+		fpAlgoVersion: 1,
+		producingRunId: "run-am",
+		commitSha: "c-am",
+		severityRaw: "warn",
+		evidence,
+		createdAt: 0,
+	};
+}
+
+function makeUnknownRuleFinding(fingerprint: string): Finding {
+	return {
+		id: `finding-unk-${fingerprint}`,
+		ruleId: "react/unknown-rule",
+		type: "opportunity",
+		fingerprint: {
+			structural: fingerprint,
+			nominal: `nom-${fingerprint}`,
+			positional: `pos-${fingerprint}`,
+		},
+		analysisVersion: 1,
+		fpAlgoVersion: 1,
+		producingRunId: "run-unk",
+		commitSha: "c-unk",
+		severityRaw: "info",
+		evidence: {
+			kind: "shared-extraction",
+			instances: [],
+			cosine: 0.5,
+			propOverlap: 0.5,
+			hookOverlap: 0,
+			variancePoints: [],
+			sharedSurface: [],
+		},
+		createdAt: 0,
+	};
+}
+
+test("findProposals returns no_analysis when analyze_repo has not run", () => {
+	const s = createSession({ config: DEFAULT_CONFIG });
+
+	const r = s.findProposals();
+
+	expect(r).toEqual({
+		status: "no_analysis",
+		message: "run analyze_repo before find_proposals",
+	});
+});
+
+test("findProposals reports shared-extraction finding as actionable without a registered builder", () => {
+	const seFinding = makeSharedExtractionFinding("se-fp-1");
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const reg = new AnalyzerRegistry();
+			reg.register({ ruleId: "react/shared-extraction", framework: "react", analyze: () => [seFinding] });
+			return reg;
+		},
+	});
+	s.analyzeRepo({ files: [{ file: "A.tsx", source: "export function A() { return <div />; }" }], asOf: 0 });
+
+	const r = s.findProposals();
+
+	expect(r).not.toHaveProperty("status", "no_analysis");
+	const result = r as { actionable: Array<{ fingerprint: string; ruleId: string; subject?: string }>; count: number };
+	expect(result.actionable).toHaveLength(1);
+	expect(result.actionable[0]).toMatchObject({ fingerprint: "se-fp-1", ruleId: "react/shared-extraction" });
+	expect(result.actionable[0]).not.toHaveProperty("subject");
+	expect(result.count).toBe(1);
+});
+
+test("findProposals reports prop-drilling finding actionable when builder is registered, with subject", () => {
+	const pdFinding = makeAdapterMetricFinding("pd-fp-2", "NavBar");
+	const stubBuilder: ProposalBuilder = {
+		ruleId: "react/prop-drilling",
+		build: ({ finding, limits }) => ({
+			status: "preview" as const,
+			kind: "preview-only" as const,
+			fingerprint: finding.fingerprint.structural,
+			ruleId: "react/prop-drilling",
+			subject: { name: "NavBar", file: "NavBar.tsx", span: {} as any },
+			observations: ["NavBar forwards props."],
+			consider: ["Context API"],
+			limits,
+			writeMode: "proposal-only" as const,
+		}),
+	};
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const reg = new AnalyzerRegistry();
+			reg.register({ ruleId: "react/prop-drilling", framework: "react", analyze: () => [pdFinding] });
+			return reg;
+		},
+		proposalBuilders: [stubBuilder],
+	});
+	s.analyzeRepo({ files: [{ file: "NavBar.tsx", source: "export function NavBar({ t }) { return <span />; }" }], asOf: 0 });
+
+	const r = s.findProposals() as { actionable: Array<{ fingerprint: string; ruleId: string; subject?: string }>; count: number };
+
+	expect(r.actionable).toHaveLength(1);
+	expect(r.actionable[0]).toMatchObject({ fingerprint: "pd-fp-2", ruleId: "react/prop-drilling", subject: "NavBar" });
+	expect(r.count).toBe(1);
+});
+
+test("findProposals excludes finding whose ruleId has no builder and is not shared-extraction", () => {
+	const unknownFinding = makeUnknownRuleFinding("unk-fp-1");
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const reg = new AnalyzerRegistry();
+			reg.register({ ruleId: "react/unknown-rule", framework: "react", analyze: () => [unknownFinding] });
+			return reg;
+		},
+	});
+	s.analyzeRepo({ files: [{ file: "A.tsx", source: "export function A() { return <div />; }" }], asOf: 0 });
+
+	const r = s.findProposals() as { actionable: unknown[]; count: number };
+
+	expect(r.actionable).toHaveLength(0);
+	expect(r.count).toBe(0);
+});
+
+test("findProposals excludes suppressed findings by default", () => {
+	let callCount = 0;
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const reg = new AnalyzerRegistry();
+			reg.register({
+				ruleId: "react/shared-extraction",
+				framework: "react",
+				analyze: () => {
+					callCount++;
+					const f = makeSharedExtractionFinding("se-fp-suppress");
+					return [{ ...f, id: `finding-se-fp-suppress-v${callCount}` }];
+				},
+			});
+			return reg;
+		},
+	});
+	const testFiles = [{ file: "A.tsx", source: "export function A() { return <div />; }" }];
+	s.analyzeRepo({ files: testFiles, asOf: 0 });
+	s.recordFeedback({ fingerprint: "se-fp-suppress", ruleId: "react/shared-extraction", verdict: "reject", source: "human", asOf: 1 });
+	s.analyzeRepo({ files: testFiles, asOf: 2, analysisVersion: 2 });
+
+	const r = s.findProposals() as { actionable: unknown[]; count: number };
+
+	expect(r.actionable).toHaveLength(0);
+	expect(r.count).toBe(0);
+});
+
+test("findProposals includes suppressed findings when includeSuppressed is true", () => {
+	let callCount = 0;
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const reg = new AnalyzerRegistry();
+			reg.register({
+				ruleId: "react/shared-extraction",
+				framework: "react",
+				analyze: () => {
+					callCount++;
+					const f = makeSharedExtractionFinding("se-fp-include-supp");
+					return [{ ...f, id: `finding-se-fp-include-supp-v${callCount}` }];
+				},
+			});
+			return reg;
+		},
+	});
+	const testFiles = [{ file: "A.tsx", source: "export function A() { return <div />; }" }];
+	s.analyzeRepo({ files: testFiles, asOf: 0 });
+	s.recordFeedback({ fingerprint: "se-fp-include-supp", ruleId: "react/shared-extraction", verdict: "reject", source: "human", asOf: 1 });
+	s.analyzeRepo({ files: testFiles, asOf: 2, analysisVersion: 2 });
+
+	const r = s.findProposals({ includeSuppressed: true }) as { actionable: Array<{ fingerprint: string }>; count: number };
+
+	expect(r.actionable).toHaveLength(1);
+	expect(r.actionable[0]!.fingerprint).toBe("se-fp-include-supp");
+	expect(r.count).toBe(1);
+});
+
+test("findProposals ruleId filter narrows results to matching rule only", () => {
+	const seFinding = makeSharedExtractionFinding("se-fp-filter");
+	const pdFinding = makeAdapterMetricFinding("pd-fp-filter", "Comp");
+	const stubBuilder: ProposalBuilder = {
+		ruleId: "react/prop-drilling",
+		build: ({ finding, limits }) => ({
+			status: "preview" as const,
+			kind: "preview-only" as const,
+			fingerprint: finding.fingerprint.structural,
+			ruleId: "react/prop-drilling",
+			subject: { name: "Comp", file: "Comp.tsx", span: {} as any },
+			observations: [],
+			consider: [],
+			limits,
+			writeMode: "proposal-only" as const,
+		}),
+	};
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const reg = new AnalyzerRegistry();
+			reg.register({ ruleId: "react/shared-extraction", framework: "react", analyze: () => [seFinding] });
+			reg.register({ ruleId: "react/prop-drilling", framework: "react", analyze: () => [pdFinding] });
+			return reg;
+		},
+		proposalBuilders: [stubBuilder],
+	});
+	s.analyzeRepo({ files: [{ file: "A.tsx", source: "export function A() { return <div />; }" }], asOf: 0 });
+
+	const r = s.findProposals({ ruleId: "react/prop-drilling" }) as { actionable: Array<{ ruleId: string }>; count: number };
+
+	expect(r.actionable.every((a) => a.ruleId === "react/prop-drilling")).toBe(true);
+	expect(r.count).toBe(r.actionable.length);
+});
+
+test("findProposals returns results in deterministic order (fingerprint asc, ruleId asc tie-break)", () => {
+	const f1 = makeSharedExtractionFinding("aaaa-fp");
+	const f2 = makeSharedExtractionFinding("zzzz-fp");
+	const f3 = makeSharedExtractionFinding("mmmm-fp");
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const reg = new AnalyzerRegistry();
+			// Intentionally register in non-alpha order
+			reg.register({ ruleId: "react/shared-extraction", framework: "react", analyze: () => [f3, f1, f2] });
+			return reg;
+		},
+	});
+	s.analyzeRepo({ files: [{ file: "A.tsx", source: "export function A() { return <div />; }" }], asOf: 0 });
+
+	const r = s.findProposals() as { actionable: Array<{ fingerprint: string }> };
+
+	expect(r.actionable.map((a) => a.fingerprint)).toEqual(["aaaa-fp", "mmmm-fp", "zzzz-fp"]);
+});
+
+test("findProposals count equals actionable length", () => {
+	const f1 = makeSharedExtractionFinding("cnt-fp-1");
+	const f2 = makeSharedExtractionFinding("cnt-fp-2");
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const reg = new AnalyzerRegistry();
+			reg.register({ ruleId: "react/shared-extraction", framework: "react", analyze: () => [f1, f2] });
+			return reg;
+		},
+	});
+	s.analyzeRepo({ files: [{ file: "A.tsx", source: "export function A() { return <div />; }" }], asOf: 0 });
+
+	const r = s.findProposals() as { actionable: unknown[]; count: number };
+
+	expect(r.count).toBe(r.actionable.length);
+});
+
+// CRITICAL agreement-invariant test: findProposals actionable set must exactly match
+// proposeRefactor's non-unsupported-rule set for the same session state.
+test("CRITICAL agreement-invariant: findProposals actionable ↔ proposeRefactor non-unsupported-rule", () => {
+	const seFinding = makeSharedExtractionFinding("inv-se-fp");
+	const pdFinding = makeAdapterMetricFinding("inv-pd-fp", "Comp");
+	const unknownFinding = makeUnknownRuleFinding("inv-unk-fp");
+	const stubBuilder: ProposalBuilder = {
+		ruleId: "react/prop-drilling",
+		build: ({ finding, limits }) => ({
+			status: "preview" as const,
+			kind: "preview-only" as const,
+			fingerprint: finding.fingerprint.structural,
+			ruleId: "react/prop-drilling",
+			subject: { name: "Comp", file: "Comp.tsx", span: {} as any },
+			observations: [],
+			consider: [],
+			limits,
+			writeMode: "proposal-only" as const,
+		}),
+	};
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const reg = new AnalyzerRegistry();
+			reg.register({ ruleId: "react/shared-extraction", framework: "react", analyze: () => [seFinding] });
+			reg.register({ ruleId: "react/prop-drilling", framework: "react", analyze: () => [pdFinding] });
+			reg.register({ ruleId: "react/unknown-rule", framework: "react", analyze: () => [unknownFinding] });
+			return reg;
+		},
+		proposalBuilders: [stubBuilder],
+	});
+	s.analyzeRepo({ files: [{ file: "A.tsx", source: "export function A() { return <div />; }" }], asOf: 0 });
+
+	const proposals = s.findProposals() as { actionable: Array<{ fingerprint: string }> };
+	const actionableFingerprints = new Set(proposals.actionable.map((a) => a.fingerprint));
+
+	// Every fingerprint findProposals calls actionable must be accepted by proposeRefactor
+	for (const fp of actionableFingerprints) {
+		const result = s.proposeRefactor({ fingerprint: fp });
+		expect(result.status).not.toBe("refused");
+		if (result.status === "refused") {
+			expect((result as any).reason).not.toBe("unsupported-rule");
+		}
+	}
+
+	// Every fingerprint proposeRefactor accepts (not unsupported-rule) must be in actionable
+	const allFingerprints = ["inv-se-fp", "inv-pd-fp", "inv-unk-fp"];
+	for (const fp of allFingerprints) {
+		const result = s.proposeRefactor({ fingerprint: fp });
+		if (result.status !== "refused" || (result as any).reason !== "unsupported-rule") {
+			// proposeRefactor accepts this → must be actionable
+			expect(actionableFingerprints.has(fp)).toBe(true);
+		} else {
+			// proposeRefactor refuses with unsupported-rule → must NOT be actionable
+			expect(actionableFingerprints.has(fp)).toBe(false);
+		}
+	}
+});
