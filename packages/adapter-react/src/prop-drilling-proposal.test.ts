@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { buildPropDrillingProposalBuilder, PROP_DRILLING_PROPOSAL_RULE_ID } from "./prop-drilling-proposal.js";
+import type { PropDrillingProposal } from "./prop-drilling-proposal.js";
 import type { ProposalBuilderInput } from "@rai/core";
 import type { PresentedFinding, AdapterMetricEvidence } from "@rai/core";
 
@@ -133,7 +134,7 @@ describe("buildPropDrillingProposalBuilder", () => {
 
 			expect(result.status).toBe("preview");
 			if (result.status !== "preview") throw new Error("expected preview");
-			expect((result as any).drilledProps).toEqual(["theme"]);
+			expect((result as PropDrillingProposal).drilledProps).toEqual(["theme"]);
 		});
 
 		test("upstreamRole matches evidence upstream-source role", () => {
@@ -142,7 +143,7 @@ describe("buildPropDrillingProposalBuilder", () => {
 
 			expect(result.status).toBe("preview");
 			if (result.status !== "preview") throw new Error("expected preview");
-			expect((result as any).upstreamRole).toBe("App");
+			expect((result as PropDrillingProposal).upstreamRole).toBe("App");
 		});
 
 		test("downstreamRole matches evidence downstream-target role", () => {
@@ -151,7 +152,7 @@ describe("buildPropDrillingProposalBuilder", () => {
 
 			expect(result.status).toBe("preview");
 			if (result.status !== "preview") throw new Error("expected preview");
-			expect((result as any).downstreamRole).toBe("Leaf");
+			expect((result as PropDrillingProposal).downstreamRole).toBe("Leaf");
 		});
 
 		test("observations array is non-empty and mentions subject and drilled props", () => {
@@ -195,7 +196,7 @@ describe("buildPropDrillingProposalBuilder", () => {
 
 			expect(result.status).toBe("preview");
 			if (result.status !== "preview") throw new Error("expected preview");
-			expect((result as any).drilledProps).toEqual(["align", "color", "zIndex"]);
+			expect((result as PropDrillingProposal).drilledProps).toEqual(["align", "color", "zIndex"]);
 		});
 	});
 

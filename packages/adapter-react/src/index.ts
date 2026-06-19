@@ -50,3 +50,4 @@ export {
 	PROP_DRILLING_PROPOSAL_RULE_ID,
 	buildPropDrillingProposalBuilder,
 } from "./prop-drilling-proposal.js";
+export type { PropDrillingProposal } from "./prop-drilling-proposal.js";

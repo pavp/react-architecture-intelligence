@@ -3,6 +3,16 @@ import type { AdapterMetricEvidence } from "@rai/core";
 
 export const PROP_DRILLING_PROPOSAL_RULE_ID = "react/prop-drilling";
 
+/**
+ * Adapter-local extension of PreviewProposal that carries prop-drilling-specific
+ * detail fields. Declared here in adapter-react so core stays framework-agnostic.
+ */
+export interface PropDrillingProposal extends PreviewProposal {
+  drilledProps: string[];
+  upstreamRole: string;
+  downstreamRole: string;
+}
+
 // Non-prescriptive consider template — lists options without asserting which is correct.
 const CONSIDER_TEMPLATE: readonly string[] = Object.freeze([
   "React Context API: lift the shared value to a context provider so intermediate components do not need to declare it in their props.",
@@ -15,10 +25,12 @@ const CONSIDER_TEMPLATE: readonly string[] = Object.freeze([
  * Pure builder factory for react/prop-drilling preview proposals.
  * Grounded 1:1 in AdapterMetricEvidence; no invented strings; no patch, diff, or write.
  */
-export function buildPropDrillingProposalBuilder(): ProposalBuilder {
+export function buildPropDrillingProposalBuilder(): Omit<ProposalBuilder, "build"> & {
+  build(input: ProposalBuilderInput): PropDrillingProposal | { status: "refused"; reason: "unsupported-rule" };
+} {
   return {
     ruleId: PROP_DRILLING_PROPOSAL_RULE_ID,
-    build({ finding, limits }: ProposalBuilderInput): PreviewProposal | { status: "refused"; reason: "unsupported-rule" } {
+    build({ finding, limits }: ProposalBuilderInput): PropDrillingProposal | { status: "refused"; reason: "unsupported-rule" } {
       if (finding.ruleId !== PROP_DRILLING_PROPOSAL_RULE_ID) {
         return { status: "refused", reason: "unsupported-rule" };
       }
@@ -48,7 +60,7 @@ export function buildPropDrillingProposalBuilder(): ProposalBuilder {
           : [`Drilled props detected: ${drilledProps.length}.`]),
       ];
 
-      const proposal: PreviewProposal & { drilledProps: string[]; upstreamRole: string; downstreamRole: string } = {
+      const proposal: PropDrillingProposal = {
         status: "preview",
         kind: "preview-only",
         fingerprint: finding.fingerprint.structural,
