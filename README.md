@@ -33,6 +33,8 @@ RAI currently detects and explains:
 | Hook topology | “This hook has a dependency shape worth checking.” |
 | Boundary violations | “This import or relationship crosses a rule your repo configured.” |
 | Next.js adapter metrics | “This route/client/server shape may need a closer look.” |
+| React pattern surface drift | compound APIs, container/presenter roles, controlled/uncontrolled props, context provider value, form controls, data fetching, overlay controls, design-system styling surfaces |
+| Prop drilling | prop threaded through intermediate components — lift or context |
 
 ## Quick path
 
@@ -63,20 +65,20 @@ rai doctor .
 rai install . --dry-run
 ```
 
-Apply the setup when it looks right:
+Apply the setup when it looks right (writes by default; `--dry-run` is the opt-out preview):
 
 ```bash
-rai install . --yes
+rai install .
 ```
 
 Supported installer targets: `opencode`, `claude-code`, `codex`, and `copilot`.
 
 | Agent | Preview install | Apply install | Writes |
 |-------|-----------------|---------------|--------|
-| OpenCode | `rai install . --platform opencode --dry-run` | `rai install . --platform opencode --yes` | `opencode.json` + `AGENTS.md` |
-| Claude Code | `rai install . --platform claude-code --dry-run` | `rai install . --platform claude-code --yes` | `.mcp.json` + `CLAUDE.md` |
-| Codex | `rai install . --platform codex --dry-run` | `rai install . --platform codex --yes` | `~/.codex/config.toml` + `AGENTS.md` |
-| Copilot | `rai install . --platform copilot --dry-run` | `rai install . --platform copilot --yes` | `.vscode/mcp.json` + `.github/copilot-instructions.md` |
+| OpenCode | `rai install . --platform opencode --dry-run` | `rai install . --platform opencode` | `opencode.json` + `AGENTS.md` |
+| Claude Code | `rai install . --platform claude-code --dry-run` | `rai install . --platform claude-code` | `.mcp.json` + `CLAUDE.md` |
+| Codex | `rai install . --platform codex --dry-run` | `rai install . --platform codex` | `~/.codex/config.toml` + `AGENTS.md` |
+| Copilot | `rai install . --platform copilot --dry-run` | `rai install . --platform copilot` | `.vscode/mcp.json` + `.github/copilot-instructions.md` |
 
 Homebrew note: `pavp/tap/rai` is Homebrew naming. It points to `pavp/homebrew-tap` and `Formula/rai.rb`.
 
@@ -84,7 +86,7 @@ Install multiple agents in one pass:
 
 ```bash
 rai install . --platform opencode,claude-code,codex --dry-run
-rai install . --platform opencode,claude-code,codex --yes
+rai install . --platform opencode,claude-code,codex
 ```
 
 Use `--no-instructions` if you only want MCP config and do not want RAI to update agent instructions.
@@ -109,6 +111,7 @@ With RAI connected, your agent can answer questions like:
 - Which source span grounds this finding?
 - Did architecture drift between snapshots?
 - Is there a safe refactor proposal to inspect?
+- Which findings have an actionable refactor proposal?
 
 Example agent flow:
 
@@ -181,7 +184,21 @@ rai explain <file> [--json]           # Explain findings connected to one file
 rai install [dir] --platform opencode # Configure MCP integration
 rai doctor [dir] --json               # Check runtime, build, MCP, and native deps
 rai mcp [dir]                         # Serve MCP stdio tools
+rai backfill [dir] --from <sha> --to <sha> --db <path>   # Backfill snapshot DB across a commit range
+rai calibrate [dir] [--json] [--db <path>] [--apply] [--apply --yes]  # Suggest or apply config calibration
 ```
+
+## Calibration
+
+`rai calibrate` reads your feedback history and suggests config adjustments to reduce false positives.
+
+```bash
+rai calibrate [dir]            # Suggest-only: read-only, no files written
+rai calibrate [dir] --apply    # Preview dry-run: shows what would be written, no files written
+rai calibrate [dir] --apply --yes  # Atomic write: merges suggestions into rai.config.json
+```
+
+Use `--json` for machine-readable output. The `--db` flag overrides the default DB path (`.git/rai.sqlite`).
 
 ## Glossary
 
