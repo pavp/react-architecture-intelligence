@@ -35,7 +35,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
 
   const now = () => Date.now();
 
-  server.tool("analyze_repo", "Analyze the repo; returns counts + fingerprint handles (findings-first).",
+  server.tool("analyze_repo", "Analyze the repo and populate the current analysis session: returns finding counts plus fingerprint handles (findings-first). Run this first — every other tool except get_drift and record_feedback reads the analysis it populates.",
     { scope: z.enum(["full", "dirty"]).optional() },
     async () => {
       const files = readSources(opts.rootDir);
@@ -45,7 +45,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("analyze_repo");
 
-  server.tool("find_shared_opportunities", "List shared-component extraction opportunities (conflicts separated).",
+  server.tool("find_shared_opportunities", "List shared-component extraction opportunities from the current analysis (conflicts separated). Run analyze_repo first; returns empty without a current analysis.",
     { includeSuppressed: z.boolean().optional() },
     async (args) => {
       const r = session.findSharedOpportunities({ includeSuppressed: args.includeSuppressed });
@@ -53,7 +53,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("find_shared_opportunities");
 
-  server.tool("propose_refactor", "Return a deterministic no-write refactor proposal for a current finding fingerprint.",
+  server.tool("propose_refactor", "Return a deterministic no-write refactor proposal for a current finding fingerprint. Run analyze_repo first, then take a fingerprint from find_proposals or find_shared_opportunities; refuses with unknown-current-finding if the fingerprint is not in the current analysis.",
     { fingerprint: z.string() },
     async (args) => {
       const r = session.proposeRefactor({ fingerprint: args.fingerprint });
@@ -61,7 +61,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("propose_refactor");
 
-  server.tool("apply_refactor", "Apply a gated refactor after dry-run, typecheck, tests, git-clean, and commit.",
+  server.tool("apply_refactor", "Apply a gated shared-extraction refactor after dry-run, typecheck, tests, git-clean check, and commit. Run analyze_repo first; only shared-extraction findings are supported today.",
     {
       fingerprint: z.string(),
       targetFile: z.string(),
@@ -95,7 +95,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("explain_finding");
 
-  server.tool("record_feedback", "Record a verdict on a finding (the only memory write path).",
+  server.tool("record_feedback", "Record a verdict (accept/reject/wontfix/confirm/dismiss) on a finding — the only memory write path. Does not require analyze_repo; the fingerprint and ruleId are caller-supplied.",
     {
       fingerprint: z.string(),
       ruleId: z.string(),
@@ -110,7 +110,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("record_feedback");
 
-  server.tool("close_session", "Close current analysis session by prompting for explicit finding decisions or recording explicit decisions only.",
+  server.tool("close_session", "Close the current analysis session by recording explicit finding decisions only, or prompting for them. Returns an empty item list when no analysis is present, so it is always safe to call.",
     {
       discussed: z.array(z.string()).optional(),
       summary: z.string().optional(),
@@ -127,7 +127,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("close_session");
 
-  server.tool("get_drift", "Return snapshot diff between two analyzed commits (read-only).",
+  server.tool("get_drift", "Return the snapshot diff between two analyzed commits (read-only, set-algebra over the snapshot DB). Does not require a current analyze_repo — it reads historic snapshots; returns unknown_commit or insufficient_history when the DB lacks the requested commits.",
     {
       baseCommit: z.string(),
       headCommit: z.string().optional(),
@@ -152,7 +152,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("query_architecture");
 
-  server.tool("get_node", "Return bounded details for a node in the latest analyzed repo graph.",
+  server.tool("get_node", "Return bounded details for a node in the latest analyzed repo graph. Run analyze_repo first; identify nodes by fingerprint or file (enumerate via raw_graph_query 'MATCH nodes'). Returns no_analysis without a current analysis.",
     {
       fingerprint: z.string().optional(),
       file: z.string().optional(),
@@ -179,7 +179,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("raw_graph_query");
 
-  server.tool("find_proposals", "List actionable findings: those with a registered proposal builder, or non-conflict shared-extraction findings. Conflict-typed shared-extraction findings are excluded. Read-only — no mutations.",
+  server.tool("find_proposals", "List actionable findings: those with a registered proposal builder, or non-conflict shared-extraction findings (conflict-typed shared-extraction findings are excluded). Read-only — no mutations. Run analyze_repo first (returns no_analysis otherwise); use before propose_refactor to obtain fingerprints.",
     {
       ruleId: z.string().optional(),
       includeSuppressed: z.boolean().optional(),

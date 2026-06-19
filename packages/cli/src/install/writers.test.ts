@@ -38,7 +38,20 @@ describe("applyInstallPlan", () => {
 
     await applyInstallPlan(plan({ projectRoot, homeDir, configDir, path: instructionPath, mode: "replace-marker-block", kind: "instructions" }));
 
-    expect(readFileSync(instructionPath, "utf8")).toBe("# Team Notes\n\nKeep this.\n\n<!-- RAI:BEGIN -->\n## React Architecture Intelligence\n\nUse RAI when investigating React architecture findings, drift, evidence, explanations, or refactor insight for this repo.\nDo not use RAI for general file reads, generic dependency graph work, non-React questions, or changes without explicit human direction.\n<!-- RAI:END -->\n\nUser tail.\n");
+    expect(readFileSync(instructionPath, "utf8")).toBe(
+      "# Team Notes\n\nKeep this.\n\n" +
+      "<!-- RAI:BEGIN -->\n" +
+      "## React Architecture Intelligence\n\n" +
+      "Use RAI when investigating React architecture findings, drift, evidence, explanations, or refactor insight for this repo.\n" +
+      "Do not use RAI for general file reads, generic dependency graph work, non-React questions, or changes without explicit human direction.\n\n" +
+      "Workflow: call analyze_repo first to populate the current analysis, then use the other tools against it (get_drift and record_feedback do not need analyze_repo first).\n\n" +
+      "Tools by purpose:\n" +
+      "- Graph queries: query_architecture, get_node, raw_graph_query — answer bounded questions about the latest analyzed graph.\n" +
+      "- Finding explanation: explain_finding — return raw evidence plus a bounded deterministic explanation.\n" +
+      "- Proposal discovery and refactor: find_proposals, find_shared_opportunities, propose_refactor, apply_refactor — list actionable findings and inspect or apply gated refactor proposals.\n" +
+      "- Feedback: record_feedback, close_session — the only memory write paths; record a verdict or close the session with explicit decisions.\n" +
+      "<!-- RAI:END -->\n\nUser tail.\n"
+    );
   });
 
   test("replaces only the Codex RAI TOML section while preserving user settings", async () => {
