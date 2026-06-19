@@ -9,6 +9,7 @@ import type {
 } from "../types.js";
 import type { ApplyWorkspace } from "../codemod/apply-pipeline.js";
 import { AnalyzerRegistry } from "../analyzers/registry.js";
+import type { PreviewProposal, ProposalBuilder, ProposalBuilderInput } from "../codemod/proposal.js";
 
 const A = `function LoginButton({ label, onClick, variant }) { const t = useTheme(); return <button onClick={onClick}>{label}</button>; }
 export default LoginButton;`;
@@ -1245,6 +1246,251 @@ test("getDrift: absent head with 1 snapshot row → unknown_commit(head), not in
 	const r = s.getDrift({ baseCommit: "known-sha", headCommit: "absent-sha" });
 	expect(r.status).toBe("unknown_commit");
 	expect((r as any).commit).toBe("absent-sha");
+});
+
+// ─── Phase 1 type-compilation tests (Task 1.1 RED) ────────────────────────────
+
+// These tests verify that PreviewProposal is assignable to ProposeRefactorResult
+// and that it has the shape required by the spec.
+test("PreviewProposal type is assignable to ProposeRefactorResult union (type-compilation guard)", () => {
+	// If PreviewProposal does not exist in proposal.ts this import fails at typecheck.
+	// If the fields are wrong, the assignment below fails at typecheck.
+	const preview: PreviewProposal = {
+		status: "preview",
+		kind: "preview-only",
+		fingerprint: "fp-abc",
+		ruleId: "react/prop-drilling",
+		subject: { name: "Middle", file: "Middle.tsx", span: {} as any },
+		observations: ["Middle forwards theme without using it."],
+		consider: ["Context API", "shared hook", "prop consolidation"],
+		limits: ["Name-level only."],
+		writeMode: "proposal-only",
+	};
+	// preview.status must be "preview" — compile-time check
+	const s: string = preview.status;
+	// writeMode must be "proposal-only" — compile-time check
+	const wm: "proposal-only" = preview.writeMode;
+	expect(s).toBe("preview");
+	expect(wm).toBe("proposal-only");
+});
+
+test("ProposalBuilder interface shape is correct (type-compilation guard)", () => {
+	// Verifies ProposalBuilder and ProposalBuilderInput exist and have the expected shape.
+	const stubBuilder: ProposalBuilder = {
+		ruleId: "react/prop-drilling",
+		build: (_input: ProposalBuilderInput) => ({
+			status: "refused" as const,
+			reason: "unsupported-rule" as const,
+		}),
+	};
+	expect(stubBuilder.ruleId).toBe("react/prop-drilling");
+});
+
+// ─── Phase 2 dispatch tests (Task 2.1 RED) ────────────────────────────────────
+
+function makePropDrillingFinding(fingerprint: string): Finding {
+	const evidence: AdapterMetricEvidence = {
+		kind: "adapter-metric",
+		adapterId: "react",
+		ruleId: "react/prop-drilling",
+		subject: {
+			id: "react:prop-drilling:B-id",
+			name: "Middle",
+			file: "Middle.tsx",
+			span: { file: "Middle.tsx", start: 0, end: 50, kind: "component", astPath: "module>component" },
+			fingerprint: "subj-fp",
+		},
+		roles: [
+			{ role: "drilled-prop", variant: "theme", file: "Middle.tsx" },
+			{ role: "upstream-source", variant: "App", file: "App.tsx" },
+			{ role: "downstream-target", variant: "Leaf", file: "Leaf.tsx" },
+		],
+		metrics: { drilledProps: 1, upstreamSources: 1, downstreamTargets: 1, propCount: 3 },
+		thresholds: { maxDrilledProps: 0 },
+		topology: { directChildIds: ["Leaf-id"], reachableNodeIds: ["App-id"], exceeded: ["propDrilling:theme"] },
+	};
+	return {
+		id: `finding-${fingerprint}`,
+		ruleId: "react/prop-drilling",
+		type: "opportunity",
+		fingerprint: { structural: fingerprint, nominal: `nom-${fingerprint}`, positional: `pos-${fingerprint}` },
+		analysisVersion: 1,
+		fpAlgoVersion: 1,
+		producingRunId: "run1",
+		commitSha: "c1",
+		severityRaw: "warn",
+		evidence,
+		createdAt: 0,
+	};
+}
+
+function makeStubPropDrillingBuilder(): ProposalBuilder {
+	return {
+		ruleId: "react/prop-drilling",
+		build: ({ finding, limits }) => ({
+			status: "preview" as const,
+			kind: "preview-only" as const,
+			fingerprint: finding.fingerprint.structural,
+			ruleId: "react/prop-drilling",
+			subject: { name: "Middle", file: "Middle.tsx", span: {} as any },
+			observations: ["Middle forwards theme."],
+			consider: ["Context API", "shared hook", "prop consolidation"],
+			limits,
+			writeMode: "proposal-only" as const,
+		}),
+	};
+}
+
+test("proposeRefactor dispatches to registered builder for prop-drilling finding (happy path)", () => {
+	// RED: Session.proposeRefactor does not yet check proposalBuilders → dispatches to
+	// buildSharedExtractionProposal which refuses with unsupported-rule for prop-drilling.
+	const propDrillingBuilder = makeStubPropDrillingBuilder();
+	const propDrillingFinding = makePropDrillingFinding("pd-fp-1");
+
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const registry = new AnalyzerRegistry();
+			registry.register({ ruleId: "react/prop-drilling", framework: "react", analyze: () => [propDrillingFinding] });
+			return registry;
+		},
+		proposalBuilders: [propDrillingBuilder],
+	});
+	const files = [
+		{ file: "App.tsx", source: "export function App() { return <Middle theme=\"dark\" />; }" },
+		{ file: "Middle.tsx", source: "export function Middle({ theme }) { return <Leaf theme={theme} />; }" },
+		{ file: "Leaf.tsx", source: "export function Leaf({ theme }) { return <div className={theme} />; }" },
+	];
+	s.analyzeRepo({ files, asOf: 0 });
+
+	const result = s.proposeRefactor({ fingerprint: "pd-fp-1" });
+
+	expect(result.status).toBe("preview");
+	expect((result as any).writeMode).toBe("proposal-only");
+	expect((result as any).ruleId).toBe("react/prop-drilling");
+	// No patch field
+	expect((result as any).patch).toBeUndefined();
+});
+
+test("proposeRefactor refuses with unsupported-rule when no builder registered for ruleId", () => {
+	// RED: no proposalBuilders in SessionOpts → dispatch falls through to shared-extraction
+	// which returns unsupported-rule. Once dispatch seam is in place the refusal comes from there.
+	const propDrillingFinding = makePropDrillingFinding("pd-fp-no-builder");
+
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const registry = new AnalyzerRegistry();
+			registry.register({ ruleId: "react/prop-drilling", framework: "react", analyze: () => [propDrillingFinding] });
+			return registry;
+		},
+		// No proposalBuilders injected
+	});
+	const files = [
+		{ file: "Middle.tsx", source: "export function Middle({ theme }) { return <Leaf theme={theme} />; }" },
+	];
+	s.analyzeRepo({ files, asOf: 0 });
+
+	const result = s.proposeRefactor({ fingerprint: "pd-fp-no-builder" });
+
+	expect(result.status).toBe("refused");
+	expect((result as any).reason).toBe("unsupported-rule");
+});
+
+test("proposeRefactor refuses stale prop-drilling fingerprint (unknown-current-finding)", () => {
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		proposalBuilders: [makeStubPropDrillingBuilder()],
+	});
+	s.analyzeRepo({ files, asOf: 0 });
+
+	const result = s.proposeRefactor({ fingerprint: "stale-pd-fp" });
+
+	expect(result).toEqual({ status: "refused", reason: "unknown-current-finding" });
+});
+
+test("proposeRefactor refuses suppressed prop-drilling finding", () => {
+	let callCount = 0;
+	const makeVersionedFinding = () => {
+		callCount++;
+		const f = makePropDrillingFinding("pd-fp-suppressed");
+		return { ...f, id: `finding-pd-fp-suppressed-v${callCount}` };
+	};
+
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const registry = new AnalyzerRegistry();
+			registry.register({ ruleId: "react/prop-drilling", framework: "react", analyze: () => [makeVersionedFinding()] });
+			return registry;
+		},
+		proposalBuilders: [makeStubPropDrillingBuilder()],
+	});
+	const testFiles = [
+		{ file: "Middle.tsx", source: "export function Middle({ theme }) { return <Leaf theme={theme} />; }" },
+	];
+	s.analyzeRepo({ files: testFiles, asOf: 0 });
+	s.recordFeedback({ fingerprint: "pd-fp-suppressed", ruleId: "react/prop-drilling", verdict: "reject", source: "human", asOf: 1 });
+	s.analyzeRepo({ files: testFiles, asOf: 2, analysisVersion: 2 });
+
+	const result = s.proposeRefactor({ fingerprint: "pd-fp-suppressed" });
+
+	expect(result).toEqual({ status: "refused", reason: "suppressed-finding" });
+});
+
+// Regression lock: shared-extraction path must be UNCHANGED after factory injection
+test("proposeRefactor shared-extraction path unchanged after proposalBuilders injection (regression lock)", () => {
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		proposalBuilders: [makeStubPropDrillingBuilder()],
+	});
+	const a = s.analyzeRepo({ files, asOf: 0 });
+	const fp = a.topFingerprints[0]!;
+
+	const result = s.proposeRefactor({ fingerprint: fp });
+
+	expect(result.status).toBe("ok");
+	expect((result as any).writeMode).toBe("proposal-only");
+	expect((result as any).ruleId).toBe("react/shared-extraction");
+});
+
+// apply_refactor on prop-drilling fingerprint must refuse (no proof, no mutation)
+test("applyRefactor refuses prop-drilling fingerprint (no apply path reachable from preview)", () => {
+	const propDrillingFinding = makePropDrillingFinding("pd-fp-apply-refuse");
+
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const registry = new AnalyzerRegistry();
+			registry.register({ ruleId: "react/prop-drilling", framework: "react", analyze: () => [propDrillingFinding] });
+			return registry;
+		},
+		proposalBuilders: [makeStubPropDrillingBuilder()],
+	});
+	const testFiles = [
+		{ file: "Middle.tsx", source: "export function Middle({ theme }) { return <Leaf theme={theme} />; }" },
+	];
+	s.analyzeRepo({ files: testFiles, asOf: 0, analysisVersion: 1 });
+	const mutationEvents: string[] = [];
+	const workspace: ApplyWorkspace = {
+		isDirty: () => false,
+		applyPatch: () => { mutationEvents.push("apply"); },
+		run: () => ({ ok: true, output: "ok" }),
+		hasUnexpectedChanges: () => false,
+		rollback: () => { mutationEvents.push("rollback"); },
+		commit: () => "a".repeat(40),
+	};
+
+	const result = s.applyRefactor({
+		fingerprint: "pd-fp-apply-refuse",
+		sources: testFiles,
+		targetFile: "Out.tsx",
+		workspace,
+	});
+
+	expect(result.status).toBe("refused");
+	expect(mutationEvents).toHaveLength(0);
+	expect(countRows(s, "codemod_proof")).toBe(0);
 });
 
 // ─── WARNING-1: happy-path ok result must write nothing ───────────────────────

@@ -28,7 +28,7 @@ export type { Analyzer, AnalyzerResult, AnalysisContext, BoundaryRule, TypeInfo,
 export { AnalyzerRegistry, createDefaultAnalyzerRegistry } from "./analyzers/registry.js";
 export type { RegistryFactory, RegistryFactoryInput, SessionOpts } from "./mcp/tools.js";
 export { buildSharedExtractionProposal } from "./codemod/proposal.js";
-export type { SharedExtractionProposal, ProposalRefusalReason, ProposalRisk, ProposalRiskLevel, ProposalRiskReason } from "./codemod/proposal.js";
+export type { SharedExtractionProposal, ProposalRefusalReason, ProposalRisk, ProposalRiskLevel, ProposalRiskReason, PreviewProposal, ProposalBuilder, ProposalBuilderInput } from "./codemod/proposal.js";
 export { mayExecuteCodemod } from "./codemod/capability-gate.js";
 export type { CodemodGateContext, CodemodGateRefusalReason, CodemodGateResult } from "./codemod/capability-gate.js";
 export { previewSharedExtractionPatch } from "./codemod/dry-run.js";

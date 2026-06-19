@@ -8,7 +8,7 @@ import { analyzeRepo } from "../engine/pipeline.js";
 import type { SourceFile } from "../parse/graph-build.js";
 import type { RepoGraph } from "../graph/repograph.js";
 import type { ComponentNode, GraphEdge } from "../types.js";
-import { buildSharedExtractionProposal, type SharedExtractionProposal } from "../codemod/proposal.js";
+import { buildSharedExtractionProposal, type SharedExtractionProposal, type PreviewProposal, type ProposalBuilder } from "../codemod/proposal.js";
 import { RULE_ID as SHARED_EXTRACTION_RULE_ID } from "../analyzers/shared-extraction.js";
 import { mayExecuteCodemod, type CodemodGateResult } from "../codemod/capability-gate.js";
 import { previewSharedExtractionPatch, type DryRunPatchPreview } from "../codemod/dry-run.js";
@@ -22,7 +22,7 @@ import type { AnalyzerRegistry } from "../analyzers/registry.js";
 export interface RegistryFactoryInput { files: SourceFile[]; }
 export type RegistryFactory = (input: RegistryFactoryInput) => AnalyzerRegistry;
 
-export interface SessionOpts { config: RaiConfig; dbPath?: string; registryFactory?: RegistryFactory | undefined; }
+export interface SessionOpts { config: RaiConfig; dbPath?: string; registryFactory?: RegistryFactory | undefined; proposalBuilders?: ProposalBuilder[] | undefined; }
 
 export interface CloseSessionDecision {
   fingerprint: string;
@@ -142,7 +142,8 @@ export type RawGraphQueryResult =
 
 export type ProposeRefactorResult =
   | SharedExtractionProposal
-  | { status: "refused"; reason: "unknown-current-finding" | "suppressed-finding" };
+  | PreviewProposal
+  | { status: "refused"; reason: "unknown-current-finding" | "suppressed-finding" | "unsupported-rule" };
 
 export type ApplyRefactorResult =
   | ApplyPipelineResult
@@ -213,12 +214,24 @@ export class Session {
     };
   }
 
-  // ── propose_refactor (P5 Slice 2) — proposal-only, no writes ────────────
+  // ── propose_refactor (P5 Slice 2 + P16-S1) — proposal-only, no writes ──
   proposeRefactor(input: { fingerprint: string }): ProposeRefactorResult {
     const finding = this.lastPresented.find((p) => p.fingerprint.structural === input.fingerprint);
     if (!finding) return { status: "refused", reason: "unknown-current-finding" };
     if (finding.status === "suppressed") return { status: "refused", reason: "suppressed-finding" };
-    return buildSharedExtractionProposal(finding);
+
+    // Shared-extraction path: preserved as hardcoded default (not routed through injected builders).
+    if (finding.ruleId === SHARED_EXTRACTION_RULE_ID) {
+      return buildSharedExtractionProposal(finding);
+    }
+
+    // Injected builder dispatch: find matching builder by ruleId.
+    const builder = this.opts.proposalBuilders?.find((b) => b.ruleId === finding.ruleId);
+    if (!builder) return { status: "refused", reason: "unsupported-rule" };
+
+    // Limits flow from the analyzer's explain hook via the existing registry seam — no React import needed.
+    const limits = this.lastRegistry?.get(finding.ruleId)?.explain?.(finding)?.limits ?? [];
+    return builder.build({ finding, limits });
   }
 
   // ── apply_refactor (P5 Slice 5b2) — gated mutation through injected workspace ──
