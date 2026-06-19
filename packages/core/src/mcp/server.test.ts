@@ -82,6 +82,25 @@ test("analyze_repo handler passes resolved SHA (not literal 'head') to session.a
 // ── E2E wiring test: buildMcpServer forwards proposalBuilders into live Session ──
 // This test is the regression guard for CRITICAL-1: proposalBuilders must flow from
 // McpServerOpts → buildMcpServer → createSession so production propose_refactor works.
+// ─── P16-S2: find_proposals server registration tests (RED → GREEN) ──────────
+
+test("find_proposals is listed in toolNames", () => {
+  const { toolNames } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
+  expect(toolNames).toContain("find_proposals");
+});
+
+test("find_proposals handler returns no_analysis before analyze_repo", async () => {
+  const { server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
+  const registeredTool = (server as any)._registeredTools?.["find_proposals"];
+  expect(registeredTool).toBeDefined();
+
+  const result = await registeredTool.handler({}, {});
+  const parsed = JSON.parse(result.content[0].text);
+  expect(parsed.status).toBe("no_analysis");
+  expect(typeof parsed.message).toBe("string");
+  expect(parsed.message.length).toBeGreaterThan(0);
+});
+
 test("buildMcpServer forwards proposalBuilders into Session so prop-drilling finding returns PreviewProposal (not unsupported-rule)", () => {
   const PD_RULE = "react/prop-drilling";
   const PD_FP = "pd-e2e-wiring-fp";
