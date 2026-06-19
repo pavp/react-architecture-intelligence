@@ -1541,6 +1541,34 @@ function cloneJson<T>(value: T): T {
 
 // ─── P16-S2: findProposals tests (RED → GREEN) ────────────────────────────────
 
+function makeSharedExtractionConflictFinding(fingerprint: string): Finding {
+	return {
+		id: `finding-se-conflict-${fingerprint}`,
+		ruleId: "react/shared-extraction",
+		type: "architectural-conflict",
+		fingerprint: {
+			structural: fingerprint,
+			nominal: `nom-${fingerprint}`,
+			positional: `pos-${fingerprint}`,
+		},
+		analysisVersion: 1,
+		fpAlgoVersion: 1,
+		producingRunId: "run-se-conflict",
+		commitSha: "c-se-conflict",
+		severityRaw: "warn",
+		evidence: {
+			kind: "shared-extraction",
+			instances: [],
+			cosine: 0.9,
+			propOverlap: 0.8,
+			hookOverlap: 0.0,
+			variancePoints: [],
+			sharedSurface: [],
+		},
+		createdAt: 0,
+	};
+}
+
 function makeSharedExtractionFinding(fingerprint: string): Finding {
 	return {
 		id: `finding-se-${fingerprint}`,
@@ -1850,10 +1878,33 @@ test("findProposals count equals actionable length", () => {
 	expect(r.count).toBe(r.actionable.length);
 });
 
+test("findProposals excludes conflict-typed shared-extraction finding from actionable", () => {
+	const conflictFinding = makeSharedExtractionConflictFinding("se-conflict-fp");
+	const s = createSession({
+		config: DEFAULT_CONFIG,
+		registryFactory: () => {
+			const reg = new AnalyzerRegistry();
+			reg.register({ ruleId: "react/shared-extraction", framework: "react", analyze: () => [conflictFinding] });
+			return reg;
+		},
+	});
+	s.analyzeRepo({ files: [{ file: "A.tsx", source: "export function A() { return <div />; }" }], asOf: 0 });
+
+	const r = s.findProposals() as { actionable: Array<{ fingerprint: string }>; count: number };
+
+	// conflict-typed shared-extraction findings are refused by proposeRefactor with
+	// "conflict-not-executable" — they must NOT appear in the actionable set.
+	const fingerprints = r.actionable.map((a) => a.fingerprint);
+	expect(fingerprints).not.toContain("se-conflict-fp");
+	expect(r.count).toBe(0);
+});
+
 // CRITICAL agreement-invariant test: findProposals actionable set must exactly match
-// proposeRefactor's non-unsupported-rule set for the same session state.
-test("CRITICAL agreement-invariant: findProposals actionable ↔ proposeRefactor non-unsupported-rule", () => {
+// proposeRefactor's non-refused set for the same session state (covers both
+// "unsupported-rule" and "conflict-not-executable" refusal reasons).
+test("CRITICAL agreement-invariant: findProposals actionable ↔ proposeRefactor non-refused (incl. conflict-not-executable)", () => {
 	const seFinding = makeSharedExtractionFinding("inv-se-fp");
+	const seConflictFinding = makeSharedExtractionConflictFinding("inv-se-conflict-fp");
 	const pdFinding = makeAdapterMetricFinding("inv-pd-fp", "Comp");
 	const unknownFinding = makeUnknownRuleFinding("inv-unk-fp");
 	const stubBuilder: ProposalBuilder = {
@@ -1874,7 +1925,7 @@ test("CRITICAL agreement-invariant: findProposals actionable ↔ proposeRefactor
 		config: DEFAULT_CONFIG,
 		registryFactory: () => {
 			const reg = new AnalyzerRegistry();
-			reg.register({ ruleId: "react/shared-extraction", framework: "react", analyze: () => [seFinding] });
+			reg.register({ ruleId: "react/shared-extraction", framework: "react", analyze: () => [seFinding, seConflictFinding] });
 			reg.register({ ruleId: "react/prop-drilling", framework: "react", analyze: () => [pdFinding] });
 			reg.register({ ruleId: "react/unknown-rule", framework: "react", analyze: () => [unknownFinding] });
 			return reg;
@@ -1886,25 +1937,30 @@ test("CRITICAL agreement-invariant: findProposals actionable ↔ proposeRefactor
 	const proposals = s.findProposals() as { actionable: Array<{ fingerprint: string }> };
 	const actionableFingerprints = new Set(proposals.actionable.map((a) => a.fingerprint));
 
-	// Every fingerprint findProposals calls actionable must be accepted by proposeRefactor
+	// Every fingerprint findProposals calls actionable must NOT be refused by proposeRefactor
 	for (const fp of actionableFingerprints) {
 		const result = s.proposeRefactor({ fingerprint: fp });
 		expect(result.status).not.toBe("refused");
-		if (result.status === "refused") {
-			expect((result as any).reason).not.toBe("unsupported-rule");
-		}
 	}
 
-	// Every fingerprint proposeRefactor accepts (not unsupported-rule) must be in actionable
-	const allFingerprints = ["inv-se-fp", "inv-pd-fp", "inv-unk-fp"];
+	// Every fingerprint proposeRefactor refuses (for ANY reason) must NOT be in actionable.
+	// Fingerprints proposeRefactor accepts must be in actionable.
+	const allFingerprints = ["inv-se-fp", "inv-se-conflict-fp", "inv-pd-fp", "inv-unk-fp"];
 	for (const fp of allFingerprints) {
 		const result = s.proposeRefactor({ fingerprint: fp });
-		if (result.status !== "refused" || (result as any).reason !== "unsupported-rule") {
-			// proposeRefactor accepts this → must be actionable
+		if (result.status !== "refused") {
+			// proposeRefactor accepts this → must be in actionable
 			expect(actionableFingerprints.has(fp)).toBe(true);
 		} else {
-			// proposeRefactor refuses with unsupported-rule → must NOT be actionable
+			// proposeRefactor refuses for ANY reason → must NOT be in actionable
 			expect(actionableFingerprints.has(fp)).toBe(false);
 		}
 	}
+
+	// Explicitly verify the conflict-typed finding is refused with conflict-not-executable
+	// and is absent from actionable (exercises the refusal direction the old test missed).
+	const conflictResult = s.proposeRefactor({ fingerprint: "inv-se-conflict-fp" });
+	expect(conflictResult.status).toBe("refused");
+	expect((conflictResult as any).reason).toBe("conflict-not-executable");
+	expect(actionableFingerprints.has("inv-se-conflict-fp")).toBe(false);
 });

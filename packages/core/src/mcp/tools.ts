@@ -248,7 +248,7 @@ export class Session {
       : this.lastPresented.filter((p) => p.status !== "suppressed");
 
     const actionable = pool
-      .filter((p) => this.isActionable(p.ruleId))
+      .filter((p) => this.isActionable(p))
       .filter((p) => opts?.ruleId === undefined || p.ruleId === opts.ruleId)
       .map((p) => {
         const subject = (p.evidence as { subject?: { name?: string } }).subject?.name;
@@ -403,9 +403,15 @@ export class Session {
     };
   }
 
-  /** Mirrors the actionability predicate in proposeRefactor (lines 224+229). */
-  private isActionable(ruleId: string): boolean {
-    return ruleId === SHARED_EXTRACTION_RULE_ID || (this.opts.proposalBuilders?.some((b) => b.ruleId === ruleId) ?? false);
+  /** Mirrors the actionability predicate in proposeRefactor (lines 224+229).
+   * For shared-extraction findings, conflict-typed findings are refused with
+   * "conflict-not-executable" by buildSharedExtractionProposal, so they are
+   * not actionable. Injected builders do not have this conflict-type guard. */
+  private isActionable(finding: { ruleId: string; type: FindingType }): boolean {
+    if (finding.ruleId === SHARED_EXTRACTION_RULE_ID) {
+      return finding.type !== "architectural-conflict";
+    }
+    return this.opts.proposalBuilders?.some((b) => b.ruleId === finding.ruleId) ?? false;
   }
 
   private findComponent(target: string): ComponentNode | null {
