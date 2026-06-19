@@ -1,7 +1,33 @@
 import { RULE_ID as SHARED_EXTRACTION_RULE_ID } from "../analyzers/shared-extraction.js";
-import type { Finding, SharedExtractionEvidence } from "../types.js";
+import type { Finding, PresentedFinding, SharedExtractionEvidence } from "../types.js";
 
 export type ProposalRefusalReason = "unsupported-rule" | "conflict-not-executable";
+
+// ── PreviewProposal — generic preview-only proposal envelope (no patch, no apply path) ──
+
+export interface PreviewProposal {
+  status: "preview";
+  kind: "preview-only";
+  fingerprint: string;
+  ruleId: string;
+  subject: { name: string; file: string; span: unknown };
+  observations: string[];
+  consider: string[];
+  limits: string[];
+  writeMode: "proposal-only";
+}
+
+// ── ProposalBuilder — injected factory interface (no React-specific types in core) ──
+
+export interface ProposalBuilderInput {
+  finding: PresentedFinding;
+  limits: string[];
+}
+
+export interface ProposalBuilder {
+  ruleId: string;
+  build(input: ProposalBuilderInput): PreviewProposal | { status: "refused"; reason: "unsupported-rule" };
+}
 export type ProposalRiskLevel = "low" | "medium" | "high";
 export type ProposalRiskReason =
   | "default-export-rewrite"

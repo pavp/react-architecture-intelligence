@@ -1,4 +1,4 @@
-import { type AnalyzerRegistry, createDefaultAnalyzerRegistry, type AnalysisDiagnostic, type Analyzer, type RegistryFactory, type SourceFile } from "@rai/core";
+import { type AnalyzerRegistry, createDefaultAnalyzerRegistry, type AnalysisDiagnostic, type Analyzer, type RegistryFactory, type SourceFile, type ProposalBuilder } from "@rai/core";
 
 const NEXT_ADAPTER_PACKAGE = "@rai/adapter-next";
 const REACT_ADAPTER_PACKAGE = "@rai/adapter-react";
@@ -8,6 +8,7 @@ type AdapterId = "next" | "react";
 export interface AdapterComposition {
   registryFactory: RegistryFactory;
   diagnostics: AnalysisDiagnostic[];
+  proposalBuilders: ProposalBuilder[];
 }
 
 interface NextAdapterModule {
@@ -16,6 +17,7 @@ interface NextAdapterModule {
 
 interface ReactAdapterModule {
   createReactCoreAnalyzers(input: { rootDir: string; files: SourceFile[] }): Analyzer[];
+  buildPropDrillingProposalBuilder?: () => ProposalBuilder;
 }
 
 interface InstalledAdapterDescriptor<TModule> {
@@ -23,6 +25,7 @@ interface InstalledAdapterDescriptor<TModule> {
   packageName: string;
   importAdapter: () => Promise<TModule>;
   createAnalyzers: (mod: TModule, input: { rootDir: string; files: SourceFile[] }) => Analyzer[];
+  collectProposalBuilders?: (mod: TModule) => ProposalBuilder[];
 }
 
 export interface LoadInstalledAdaptersInput {
@@ -37,18 +40,23 @@ export interface LoadInstalledAdaptersInput {
 export async function loadInstalledAdapters(input: LoadInstalledAdaptersInput): Promise<AdapterComposition> {
   const diagnostics: AnalysisDiagnostic[] = [];
   const createAnalyzers: ((input: { files: SourceFile[] }) => Analyzer[])[] = [];
+  const proposalBuilders: ProposalBuilder[] = [];
 
   for (const descriptor of adapterDescriptors(input)) {
     try {
       const mod = await descriptor.importAdapter();
       createAnalyzers.push(({ files }) => descriptor.createAnalyzers(mod, { rootDir: input.rootDir, files }));
+      if (descriptor.collectProposalBuilders) {
+        proposalBuilders.push(...descriptor.collectProposalBuilders(mod));
+      }
+
     } catch (error) {
       if (isModuleNotFound(error, descriptor.packageName)) continue;
       diagnostics.push(adapterLoadDiagnostic(descriptor.adapterId, descriptor.packageName, error));
     }
   }
 
-  return { diagnostics, registryFactory: composeRegistryFactory({ createAnalyzers }) };
+  return { diagnostics, registryFactory: composeRegistryFactory({ createAnalyzers }), proposalBuilders };
 }
 
 function adapterDescriptors(input: LoadInstalledAdaptersInput): InstalledAdapterDescriptor<NextAdapterModule | ReactAdapterModule>[] {
@@ -64,6 +72,12 @@ function adapterDescriptors(input: LoadInstalledAdaptersInput): InstalledAdapter
       packageName: REACT_ADAPTER_PACKAGE,
       importAdapter: input.importers?.react ?? importReactAdapter,
       createAnalyzers: (mod, analyzerInput) => (mod as ReactAdapterModule).createReactCoreAnalyzers(analyzerInput),
+      collectProposalBuilders: (mod) => {
+        const reactMod = mod as ReactAdapterModule;
+        return typeof reactMod.buildPropDrillingProposalBuilder === "function"
+          ? [reactMod.buildPropDrillingProposalBuilder()]
+          : [];
+      },
     },
   ];
 }

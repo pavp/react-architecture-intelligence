@@ -104,6 +104,42 @@ test("@rai/cli declares the React adapter as a workspace dependency", () => {
   expect(pkg.dependencies["@rai/adapter-react"]).toBe("workspace:*");
 });
 
+// ─── Phase 4 RED: proposalBuilders wiring at composition root ─────────────────
+
+test("loadInstalledAdapters includes proposalBuilders with a react/prop-drilling builder when react adapter loads", async () => {
+  const reactAnalyzer: Analyzer = { ruleId: "react/test", framework: "react", analyze: () => [] };
+  const stubBuilder = { ruleId: "react/prop-drilling", build: () => ({ status: "refused" as const, reason: "unsupported-rule" as const }) };
+  const composition = await loadInstalledAdapters({
+    rootDir: ".",
+    importers: {
+      react: async () => ({
+        createReactCoreAnalyzers: () => [reactAnalyzer],
+        buildPropDrillingProposalBuilder: () => stubBuilder,
+      }),
+    },
+  });
+
+  expect(composition.proposalBuilders).toBeDefined();
+  expect(Array.isArray(composition.proposalBuilders)).toBe(true);
+  const ruleIds = (composition.proposalBuilders ?? []).map((b: { ruleId: string }) => b.ruleId);
+  expect(ruleIds).toContain("react/prop-drilling");
+});
+
+test("loadInstalledAdapters provides empty proposalBuilders when react adapter unavailable", async () => {
+  const composition = await loadInstalledAdapters({
+    rootDir: ".",
+    importers: {
+      react: async () => {
+        throw Object.assign(new Error("Cannot find package '@rai/adapter-react'"), { code: "ERR_MODULE_NOT_FOUND" });
+      },
+    },
+  });
+
+  // proposalBuilders may be empty or absent; it MUST NOT contain react/prop-drilling
+  const ruleIds = (composition.proposalBuilders ?? []).map((b: { ruleId: string }) => b.ruleId);
+  expect(ruleIds).not.toContain("react/prop-drilling");
+});
+
 test("composeRegistryFactory keeps baseline analyzers and appends adapter analyzers per file set", () => {
   const seen: number[] = [];
   const adapterAnalyzer: Analyzer = { ruleId: "next/dynamic", framework: "next", analyze: () => [] };
