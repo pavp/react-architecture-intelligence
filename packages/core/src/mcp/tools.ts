@@ -83,6 +83,10 @@ export type DriftResult =
   | { status: "unknown_commit"; commit: string; message: string }
   | { status: "insufficient_history"; snapshotCount: number; requiredSnapshots: 2; added: []; removed: []; message: string };
 
+const UNKNOWN_TARGET_HINT =
+  "Target accepts a component name or a node id of the form {file}#N. " +
+  "To enumerate valid targets in the current analysis, call raw_graph_query with 'MATCH nodes'.";
+
 const QUERY_ARCHITECTURE_QUESTIONS = ["renders", "rendered-by", "fan-in", "fan-out", "reachability"] as const;
 type QueryArchitectureQuestion = typeof QUERY_ARCHITECTURE_QUESTIONS[number];
 const MAX_QUERY_ARCHITECTURE_DEPTH = 5;
@@ -112,7 +116,7 @@ export type QueryArchitectureResult =
   | { status: "ok"; answer: Record<string, unknown>; nodes: NodeRef[]; edges: EdgeRef[] }
   | { status: "no_analysis"; message: string }
   | { status: "unknown_question"; question: string; validQuestions: QueryArchitectureQuestion[] }
-  | { status: "unknown_target"; target: string };
+  | { status: "unknown_target"; target: string; hint: string };
 
 export interface GetNodeInput {
   fingerprint?: string | undefined;
@@ -136,7 +140,7 @@ export interface RawGraphQueryInput {
 }
 
 export type RawGraphQueryResult =
-  | { status: "ok"; rows: unknown[]; truncated: boolean }
+  | { status: "ok"; rows: unknown[]; truncated: boolean; total: number }
   | { status: "no_analysis"; message: string }
   | { status: "unsupported_query"; supportedQueries: RawGraphQueryKind[] };
 
@@ -311,7 +315,7 @@ export class Session {
     }
 
     const target = this.findComponent(input.target);
-    if (!target) return { status: "unknown_target", target: input.target };
+    if (!target) return { status: "unknown_target", target: input.target, hint: UNKNOWN_TARGET_HINT };
 
     const edges = this.renderEdges();
     if (input.question === "renders") return this.renderChildren(target, edges);
@@ -350,7 +354,8 @@ export class Session {
 
     const limit = normalizeRawGraphLimit(input.limit);
     const rows = query === "nodes" ? this.rawNodeRows() : this.rawEdgeRows();
-    return { status: "ok", rows: rows.slice(0, limit), truncated: rows.length > limit };
+    const total = rows.length;
+    return { status: "ok", rows: rows.slice(0, limit), truncated: total > limit, total };
   }
 
   hasSnapshot(commitSha: string): boolean {

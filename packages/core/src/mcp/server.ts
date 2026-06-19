@@ -140,7 +140,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("get_drift");
 
-  server.tool("query_architecture", "Answer bounded graph questions from the latest analyzed repo graph.",
+  server.tool("query_architecture", "Answer bounded graph questions from the latest analysis. question is one of: renders, rendered-by, fan-in, fan-out, reachability. target is a component name or a node id of the form {file}#N; enumerate valid targets via raw_graph_query 'MATCH nodes'. depth (optional) bounds reachability up to 5.",
     {
       question: z.string(),
       target: z.string(),
@@ -168,7 +168,7 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("get_node");
 
-  server.tool("raw_graph_query", "Return bounded allowlisted graph rows from the latest analyzed repo graph.",
+  server.tool("raw_graph_query", "Return allowlisted graph rows from the latest analysis. cypherLike accepts 'MATCH nodes' or 'MATCH edges'. Rows are capped at 100 (limit is clamped to 1..100); results include truncated:boolean and total:number (full pre-slice count) so you can tell how many rows exist. 'MATCH nodes' is the enumeration path for valid query_architecture targets.",
     {
       cypherLike: z.string(),
       limit: z.number(),
