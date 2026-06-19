@@ -21,7 +21,7 @@ Latest release verification after P8:
 
 ```bash
 pnpm release:check   # status: pass, 0 failures (run release-config-check.ts directly if pnpm pre-hook is blocked locally)
-pnpm test       # 79 files / 764 tests (post-P16-S1 baseline; v0.2.0 baseline was 78 files / 719 tests)
+pnpm test       # 79 files / 767 tests (post-P16-S1 remediation baseline; v0.2.0 baseline was 78 files / 719 tests)
 pnpm typecheck
 pnpm build
 pnpm lint

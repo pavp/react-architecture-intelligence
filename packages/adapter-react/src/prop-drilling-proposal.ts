@@ -23,6 +23,10 @@ export function buildPropDrillingProposalBuilder(): ProposalBuilder {
         return { status: "refused", reason: "unsupported-rule" };
       }
 
+      // S-1: guard against evidence kind mismatch — do not cast blindly
+      if (finding.evidence.kind !== "adapter-metric") {
+        return { status: "refused", reason: "unsupported-rule" };
+      }
       const evidence = finding.evidence as AdapterMetricEvidence;
       const drilledProps = roleVariants(evidence, "drilled-prop").sort();
       const upstreamSources = roleVariants(evidence, "upstream-source");
@@ -32,12 +36,16 @@ export function buildPropDrillingProposalBuilder(): ProposalBuilder {
       const downstreamRole = downstreamTargets[0] ?? "unknown";
 
       const propList = drilledProps.join(", ");
+      const propCount = evidence.metrics["propCount"];
       const observations: string[] = [
         drilledProps.length === 1
           ? `${evidence.subject.name} forwards prop "${drilledProps[0]}" through its interface without appearing to transform it.`
           : `${evidence.subject.name} forwards ${drilledProps.length} props (${propList}) through its interface without appearing to transform them.`,
         `Upstream source: ${upstreamRole}. Downstream target: ${downstreamRole}.`,
-        `Total props declared: ${evidence.metrics["propCount"] ?? "unknown"}. Drilled props detected: ${drilledProps.length}.`,
+        // S-2: only include propCount when the metric is present (never render literal "unknown")
+        ...(typeof propCount === "number"
+          ? [`Total props declared: ${propCount}. Drilled props detected: ${drilledProps.length}.`]
+          : [`Drilled props detected: ${drilledProps.length}.`]),
       ];
 
       const proposal: PreviewProposal & { drilledProps: string[]; upstreamRole: string; downstreamRole: string } = {

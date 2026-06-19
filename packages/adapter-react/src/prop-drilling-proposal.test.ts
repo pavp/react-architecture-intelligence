@@ -267,4 +267,59 @@ describe("buildPropDrillingProposalBuilder", () => {
 			expect((result as any).varianceParameters).toBeUndefined();
 		});
 	});
+
+	// S-1: evidence kind guard — must refuse (not crash) when evidence.kind is not adapter-metric
+	describe("S-1: evidence kind guard", () => {
+		test("refuses when evidence.kind is not adapter-metric (returns refused unsupported-rule, does not throw)", () => {
+			const builder = buildPropDrillingProposalBuilder();
+			const input = makePropDrillingInput();
+			const wrongEvidenceInput: ProposalBuilderInput = {
+				...input,
+				finding: {
+					...input.finding,
+					evidence: {
+						// Evidence with a different kind (shared-extraction)
+						kind: "shared-extraction",
+						instances: [],
+						cosine: 1,
+						propOverlap: 1,
+						hookOverlap: 1,
+						variancePoints: [],
+						sharedSurface: [],
+					} as any,
+				},
+			};
+
+			expect(() => builder.build(wrongEvidenceInput)).not.toThrow();
+			const result = builder.build(wrongEvidenceInput);
+			expect(result.status).toBe("refused");
+			expect((result as any).reason).toBe("unsupported-rule");
+		});
+	});
+
+	// S-2: propCount absent — observations must omit the field rather than rendering "unknown"
+	describe("S-2: absent propCount omitted from observations", () => {
+		test("observations do not contain literal 'unknown' when metrics.propCount is absent", () => {
+			const builder = buildPropDrillingProposalBuilder();
+			const input = makePropDrillingInput();
+			// Remove propCount from metrics
+			const noPropCountInput: ProposalBuilderInput = {
+				...input,
+				finding: {
+					...input.finding,
+					evidence: {
+						...input.finding.evidence as any,
+						metrics: { drilledProps: 1, upstreamSources: 1, downstreamTargets: 1 },
+					},
+				},
+			};
+
+			const result = builder.build(noPropCountInput);
+
+			expect(result.status).toBe("preview");
+			if (result.status !== "preview") throw new Error("expected preview");
+			const joined = result.observations.join(" ");
+			expect(joined).not.toContain("unknown");
+		});
+	});
 });
