@@ -216,7 +216,25 @@ test("queryArchitecture refuses unknown targets", () => {
 
 	const r = s.queryArchitecture({ question: "renders", target: "Missing" });
 
-	expect(r).toEqual({ status: "unknown_target", target: "Missing" });
+	expect(r).toEqual({
+		status: "unknown_target",
+		target: "Missing",
+		hint: "Target accepts a component name or a node id of the form {file}#N. To enumerate valid targets in the current analysis, call raw_graph_query with 'MATCH nodes'.",
+	});
+});
+
+test("queryArchitecture unknown_target hint names raw_graph_query and MATCH nodes", () => {
+	const s = createSession({ config: DEFAULT_CONFIG });
+	s.analyzeRepo({ files: graphFiles, asOf: 0 });
+
+	const r = s.queryArchitecture({ question: "renders", target: "Missing" });
+
+	expect(r.status).toBe("unknown_target");
+	if (r.status !== "unknown_target") throw new Error("expected unknown_target");
+	expect(typeof r.hint).toBe("string");
+	expect(r.hint.length).toBeGreaterThan(0);
+	expect(r.hint).toContain("raw_graph_query");
+	expect(r.hint).toContain("MATCH nodes");
 });
 
 test("getNode requires a prior analysis", () => {
