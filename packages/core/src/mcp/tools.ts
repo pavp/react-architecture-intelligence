@@ -145,6 +145,10 @@ export type ProposeRefactorResult =
   | PreviewProposal
   | { status: "refused"; reason: "unknown-current-finding" | "suppressed-finding" | "unsupported-rule" };
 
+export type FindProposalsResult =
+  | { actionable: Array<{ fingerprint: string; ruleId: string; subject?: string }>; count: number }
+  | { status: "no_analysis"; message: string };
+
 export type ApplyRefactorResult =
   | ApplyPipelineResult
   | DryRunPatchPreview
@@ -232,6 +236,32 @@ export class Session {
     // Limits flow from the analyzer's explain hook via the existing registry seam — no React import needed.
     const limits = this.lastRegistry?.get(finding.ruleId)?.explain?.(finding)?.limits ?? [];
     return builder.build({ finding, limits });
+  }
+
+  // ── find_proposals (P16-S2) — read-only actionable-finding discovery ──────
+  findProposals(opts?: { ruleId?: string | undefined; includeSuppressed?: boolean | undefined }): FindProposalsResult {
+    if (!this.lastPresented.length) {
+      return { status: "no_analysis", message: "run analyze_repo before find_proposals" };
+    }
+    const pool = opts?.includeSuppressed
+      ? this.lastPresented
+      : this.lastPresented.filter((p) => p.status !== "suppressed");
+
+    const actionable = pool
+      .filter((p) => this.isActionable(p))
+      .filter((p) => opts?.ruleId === undefined || p.ruleId === opts.ruleId)
+      .map((p) => {
+        const subject = (p.evidence as { subject?: { name?: string } }).subject?.name;
+        const entry: { fingerprint: string; ruleId: string; subject?: string } = {
+          fingerprint: p.fingerprint.structural,
+          ruleId: p.ruleId,
+        };
+        if (subject !== undefined) entry.subject = subject;
+        return entry;
+      })
+      .sort((a, b) => a.fingerprint.localeCompare(b.fingerprint) || a.ruleId.localeCompare(b.ruleId));
+
+    return { actionable, count: actionable.length };
   }
 
   // ── apply_refactor (P5 Slice 5b2) — gated mutation through injected workspace ──
@@ -371,6 +401,17 @@ export class Session {
       results,
       ...(input.summary !== undefined ? { summary: input.summary } : {}),
     };
+  }
+
+  /** Mirrors the actionability predicate in proposeRefactor (lines 224+229).
+   * For shared-extraction findings, conflict-typed findings are refused with
+   * "conflict-not-executable" by buildSharedExtractionProposal, so they are
+   * not actionable. Injected builders do not have this conflict-type guard. */
+  private isActionable(finding: { ruleId: string; type: FindingType }): boolean {
+    if (finding.ruleId === SHARED_EXTRACTION_RULE_ID) {
+      return finding.type !== "architectural-conflict";
+    }
+    return this.opts.proposalBuilders?.some((b) => b.ruleId === finding.ruleId) ?? false;
   }
 
   private findComponent(target: string): ComponentNode | null {

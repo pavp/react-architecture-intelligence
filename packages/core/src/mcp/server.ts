@@ -179,6 +179,17 @@ export function buildMcpServer(opts: McpServerOpts): { server: McpServer; sessio
     });
   toolNames.push("raw_graph_query");
 
+  server.tool("find_proposals", "List actionable findings: those with a registered proposal builder, or non-conflict shared-extraction findings. Conflict-typed shared-extraction findings are excluded. Read-only — no mutations.",
+    {
+      ruleId: z.string().optional(),
+      includeSuppressed: z.boolean().optional(),
+    },
+    async (args) => {
+      const r = session.findProposals(args);
+      return { content: [{ type: "text", text: JSON.stringify(r, null, 2) }] };
+    });
+  toolNames.push("find_proposals");
+
   return { server, session, toolNames };
 }
 
