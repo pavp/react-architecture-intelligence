@@ -136,7 +136,7 @@ export interface RawGraphQueryInput {
 }
 
 export type RawGraphQueryResult =
-  | { status: "ok"; rows: unknown[]; truncated: boolean }
+  | { status: "ok"; rows: unknown[]; truncated: boolean; total: number }
   | { status: "no_analysis"; message: string }
   | { status: "unsupported_query"; supportedQueries: RawGraphQueryKind[] };
 
@@ -350,7 +350,8 @@ export class Session {
 
     const limit = normalizeRawGraphLimit(input.limit);
     const rows = query === "nodes" ? this.rawNodeRows() : this.rawEdgeRows();
-    return { status: "ok", rows: rows.slice(0, limit), truncated: rows.length > limit };
+    const total = rows.length;
+    return { status: "ok", rows: rows.slice(0, limit), truncated: total > limit, total };
   }
 
   hasSnapshot(commitSha: string): boolean {

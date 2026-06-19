@@ -322,6 +322,20 @@ test("rawGraphQuery returns bounded graph rows with truncation", () => {
 	if (r.status !== "ok") throw new Error("expected raw graph query to succeed");
 	expect(r.rows).toHaveLength(1);
 	expect(r.truncated).toBe(true);
+	// total must be pre-slice: strict > proves we have more rows than were returned
+	expect(r.total).toBeGreaterThan(r.rows.length);
+});
+
+test("rawGraphQuery total equals returned count when not truncated", () => {
+	const s = createSession({ config: DEFAULT_CONFIG });
+	s.analyzeRepo({ files: graphFiles, asOf: 0 });
+
+	const r = s.rawGraphQuery({ cypherLike: "MATCH edges", limit: 100 });
+
+	expect(r.status).toBe("ok");
+	if (r.status !== "ok") throw new Error("expected raw graph query to succeed");
+	expect(r.truncated).toBe(false);
+	expect(r.total).toBe(r.rows.length);
 });
 
 test("analyze_repo returns diagnostic count and details for partial analyzer failure", () => {
