@@ -46,6 +46,30 @@ test("explain_finding description promises bounded explanation plus raw evidence
   expect(registeredTool?.description).toContain("raw evidence");
 });
 
+test("analyze_repo description says run-first and populate current analysis", () => {
+  const { server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
+  const registeredTool = (server as any)._registeredTools?.["analyze_repo"];
+
+  expect(registeredTool?.description).toContain("Run this first");
+  expect(registeredTool?.description).toContain("populate the current analysis");
+});
+
+test("find_proposals description says run analyze_repo first and use before propose_refactor", () => {
+  const { server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
+  const registeredTool = (server as any)._registeredTools?.["find_proposals"];
+
+  expect(registeredTool?.description).toContain("Run analyze_repo first");
+  expect(registeredTool?.description).toContain("use before propose_refactor");
+});
+
+test("propose_refactor description mentions unknown-current-finding and find_proposals or find_shared_opportunities", () => {
+  const { server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
+  const registeredTool = (server as any)._registeredTools?.["propose_refactor"];
+
+  expect(registeredTool?.description).toContain("unknown-current-finding");
+  expect(registeredTool?.description).toContain("find_proposals or find_shared_opportunities");
+});
+
 test("get_node MCP schema avoids tuple byteRange for opencode compatibility", async () => {
   const { session, server } = buildMcpServer({ config: DEFAULT_CONFIG, rootDir: process.cwd() });
   const registeredTool = (server as any)._registeredTools?.["get_node"];
