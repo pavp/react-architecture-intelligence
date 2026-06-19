@@ -160,7 +160,7 @@ export function formatInstallResult(payload: { status: string; operations: Array
 export async function buildCliMcpServer(dir: string) {
   const config = resolveConfig(loadProjectConfig(dir));
   const adapters = await loadInstalledAdapters({ rootDir: dir });
-  return buildMcpServer({ config, rootDir: dir, registryFactory: ({ files }) => adapters.registryFactory({ files: files.length > 0 ? files : readSources(dir) }) });
+  return buildMcpServer({ config, rootDir: dir, registryFactory: ({ files }) => adapters.registryFactory({ files: files.length > 0 ? files : readSources(dir) }), proposalBuilders: adapters.proposalBuilders });
 }
 
 export interface CalibrateResult {
@@ -400,7 +400,7 @@ async function runInner(argv: string[]): Promise<number> {
     }
     case "mcp": {
       const adapters = await loadInstalledAdapters({ rootDir: dir });
-      await serveStdio({ config: resolveConfig(loadProjectConfig(dir)), rootDir: dir, registryFactory: adapters.registryFactory });
+      await serveStdio({ config: resolveConfig(loadProjectConfig(dir)), rootDir: dir, registryFactory: adapters.registryFactory, proposalBuilders: adapters.proposalBuilders });
       return 0; // serveStdio resolves only when the transport closes
     }
     case "backfill": {
